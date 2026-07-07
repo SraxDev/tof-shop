@@ -73,7 +73,7 @@ export default function Brands() {
   const { ref, isInView } = useInView(0.05);
 
   return (
-    <section id="marques" className="py-20 lg:py-28 bg-white" ref={ref}>
+    <section id="marques" className="py-14 sm:py-20 lg:py-28 bg-white" ref={ref}>
       <div className="mx-auto max-w-6xl px-5">
         <div className="text-center mb-14">
           <h2 className="font-display text-4xl sm:text-5xl font-800 tracking-tight text-dark">
@@ -82,17 +82,17 @@ export default function Brands() {
           <p className="mt-3 text-dark/40">les logos des marques les plus demandees</p>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
           {brands.map((brand, i) => (
             <div
               key={brand.name}
-              className={`group relative min-h-32 overflow-hidden rounded-2xl bg-bg border border-dark/5 cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:bg-dark hover:shadow-xl hover:shadow-dark/10 ${
+              className={`group relative min-h-24 sm:min-h-32 overflow-hidden rounded-2xl bg-bg border border-dark/5 cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:bg-dark hover:shadow-xl hover:shadow-dark/10 ${
                 isInView ? 'anim-fade-up opacity-0' : 'opacity-0'
               }`}
               style={{ animationDelay: `${i * 0.04}s` }}
             >
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(232,77,26,0.12),transparent_45%)] opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="relative h-full min-h-32 flex items-center justify-center px-5 py-6 text-center">
+              <div className="relative h-full min-h-24 sm:min-h-32 flex items-center justify-center px-3 sm:px-5 py-4 sm:py-6 text-center">
                 <BrandLogo brand={brand} />
               </div>
             </div>

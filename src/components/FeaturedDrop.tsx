@@ -77,7 +77,7 @@ export default function FeaturedDrop() {
   const sizes = drop.sizes.split(',').map((size) => size.trim()).filter(Boolean);
 
   return (
-    <section className="py-20 lg:py-28 bg-dark text-white" ref={ref}>
+    <section className="py-14 sm:py-20 lg:py-28 bg-dark text-white" ref={ref}>
       <div className="mx-auto max-w-6xl px-5">
         <div
           className={`grid lg:grid-cols-2 gap-10 lg:gap-16 items-center ${

@@ -18,7 +18,7 @@ export default function CTA() {
   }, []);
 
   return (
-    <section className="py-20 lg:py-28 bg-bg" ref={ref}>
+    <section className="py-14 sm:py-20 lg:py-28 bg-bg" ref={ref}>
       <div className="mx-auto max-w-6xl px-5">
         <div
           className={`relative bg-dark rounded-3xl overflow-hidden px-8 py-16 sm:px-14 sm:py-20 text-center ${

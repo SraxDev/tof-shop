@@ -18,7 +18,7 @@ export default function Contact() {
   }, []);
 
   return (
-    <section id="contact" className="py-20 lg:py-28 bg-bg" ref={ref}>
+    <section id="contact" className="py-14 sm:py-20 lg:py-28 bg-bg" ref={ref}>
       <div className="mx-auto max-w-4xl px-5">
         <div className={`text-center mb-12 ${isInView ? 'anim-fade-up opacity-0' : 'opacity-0'}`}>
           <h2 className="font-display text-4xl sm:text-5xl font-800 tracking-tight text-dark flex items-center justify-center gap-3">

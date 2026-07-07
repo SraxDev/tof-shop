@@ -23,7 +23,7 @@ export default function WhyUs() {
   const { ref, isInView } = useInView(0.1);
 
   return (
-    <section id="apropos" className="py-20 lg:py-28 bg-bg" ref={ref}>
+    <section id="apropos" className="py-14 sm:py-20 lg:py-28 bg-bg" ref={ref}>
       <div className="mx-auto max-w-6xl px-5">
         <div className="text-center mb-14">
           <h2 className="font-display text-4xl sm:text-5xl font-800 tracking-tight text-dark flex items-center justify-center gap-3">

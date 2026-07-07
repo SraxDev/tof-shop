@@ -122,7 +122,7 @@ export default function Products() {
   const quickColors = quickAdd ? parseSplit(quickAdd.colors) : [];
 
   return (
-    <section id="shop" className="py-20 lg:py-28 bg-bg" ref={ref}>
+    <section id="shop" className="py-14 sm:py-20 lg:py-28 bg-bg" ref={ref}>
       <div className="mx-auto max-w-6xl px-5">
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5 mb-10">
           <div>
@@ -146,7 +146,7 @@ export default function Products() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-5">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5">
           {visibleProducts.map((p, i) => (
             <div
               key={p.id}
@@ -181,10 +181,7 @@ export default function Products() {
                 <span className="text-[11px] font-semibold text-accent uppercase tracking-wide">{p.brand}</span>
                 <h3 className="text-sm font-medium text-dark/80 mt-0.5 leading-snug">{p.name}</h3>
                 <span className="text-sm font-bold text-dark mt-1 block">{formatPrice(p.salePrice)}</span>
-                <span className="text-[11px] text-dark/35 mt-1 block">Paiement via WhatsApp</span>
-                <span className="mt-2 inline-flex sm:hidden rounded-full bg-dark px-4 py-2 text-xs font-bold text-white items-center gap-1.5">
-                  <ShoppingBag size={12} /> Ajouter
-                </span>
+                <span className="text-[11px] text-dark/35 mt-0.5 block">Paiement via WhatsApp</span>
               </button>
             </div>
           ))}

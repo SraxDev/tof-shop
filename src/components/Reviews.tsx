@@ -44,7 +44,7 @@ export default function Reviews() {
   const { ref, isInView } = useInView(0.1);
 
   return (
-    <section className="py-20 lg:py-28 bg-white" ref={ref}>
+    <section className="py-14 sm:py-20 lg:py-28 bg-white" ref={ref}>
       <div className="mx-auto max-w-6xl px-5">
         <div className="text-center mb-14">
           <h2 className="font-display text-4xl sm:text-5xl font-800 tracking-tight text-dark">
@@ -53,7 +53,7 @@ export default function Reviews() {
           <p className="mt-3 text-dark/40">des retours clients simples, pas des phrases robot</p>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {reviews.map((r, i) => (
             <div
               key={r.name}

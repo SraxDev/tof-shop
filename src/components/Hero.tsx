@@ -41,7 +41,7 @@ export default function Hero() {
               </span>
             </div>
 
-            <h1 className="anim-fade-up opacity-0 delay-200 font-display text-5xl sm:text-6xl lg:text-7xl font-800 leading-[0.95] tracking-tight text-dark">
+            <h1 className="anim-fade-up opacity-0 delay-200 font-display text-4xl sm:text-6xl lg:text-7xl font-800 leading-[0.95] tracking-tight text-dark">
               {settings.heroTitleStart}{' '}
               <span className="relative inline-block">
                 {settings.heroTitleHighlight}
@@ -76,9 +76,9 @@ export default function Hero() {
             </div>
 
             {/* Mini trust */}
-            <div className="anim-fade-up opacity-0 delay-700 flex items-center gap-5 pt-2 text-sm text-dark/35">
-              <span className="flex items-center gap-1.5">✓ Livraison rapide</span>
-              <span className="flex items-center gap-1.5">✓ Retours gratuits</span>
+            <div className="anim-fade-up opacity-0 delay-700 flex items-center gap-3 sm:gap-5 pt-2 text-xs sm:text-sm text-dark/35">
+              <span className="flex items-center gap-1.5">✓ Livraison suivie</span>
+              <span className="flex items-center gap-1.5">✓ Paiement WhatsApp</span>
             </div>
           </div>
 
@@ -128,7 +128,7 @@ export default function Hero() {
       </div>
 
       {/* Scroll */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2">
+      <div className="absolute bottom-8 sm:bottom-6 left-1/2 -translate-x-1/2 hidden sm:block">
         <ArrowDown size={18} className="text-dark/20 animate-bounce" />
       </div>
     </section>
