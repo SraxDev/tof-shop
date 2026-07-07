@@ -104,6 +104,30 @@ export async function saveSettings(value: DbSettings) {
   window.dispatchEvent(new CustomEvent('tof-settings-updated'));
 }
 
+// ─── Notes ───────────────────────────────────────────────
+
+export type DbNote = {
+  id: string;
+  text: string;
+  category: string;
+  done: boolean;
+  priority: number;
+  created_at?: string;
+};
+
+export async function fetchNotes(): Promise<DbNote[]> {
+  const { data } = await supabase.from('notes').select('*').order('priority', { ascending: true }).order('created_at', { ascending: false });
+  return (data as DbNote[]) || [];
+}
+
+export async function upsertNote(note: DbNote) {
+  await supabase.from('notes').upsert(note);
+}
+
+export async function deleteNote(id: string) {
+  await supabase.from('notes').delete().eq('id', id);
+}
+
 // ─── Drop ────────────────────────────────────────────────
 
 export async function fetchDrop(): Promise<DbDrop | null> {

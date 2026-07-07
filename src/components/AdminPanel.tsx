@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Copy, ExternalLink, Package, Pencil, Plus, Save, Trash2, Truck } from 'lucide-react';
 import { defaultDrop, type FeaturedDropConfig } from './FeaturedDrop';
 import { defaultSettings, readSiteSettings, saveSiteSettings, hydrateSiteSettings, type SiteSettings } from '../lib/siteSettings';
-import { fetchProducts, upsertProduct, deleteProduct as dbDeleteProduct, fetchOrders, updateOrder, insertOrder as dbInsertOrder, fetchDrop, saveDrop as dbSaveDrop, type DbProduct, type DbOrder, type DbDrop } from '../lib/db';
+import { fetchProducts, upsertProduct, deleteProduct as dbDeleteProduct, fetchOrders, updateOrder, insertOrder as dbInsertOrder, fetchDrop, saveDrop as dbSaveDrop, fetchNotes, upsertNote, deleteNote as dbDeleteNote, type DbProduct, type DbOrder, type DbDrop, type DbNote } from '../lib/db';
 import { showToast } from './Toast';
 
 type Product = {
@@ -300,7 +300,10 @@ export default function AdminPanel() {
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'products' | 'drop' | 'settings' | 'estimate'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'products' | 'drop' | 'settings' | 'estimate' | 'notes'>('dashboard');
+  const [notes, setNotes] = useState<DbNote[]>([]);
+  const [noteFilter, setNoteFilter] = useState<'all' | 'idea' | 'todo' | 'urgent' | 'done'>('all');
+  const [newNote, setNewNote] = useState({ text: '', category: 'todo' });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftProduct, setDraftProduct] = useState<Product | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -350,11 +353,12 @@ export default function AdminPanel() {
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [dbProds, dbOrds, dbDr] = await Promise.all([fetchProducts(), fetchOrders(), fetchDrop()]);
+      const [dbProds, dbOrds, dbDr, dbNotes] = await Promise.all([fetchProducts(), fetchOrders(), fetchDrop(), fetchNotes()]);
       await hydrateSiteSettings();
       setProducts(dbProds.map(dbToProduct).map(normalizedProduct));
       setOrders(dbOrds.map(dbToOrder));
       if (dbDr) setDropDraft(dbToDrop(dbDr));
+      setNotes(dbNotes);
       setSiteSettings(readSiteSettings());
     } catch (e) { console.error('load error', e); }
     setLoading(false);
@@ -405,6 +409,51 @@ export default function AdminPanel() {
       setDropDraft({ ...dropDraft, imageUrl: String(reader.result) });
     };
     reader.readAsDataURL(file);
+  };
+
+  const addNote = async () => {
+    if (!newNote.text.trim()) return;
+    const note: DbNote = {
+      id: `n${Date.now()}`,
+      text: newNote.text.trim(),
+      category: newNote.category,
+      done: false,
+      priority: newNote.category === 'urgent' ? 0 : newNote.category === 'todo' ? 1 : 2,
+    };
+    await upsertNote(note);
+    setNotes((prev) => [note, ...prev]);
+    setNewNote({ text: '', category: 'todo' });
+    showToast('Note ajoutée ✓');
+  };
+
+  const toggleNoteDone = async (note: DbNote) => {
+    const updated = { ...note, done: !note.done, category: !note.done ? 'done' : 'todo' };
+    await upsertNote(updated);
+    setNotes((prev) => prev.map((n) => n.id === note.id ? updated : n));
+    showToast(updated.done ? 'Marqué comme fait ✓' : 'Remis en cours');
+  };
+
+  const removeNote = async (id: string) => {
+    await dbDeleteNote(id);
+    setNotes((prev) => prev.filter((n) => n.id !== id));
+    showToast('Note supprimée ✓');
+  };
+
+  const filteredNotes = notes.filter((n) => {
+    if (noteFilter === 'all') return true;
+    if (noteFilter === 'done') return n.done;
+    if (noteFilter === 'idea') return n.category === 'idea' && !n.done;
+    if (noteFilter === 'todo') return n.category === 'todo' && !n.done;
+    if (noteFilter === 'urgent') return n.category === 'urgent' && !n.done;
+    return true;
+  });
+
+  const noteStats = {
+    total: notes.length,
+    done: notes.filter((n) => n.done).length,
+    urgent: notes.filter((n) => n.category === 'urgent' && !n.done).length,
+    todo: notes.filter((n) => n.category === 'todo' && !n.done).length,
+    idea: notes.filter((n) => n.category === 'idea' && !n.done).length,
   };
 
   const saveSettings = async () => {
@@ -642,6 +691,7 @@ export default function AdminPanel() {
             { id: 'products', label: 'Produits & liens' },
             { id: 'drop', label: 'Drop semaine' },
             { id: 'settings', label: 'Réglages' },
+            { id: 'notes', label: 'Notes & idées' },
             { id: 'estimate', label: 'Estimation livraison' },
           ].map((tab) => (
             <button
@@ -1364,6 +1414,142 @@ export default function AdminPanel() {
                 <a href={siteSettings.whatsappUrl} className="block rounded-xl bg-[#25D366]/10 px-4 py-3 font-bold text-[#25D366]">Tester WhatsApp →</a>
                 <a href={siteSettings.snapchatUrl} className="block rounded-xl bg-[#FFFC00]/10 px-4 py-3 font-bold text-[#FFFC00]">Tester Snap →</a>
                 <a href={siteSettings.paypalUrl} className="block rounded-xl bg-white/5 px-4 py-3 font-bold text-white/55">Tester PayPal →</a>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'notes' && (
+          <div className="space-y-5">
+            {/* Stats */}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-3">
+              {[
+                { label: 'Total', value: noteStats.total, filter: 'all' as const, color: 'bg-white/5' },
+                { label: 'Urgent', value: noteStats.urgent, filter: 'urgent' as const, color: 'bg-red-500/10' },
+                { label: 'À faire', value: noteStats.todo, filter: 'todo' as const, color: 'bg-amber-400/10' },
+                { label: 'Idées', value: noteStats.idea, filter: 'idea' as const, color: 'bg-blue-400/10' },
+                { label: 'Fait', value: noteStats.done, filter: 'done' as const, color: 'bg-green-500/10' },
+              ].map((s) => (
+                <button
+                  key={s.label}
+                  onClick={() => setNoteFilter(s.filter)}
+                  className={`rounded-2xl p-3 sm:p-4 text-center transition-all ${s.color} border ${noteFilter === s.filter ? 'border-accent' : 'border-white/10'}`}
+                >
+                  <div className="text-xl sm:text-2xl font-800 text-white">{s.value}</div>
+                  <div className="text-[10px] sm:text-[11px] text-white/40">{s.label}</div>
+                </button>
+              ))}
+            </div>
+
+            <div className="grid lg:grid-cols-3 gap-5">
+              {/* Liste des notes */}
+              <div className="lg:col-span-2 space-y-3">
+                {filteredNotes.length === 0 && (
+                  <div className="rounded-3xl bg-white/5 border border-white/10 p-8 text-center text-white/30">
+                    {noteFilter === 'all' ? "Aucune note pour l'instant. Ajoute ta première idée !" : 'Rien dans cette catégorie.'}
+                  </div>
+                )}
+                {filteredNotes.map((note) => (
+                  <div
+                    key={note.id}
+                    className={`rounded-2xl p-4 flex items-start gap-3 transition-all ${
+                      note.done ? 'bg-white/5 border border-white/5' : 'bg-white text-dark shadow-lg shadow-black/5'
+                    }`}
+                  >
+                    <button
+                      onClick={() => toggleNoteDone(note)}
+                      className={`mt-0.5 h-6 w-6 rounded-lg border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                        note.done ? 'bg-green-500 border-green-500 text-white' : 'border-dark/20 hover:border-accent'
+                      }`}
+                    >
+                      {note.done && <span className="text-xs">✓</span>}
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm leading-relaxed ${note.done ? 'text-white/30 line-through' : ''}`}>
+                        {note.text}
+                      </p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                          note.category === 'urgent' ? 'bg-red-500/10 text-red-400' :
+                          note.category === 'todo' ? 'bg-amber-400/10 text-amber-400' :
+                          note.category === 'idea' ? 'bg-blue-400/10 text-blue-400' :
+                          'bg-green-500/10 text-green-400'
+                        }`}>
+                          {note.category === 'urgent' ? '🔴 Urgent' :
+                           note.category === 'todo' ? '🟡 À faire' :
+                           note.category === 'idea' ? '💡 Idée' : '✅ Fait'}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => removeNote(note.id)}
+                      className={`flex-shrink-0 text-xs font-bold px-2 py-1 rounded-lg transition-colors ${
+                        note.done ? 'text-white/15 hover:text-red-400' : 'text-dark/20 hover:text-red-500'
+                      }`}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Formulaire ajout */}
+              <div className="rounded-3xl bg-white/5 border border-white/10 p-5 h-fit space-y-4">
+                <h3 className="font-bold text-white text-lg">Ajouter une note</h3>
+                <textarea
+                  value={newNote.text}
+                  onChange={(e) => setNewNote({ ...newNote, text: e.target.value })}
+                  placeholder="Ta note, idée, tâche..."
+                  rows={4}
+                  className="w-full rounded-xl bg-white/10 border border-white/10 px-4 py-3 text-sm text-white placeholder-white/25 outline-none resize-none"
+                />
+                <div className="flex gap-2">
+                  {[
+                    { value: 'urgent', label: '🔴 Urgent', color: 'bg-red-500/20 text-red-300' },
+                    { value: 'todo', label: '🟡 À faire', color: 'bg-amber-400/20 text-amber-300' },
+                    { value: 'idea', label: '💡 Idée', color: 'bg-blue-400/20 text-blue-300' },
+                  ].map((cat) => (
+                    <button
+                      key={cat.value}
+                      onClick={() => setNewNote({ ...newNote, category: cat.value })}
+                      className={`rounded-full px-3 py-1.5 text-xs font-bold transition-all ${
+                        newNote.category === cat.value ? cat.color + ' ring-2 ring-white/20' : 'bg-white/5 text-white/30'
+                      }`}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={addNote}
+                  className="w-full rounded-full bg-accent px-5 py-3 text-sm font-bold text-white hover:bg-accent-light transition-colors"
+                >
+                  Ajouter
+                </button>
+
+                <div className="border-t border-white/5 pt-4 mt-4">
+                  <h4 className="font-bold text-white/60 text-sm mb-3">Suggestions</h4>
+                  <div className="space-y-2">
+                    {[
+                      'Ajouter mes vrais produits avec liens 1688',
+                      'Mettre les photos produits',
+                      'Trouver un agent pour le fulfillment',
+                      'Tester avec 2-3 commandes réelles',
+                      'Configurer le drop de la semaine',
+                      'Acheter un nom de domaine',
+                      'Calculer mes marges réelles',
+                      'Préparer les réponses types WhatsApp',
+                    ].map((suggestion) => (
+                      <button
+                        key={suggestion}
+                        onClick={() => setNewNote({ ...newNote, text: suggestion })}
+                        className="block w-full text-left rounded-xl bg-white/5 hover:bg-white/10 px-3 py-2 text-xs text-white/35 hover:text-white/55 transition-colors"
+                      >
+                        + {suggestion}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
