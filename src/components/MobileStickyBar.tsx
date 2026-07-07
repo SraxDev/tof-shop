@@ -16,7 +16,7 @@ export default function MobileStickyBar() {
   }, []);
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 z-50 md:hidden">
+    <div className="fixed bottom-4 left-4 right-4 z-50 md:hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
       <div className="grid grid-cols-2 gap-2 rounded-full bg-dark/90 p-2 shadow-2xl shadow-dark/25 backdrop-blur-xl border border-white/10">
         <a
           href="#shop"

@@ -28,6 +28,19 @@ body {
   color: white;
 }
 
+/* Safe area for mobile notch/home bar */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Better touch targets */
+@media (max-width: 640px) {
+  input, select, textarea, button {
+    min-height: 44px;
+    font-size: 16px !important;
+  }
+}
+
 img.emoji {
   display: inline-block;
   height: 1.2em;

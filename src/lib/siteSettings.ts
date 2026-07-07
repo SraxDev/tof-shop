@@ -22,8 +22,8 @@ export type SiteSettings = {
 export const SETTINGS_STORAGE_KEY = 'tof-site-settings-v1';
 
 export const defaultSettings: SiteSettings = {
-  whatsappUrl: '#',
-  snapchatUrl: '#',
+  whatsappUrl: 'https://wa.me/33744596043',
+  snapchatUrl: 'https://www.snapchat.com/add/tofh2b',
   paypalUrl: '#',
   paymentText: 'Paiement PayPal, finalisation sur WhatsApp.',
   announcementEnabled: true,

@@ -101,7 +101,7 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
   return (
     <div className="fixed inset-0 z-[90] flex justify-end">
       <div className="absolute inset-0 bg-dark/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-white h-full overflow-y-auto shadow-2xl flex flex-col">
+      <div className="relative w-full sm:max-w-md bg-white h-full overflow-y-auto shadow-2xl flex flex-col safe-bottom">
         {/* Header */}
         <div className="sticky top-0 bg-white z-10 flex items-center justify-between px-5 py-4 border-b border-dark/5">
           <div className="flex items-center gap-2">

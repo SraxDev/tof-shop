@@ -582,40 +582,45 @@ export default function AdminPanel() {
   };
 
   const whatsappLink = (order: Order, type: 'payment' | 'paid' | 'tracking' | 'delay') => {
-    const phone = order.phone.replace(/[^0-9]/g, '');
+    let phone = order.phone.replace(/[^0-9+]/g, '');
+    // Convert French 0X to 33X
+    if (phone.startsWith('0') && phone.length === 10) {
+      phone = '33' + phone.slice(1);
+    }
+    phone = phone.replace(/^\+/, '');
     const text = encodeURIComponent(clientMessage(order, type));
     return `https://wa.me/${phone}?text=${text}`;
   };
 
   return (
-    <section id="admin" className="py-20 lg:py-28 bg-dark text-white">
-      <div className="mx-auto max-w-6xl px-5">
+    <section id="admin" className="py-8 sm:py-20 lg:py-28 bg-dark text-white">
+      <div className="mx-auto max-w-6xl px-3 sm:px-5">
         <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6 mb-10">
           <div>
             <span className="text-accent text-xs font-bold uppercase tracking-widest">Panel prive</span>
-            <h2 className="font-display text-4xl sm:text-5xl font-800 tracking-tight mt-3">admin tof.</h2>
+            <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-800 tracking-tight mt-2">admin tof.</h2>
             <p className="text-white/35 mt-3 max-w-xl">
               {loading ? 'Chargement depuis Supabase...' : 'Donnees synchronisees avec Supabase.'}
             </p>
           </div>
 
-          <div className="grid grid-cols-3 gap-3 text-center">
-            <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
-              <div className="text-2xl font-800">{products.length}</div>
-              <div className="text-[11px] text-white/30">produits</div>
+          <div className="grid grid-cols-3 gap-2 sm:gap-3 text-center">
+            <div className="rounded-2xl bg-white/5 border border-white/10 p-3 sm:p-4">
+              <div className="text-xl sm:text-2xl font-800">{products.length}</div>
+              <div className="text-[10px] sm:text-[11px] text-white/30">produits</div>
             </div>
-            <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
-              <div className="text-2xl font-800">{orders.length}</div>
-              <div className="text-[11px] text-white/30">commandes</div>
+            <div className="rounded-2xl bg-white/5 border border-white/10 p-3 sm:p-4">
+              <div className="text-xl sm:text-2xl font-800">{orders.length}</div>
+              <div className="text-[10px] sm:text-[11px] text-white/30">commandes</div>
             </div>
-            <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
-              <div className="text-2xl font-800">{euro(totals.avgMargin / Math.max(products.length, 1))}</div>
-              <div className="text-[11px] text-white/30">marge moy.</div>
+            <div className="rounded-2xl bg-white/5 border border-white/10 p-3 sm:p-4">
+              <div className="text-lg sm:text-2xl font-800">{euro(totals.avgMargin / Math.max(products.length, 1))}</div>
+              <div className="text-[10px] sm:text-[11px] text-white/30">marge moy.</div>
             </div>
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 mb-6">
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-2 -mx-1 px-1">
           {[
             { id: 'dashboard', label: 'Dashboard' },
             { id: 'orders', label: 'Commandes' },
@@ -627,7 +632,7 @@ export default function AdminPanel() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as typeof activeTab)}
-              className={`rounded-full px-5 py-2.5 text-sm font-semibold transition-colors ${
+              className={`rounded-full px-4 py-2.5 text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap flex-shrink-0 ${
                 activeTab === tab.id ? 'bg-accent text-white' : 'bg-white/5 text-white/45 hover:bg-white/10'
               }`}
             >
@@ -851,9 +856,9 @@ export default function AdminPanel() {
                     <div className="flex flex-wrap gap-2 mt-5">
                       <button
                         onClick={() => copyOrder(order)}
-                        className="inline-flex items-center gap-2 rounded-full bg-dark px-5 py-3 text-sm font-semibold text-white hover:bg-accent transition-colors"
+                        className="inline-flex items-center gap-2 rounded-full bg-dark px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-white hover:bg-accent transition-colors"
                       >
-                        <Copy size={15} /> {copiedId === order.id ? 'Copie !' : 'Copier pour Mulebuy'}
+                        <Copy size={14} /> {copiedId === order.id ? 'Copie !' : 'Mulebuy'}
                       </button>
                       <a
                         href={product.sourceUrl}
@@ -863,17 +868,17 @@ export default function AdminPanel() {
                       >
                         <ExternalLink size={15} /> Ouvrir lien source
                       </a>
-                      <a href={whatsappLink(order, 'payment')} target="_blank" rel="noreferrer" className="rounded-full bg-[#25D366]/10 px-5 py-3 text-sm font-semibold text-[#1cae54] hover:bg-[#25D366]/20 transition-colors">
-                        WhatsApp paiement
+                      <a href={whatsappLink(order, 'payment')} target="_blank" rel="noreferrer" className="rounded-full bg-[#25D366]/10 px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-[#1cae54] hover:bg-[#25D366]/20 transition-colors">
+                        WA paiement
                       </a>
-                      <a href={whatsappLink(order, 'paid')} target="_blank" rel="noreferrer" className="rounded-full bg-[#25D366]/10 px-5 py-3 text-sm font-semibold text-[#1cae54] hover:bg-[#25D366]/20 transition-colors">
-                        WhatsApp paye
+                      <a href={whatsappLink(order, 'paid')} target="_blank" rel="noreferrer" className="rounded-full bg-[#25D366]/10 px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-[#1cae54] hover:bg-[#25D366]/20 transition-colors">
+                        WA paye
                       </a>
-                      <a href={whatsappLink(order, 'delay')} target="_blank" rel="noreferrer" className="rounded-full bg-dark/5 px-5 py-3 text-sm font-semibold text-dark/60 hover:bg-dark/10 transition-colors">
-                        WhatsApp retard
+                      <a href={whatsappLink(order, 'delay')} target="_blank" rel="noreferrer" className="rounded-full bg-dark/5 px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-dark/60 hover:bg-dark/10 transition-colors">
+                        WA retard
                       </a>
-                      <button onClick={() => copyClientMessage(order, 'payment')} className="rounded-full bg-dark/5 px-5 py-3 text-sm font-semibold text-dark/60 hover:bg-dark/10 transition-colors">
-                        {copiedId === `${order.id}-payment` ? 'Copie !' : 'Copier msg'}
+                      <button onClick={() => copyClientMessage(order, 'payment')} className="rounded-full bg-dark/5 px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-dark/60 hover:bg-dark/10 transition-colors">
+                        {copiedId === `${order.id}-payment` ? 'Copie !' : 'Copier'}
                       </button>
                     </div>
                   </div>
