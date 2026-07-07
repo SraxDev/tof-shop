@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Copy, ExternalLink, Package, Pencil, Plus, Save, Truck } from 'lucide-react';
+import { Copy, ExternalLink, Package, Pencil, Plus, Save, Trash2, Truck } from 'lucide-react';
 import { defaultDrop, type FeaturedDropConfig } from './FeaturedDrop';
 import { defaultSettings, readSiteSettings, saveSiteSettings, hydrateSiteSettings, type SiteSettings } from '../lib/siteSettings';
-import { fetchProducts, upsertProduct, fetchOrders, updateOrder, insertOrder as dbInsertOrder, fetchDrop, saveDrop as dbSaveDrop, type DbProduct, type DbOrder, type DbDrop } from '../lib/db';
+import { fetchProducts, upsertProduct, deleteProduct as dbDeleteProduct, fetchOrders, updateOrder, insertOrder as dbInsertOrder, fetchDrop, saveDrop as dbSaveDrop, type DbProduct, type DbOrder, type DbDrop } from '../lib/db';
 
 type Product = {
   id: string;
@@ -351,7 +351,7 @@ export default function AdminPanel() {
     try {
       const [dbProds, dbOrds, dbDr] = await Promise.all([fetchProducts(), fetchOrders(), fetchDrop()]);
       await hydrateSiteSettings();
-      if (dbProds.length > 0) setProducts(dbProds.map(dbToProduct).map(normalizedProduct));
+      setProducts(dbProds.map(dbToProduct).map(normalizedProduct));
       setOrders(dbOrds.map(dbToOrder));
       if (dbDr) setDropDraft(dbToDrop(dbDr));
       setSiteSettings(readSiteSettings());
@@ -375,6 +375,12 @@ export default function AdminPanel() {
   const saveProducts = async (next: Product[]) => {
     setProducts(next);
     for (const p of next) await upsertProduct(productToDb(p));
+  };
+
+  const removeProduct = async (id: string) => {
+    await dbDeleteProduct(id);
+    setProducts((prev) => prev.filter((p) => p.id !== id));
+    window.dispatchEvent(new CustomEvent('tof-products-updated'));
   };
 
   const saveOrderField = async (id: string, field: string, value: string) => {
@@ -1100,6 +1106,7 @@ export default function AdminPanel() {
                           <button onClick={() => startEdit(product)} className="inline-flex items-center gap-2 rounded-full bg-dark px-4 py-2 text-sm font-semibold text-white"><Pencil size={14} /> Edit</button>
                         )}
                         <a href={current.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full bg-dark/5 px-4 py-2 text-sm font-semibold text-dark/60"><ExternalLink size={14} /> Ouvrir</a>
+                        <button onClick={() => { if (confirm('Supprimer ce produit ?')) removeProduct(product.id); }} className="inline-flex items-center gap-2 rounded-full bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-500 hover:bg-red-500/20 transition-colors"><Trash2 size={14} /></button>
                       </div>
                     </div>
                   </div>
