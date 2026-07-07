@@ -494,7 +494,8 @@ export default function AdminPanel() {
     setNewOrder({ ...newOrder, customerName: '', phone: '', address: '', city: '', zip: '', snapOrWhatsapp: '' });
   };
 
-  const getProduct = (id: string) => products.find((product) => product.id === id) || products[0];
+  const fallbackProduct: Product = { id: '', brand: '-', name: '-', category: 'T-shirt', salePrice: 0, sourcePriceCny: 0, weightGrams: 300, packaging: 'none', sizes: '', colors: '', sourceUrl: '', status: 'active' };
+  const getProduct = (id: string) => products.find((product) => product.id === id) || products[0] || fallbackProduct;
 
   const dashboard = useMemo(() => {
     const statusCounts = orders.reduce<Record<OrderStatus, number>>((acc, order) => {
@@ -1365,6 +1366,10 @@ export default function AdminPanel() {
             <div className="rounded-3xl bg-white text-dark p-6">
               <h3 className="font-bold text-xl flex items-center gap-2"><Truck size={20} /> Estimation Mulebuy</h3>
               <p className="text-sm text-dark/40 mt-2">Ce n'est pas un tarif officiel, mais une estimation pour te donner une marge avant de commander.</p>
+              {products.length === 0 ? (
+                <div className="mt-5 rounded-2xl bg-bg p-6 text-center text-sm text-dark/40">Ajoute un produit d'abord pour estimer la livraison.</div>
+              ) : (
+              <>
               <select
                 value={selectedEstimateProduct}
                 onChange={(event) => setSelectedEstimateProduct(event.target.value)}
@@ -1401,6 +1406,8 @@ export default function AdminPanel() {
                   </>
                 );
               })()}
+              </>
+              )}
             </div>
             <div className="rounded-3xl bg-white/5 border border-white/10 p-6">
               <h3 className="font-bold text-xl flex items-center gap-2"><Package size={20} /> Comment l'utiliser</h3>
