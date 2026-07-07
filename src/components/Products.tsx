@@ -129,7 +129,7 @@ export default function Products() {
             <h2 className="font-display text-4xl sm:text-5xl font-800 tracking-tight text-dark flex items-center gap-3">
               le shop <AppleEmoji emoji="🛒" size={36} />
             </h2>
-            <p className="mt-2 text-dark/40">choisis ta piece, ajoute au panier</p>
+            <p className="mt-2 text-dark/40">choisis ta pièce, ajoute au panier</p>
           </div>
           <div className="flex gap-2 overflow-x-auto pb-1">
             {filters.map((f) => (
@@ -189,7 +189,7 @@ export default function Products() {
 
         {visibleProducts.length === 0 && (
           <div className="rounded-3xl bg-white border border-dark/5 p-10 text-center text-dark/40">
-            Aucun produit actif dans cette categorie.
+            Aucun produit actif dans cette catégorie.
           </div>
         )}
       </div>
@@ -253,7 +253,7 @@ export default function Products() {
             )}
 
             {(!selectedSize || !selectedColor) && (
-              <p className="text-xs text-accent font-semibold mb-4">Selectionne une taille et une couleur</p>
+              <p className="text-xs text-accent font-semibold mb-4">Sélectionne une taille et une couleur</p>
             )}
 
             <button
@@ -267,7 +267,7 @@ export default function Products() {
                     : 'bg-dark hover:bg-accent'
               }`}
             >
-              {addedId ? '✓ Ajoute au panier !' : <><ShoppingBag size={15} /> Ajouter au panier</>}
+              {addedId ? '✓ Ajouté au panier !' : <><ShoppingBag size={15} /> Ajouter au panier</>}
             </button>
           </div>
         </div>

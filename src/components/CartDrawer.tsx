@@ -214,7 +214,7 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
               </div>
 
               <div className="rounded-2xl bg-bg p-4 space-y-2 text-sm">
-                <div className="font-bold text-dark/60">Recapitulatif</div>
+                <div className="font-bold text-dark/60">Récapitulatif</div>
                 {cart.map((item) => (
                   <div key={`${item.productId}-${item.size}-${item.color}`} className="flex justify-between">
                     <span className="text-dark/45 truncate mr-2">{item.brand} {item.name} x{item.quantity}</span>
@@ -246,11 +246,11 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
           <div className="flex-1 flex items-center justify-center p-8">
             <div className="text-center">
               <div className="mx-auto h-16 w-16 rounded-3xl bg-green-500/10 text-green-600 flex items-center justify-center text-3xl font-800 mb-5">✓</div>
-              <h3 className="font-display text-3xl font-800 tracking-tight text-dark">Commande reservee</h3>
-              <p className="mt-3 text-dark/45 max-w-sm mx-auto text-sm leading-relaxed">
-                Ta commande <span className="font-bold text-dark">{createdOrderId}</span> est enregistree.
-                Finalise le paiement sur WhatsApp.
-              </p>
+                <h3 className="font-display text-3xl font-800 tracking-tight text-dark">Commande réservée</h3>
+                <p className="mt-3 text-dark/45 max-w-sm mx-auto text-sm leading-relaxed">
+                  Ta commande <span className="font-bold text-dark">{createdOrderId}</span> est enregistrée.
+                  Finalise le paiement sur WhatsApp.
+                </p>
               <div className="mt-6 space-y-3">
                 <a
                   href={whatsappCheckoutLink()}

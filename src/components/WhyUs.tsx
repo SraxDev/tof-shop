@@ -5,17 +5,17 @@ const points = [
   {
     emoji: '📦',
     title: 'Livraison suivie',
-    desc: 'Tracking envoye directement sur WhatsApp. Tu sais ou en est ton colis.',
+    desc: 'Tracking envoyé directement sur WhatsApp. Tu sais où en est ton colis.',
   },
   {
     emoji: '🔄',
     title: 'Retours faciles',
-    desc: 'Probleme ? On gere ca ensemble sur WhatsApp, sans prise de tete.',
+    desc: 'Problème ? On gère ça ensemble sur WhatsApp, sans prise de tête.',
   },
   {
     emoji: '💬',
     title: 'Dispo sur Snap & WhatsApp',
-    desc: 'Une question ? On te repond vite fait sur tes apps preferees.',
+    desc: 'Une question ? On te répond vite fait sur tes apps préférées.',
   },
 ];
 

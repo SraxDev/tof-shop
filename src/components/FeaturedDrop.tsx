@@ -21,10 +21,10 @@ export type FeaturedDropConfig = {
 
 export const defaultDrop: FeaturedDropConfig = {
   badge: 'DROP DE LA SEMAINE',
-  eyebrow: 'Exclusivite tof.',
+  eyebrow: 'Exclusivité tof.',
   brand: 'Nike x Off-White',
   name: 'Air Jordan 1 Retro',
-  description: "La paire la plus demandee du moment. Quantites limitees, commande via WhatsApp apres reservation.",
+  description: "La paire la plus demandée du moment. Quantités limitées, commande via WhatsApp après réservation.",
   price: 389,
   oldPrice: 520,
   discount: '-25%',

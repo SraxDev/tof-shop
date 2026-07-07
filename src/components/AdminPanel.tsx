@@ -3,6 +3,7 @@ import { Copy, ExternalLink, Package, Pencil, Plus, Save, Trash2, Truck } from '
 import { defaultDrop, type FeaturedDropConfig } from './FeaturedDrop';
 import { defaultSettings, readSiteSettings, saveSiteSettings, hydrateSiteSettings, type SiteSettings } from '../lib/siteSettings';
 import { fetchProducts, upsertProduct, deleteProduct as dbDeleteProduct, fetchOrders, updateOrder, insertOrder as dbInsertOrder, fetchDrop, saveDrop as dbSaveDrop, type DbProduct, type DbOrder, type DbDrop } from '../lib/db';
+import { showToast } from './Toast';
 
 type Product = {
   id: string;
@@ -375,12 +376,14 @@ export default function AdminPanel() {
   const saveProducts = async (next: Product[]) => {
     setProducts(next);
     for (const p of next) await upsertProduct(productToDb(p));
+    showToast('Produit sauvegardé ✓');
   };
 
   const removeProduct = async (id: string) => {
     await dbDeleteProduct(id);
     setProducts((prev) => prev.filter((p) => p.id !== id));
     window.dispatchEvent(new CustomEvent('tof-products-updated'));
+    showToast('Produit supprimé ✓');
   };
 
   const saveOrderField = async (id: string, field: string, value: string) => {
@@ -392,6 +395,7 @@ export default function AdminPanel() {
   const saveDrop = async () => {
     await dbSaveDrop(dropToDb(dropDraft));
     window.dispatchEvent(new CustomEvent('tof-drop-updated'));
+    showToast('Drop de la semaine sauvegardé ✓');
   };
 
   const uploadDropImage = (file?: File) => {
@@ -407,6 +411,7 @@ export default function AdminPanel() {
     await saveSiteSettings(siteSettings);
     setSettingsSaved(true);
     setTimeout(() => setSettingsSaved(false), 1600);
+    showToast('Réglages sauvegardés ✓');
   };
 
   const startEdit = (product: Product) => {
@@ -492,6 +497,7 @@ export default function AdminPanel() {
     await dbInsertOrder(dbOrd);
     setOrders([order, ...orders]);
     setNewOrder({ ...newOrder, customerName: '', phone: '', address: '', city: '', zip: '', snapOrWhatsapp: '' });
+    showToast('Commande créée ✓');
   };
 
   const fallbackProduct: Product = { id: '', brand: '-', name: '-', category: 'T-shirt', salePrice: 0, sourcePriceCny: 0, weightGrams: 300, packaging: 'none', sizes: '', colors: '', sourceUrl: '', status: 'active' };
@@ -565,6 +571,7 @@ export default function AdminPanel() {
     await navigator.clipboard.writeText(orderText(order));
     setCopiedId(order.id);
     setTimeout(() => setCopiedId(null), 1800);
+    showToast('Bloc Mulebuy copié ✓');
   };
 
   const clientMessage = (order: Order, type: 'payment' | 'paid' | 'tracking' | 'delay') => {
@@ -586,6 +593,7 @@ export default function AdminPanel() {
     await navigator.clipboard.writeText(clientMessage(order, type));
     setCopiedId(`${order.id}-${type}`);
     setTimeout(() => setCopiedId(null), 1800);
+    showToast('Message copié ✓');
   };
 
   const whatsappLink = (order: Order, type: 'payment' | 'paid' | 'tracking' | 'delay') => {
@@ -604,10 +612,10 @@ export default function AdminPanel() {
       <div className="mx-auto max-w-6xl px-3 sm:px-5">
         <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6 mb-10">
           <div>
-            <span className="text-accent text-xs font-bold uppercase tracking-widest">Panel prive</span>
+            <span className="text-accent text-xs font-bold uppercase tracking-widest">Panel privé</span>
             <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-800 tracking-tight mt-2">admin tof.</h2>
             <p className="text-white/35 mt-3 max-w-xl">
-              {loading ? 'Chargement depuis Supabase...' : 'Donnees synchronisees avec Supabase.'}
+              {loading ? 'Chargement depuis Supabase...' : 'Données synchronisées avec Supabase.'}
             </p>
           </div>
 
@@ -633,7 +641,7 @@ export default function AdminPanel() {
             { id: 'orders', label: 'Commandes' },
             { id: 'products', label: 'Produits & liens' },
             { id: 'drop', label: 'Drop semaine' },
-            { id: 'settings', label: 'Reglages' },
+            { id: 'settings', label: 'Réglages' },
             { id: 'estimate', label: 'Estimation livraison' },
           ].map((tab) => (
             <button
@@ -653,9 +661,9 @@ export default function AdminPanel() {
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {[
                 { label: 'CA potentiel', value: euro(dashboard.revenue), hint: `${orders.length} commandes` },
-                { label: 'Marge estimee', value: euro(dashboard.netMargin), hint: 'apres livraison + frais' },
-                { label: 'Paiements recus', value: String(dashboard.paymentCounts.paid), hint: `${dashboard.paymentCounts.pending} en attente` },
-                { label: 'A traiter', value: String(dashboard.toProcess), hint: 'nouvelles / a commander' },
+                { label: 'Marge estimée', value: euro(dashboard.netMargin), hint: 'après livraison + frais' },
+                { label: 'Paiements reçus', value: String(dashboard.paymentCounts.paid), hint: `${dashboard.paymentCounts.pending} en attente` },
+                { label: 'À traiter', value: String(dashboard.toProcess), hint: 'nouvelles / à commander' },
               ].map((card) => (
                 <div key={card.label} className="rounded-3xl bg-white text-dark p-5">
                   <div className="text-xs font-bold uppercase tracking-wider text-dark/25">{card.label}</div>
@@ -670,7 +678,7 @@ export default function AdminPanel() {
                 <div className="flex items-center justify-between gap-4 mb-5">
                   <div>
                     <h3 className="font-bold text-xl">Ce qui marche le mieux</h3>
-                    <p className="text-sm text-dark/40 mt-1">Classement selon les commandes creees depuis le shop.</p>
+                    <p className="text-sm text-dark/40 mt-1">Classement selon les commandes créées depuis le shop.</p>
                   </div>
                   <button onClick={() => setActiveTab('orders')} className="rounded-full bg-dark/5 px-4 py-2 text-xs font-bold text-dark/50 hover:text-accent transition-colors">
                     Voir commandes
@@ -724,11 +732,11 @@ export default function AdminPanel() {
 
             <div className="grid lg:grid-cols-3 gap-5">
               <div className="rounded-3xl bg-white text-dark p-6">
-                <h3 className="font-bold text-xl mb-4">Repartition argent</h3>
+                <h3 className="font-bold text-xl mb-4">Répartition argent</h3>
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between"><span className="text-dark/45">Prix source</span><span className="font-bold">{euro(dashboard.sourceCost)}</span></div>
                   <div className="flex justify-between"><span className="text-dark/45">Budget livraison</span><span className="font-bold">{euro(dashboard.shippingBudget)}</span></div>
-                  <div className="flex justify-between"><span className="text-dark/45">Marge estimee</span><span className="font-bold text-green-600">{euro(dashboard.netMargin)}</span></div>
+                  <div className="flex justify-between"><span className="text-dark/45">Marge estimée</span><span className="font-bold text-green-600">{euro(dashboard.netMargin)}</span></div>
                 </div>
               </div>
 
@@ -823,7 +831,7 @@ export default function AdminPanel() {
                         <div className="text-dark/45 text-xs mt-1">{order.country}</div>
                       </div>
                       <div className="rounded-2xl bg-bg p-4">
-                        <div className="text-dark/35 text-xs">Livraison estimee</div>
+                        <div className="text-dark/35 text-xs">Livraison estimée</div>
                         <div className="font-semibold mt-1">{euro(margin.shipping.low)} - {euro(margin.shipping.high)}</div>
                         <div className="text-dark/45 text-xs mt-1">{margin.shipping.label} · {margin.effectiveWeight}g</div>
                       </div>
@@ -918,7 +926,7 @@ export default function AdminPanel() {
                 </div>
                 <input className="w-full rounded-xl bg-white/10 border border-white/10 px-4 py-3 text-sm outline-none" placeholder="Snap ou WhatsApp" value={newOrder.snapOrWhatsapp} onChange={(e) => setNewOrder({ ...newOrder, snapOrWhatsapp: e.target.value })} />
                 <button onClick={addOrder} className="w-full rounded-full bg-accent px-5 py-3 text-sm font-bold text-white hover:bg-accent-light transition-colors">
-                  Creer la commande
+                    Créer la commande
                 </button>
               </div>
             </div>

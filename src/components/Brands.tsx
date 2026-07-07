@@ -79,7 +79,7 @@ export default function Brands() {
           <h2 className="font-display text-4xl sm:text-5xl font-800 tracking-tight text-dark">
             les marques
           </h2>
-          <p className="mt-3 text-dark/40">les logos des marques les plus demandees</p>
+          <p className="mt-3 text-dark/40">les logos des marques les plus demandées</p>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">

@@ -16,6 +16,7 @@ import AdminPanel from './components/AdminPanel';
 import Footer from './components/Footer';
 import BackToTop from './components/BackToTop';
 import MobileStickyBar from './components/MobileStickyBar';
+import ToastContainer from './components/Toast';
 
 const ADMIN_PASSWORD = 'tofadmin';
 
@@ -89,6 +90,7 @@ function AdminAccess() {
         </div>
       </div>
       <AdminPanel />
+      <ToastContainer />
     </div>
   );
 }
@@ -127,6 +129,7 @@ export default function App() {
       <Footer />
       <BackToTop />
       <MobileStickyBar />
+      <ToastContainer />
     </div>
   );
 }

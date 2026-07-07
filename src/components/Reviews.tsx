@@ -7,7 +7,7 @@ const reviews = [
     city: 'Lyon',
     product: 'Jordan 1 Retro High',
     date: 'il y a 6 jours',
-    text: "J'avais un peu peur au debut vu que c'etait ma premiere commande, mais le suivi etait propre. Recu en un peu moins de 2 semaines, la paire est nickel. Je recommanderai surement.",
+    text: "J'avais un peu peur au début vu que c'était ma première commande, mais le suivi était propre. Reçu en un peu moins de 2 semaines, la paire est nickel. Je recommanderai sûrement.",
     stars: 5,
     initials: 'YK',
   },
@@ -16,7 +16,7 @@ const reviews = [
     city: 'Marseille',
     product: 'Sac Prada Re-Nylon',
     date: 'il y a 2 semaines',
-    text: "Bonne communication sur WhatsApp, il m'a envoye les photos avant l'envoi. Le colis a mis 13 jours. Franchement pour le prix je suis contente, juste l'emballage aurait pu etre un peu mieux.",
+    text: "Bonne communication sur WhatsApp, il m'a envoyé les photos avant l'envoi. Le colis a mis 13 jours. Franchement pour le prix je suis contente, juste l'emballage aurait pu être un peu mieux.",
     stars: 4,
     initials: 'IB',
   },
@@ -25,7 +25,7 @@ const reviews = [
     city: 'Paris',
     product: 'Hoodie LV Monogram',
     date: 'il y a 3 semaines',
-    text: "Deuxieme commande chez tof. Le hoodie taille bien, matiere lourde comme je voulais. Delai un peu long mais il m'avait prevenu donc pas de surprise. Service serieux.",
+    text: "Deuxième commande chez tof. Le hoodie taille bien, matière lourde comme je voulais. Délai un peu long mais il m'avait prévenu donc pas de surprise. Service sérieux.",
     stars: 5,
     initials: 'AR',
   },
@@ -34,7 +34,7 @@ const reviews = [
     city: 'Toulouse',
     product: 'Casquette Dior',
     date: 'il y a 1 mois',
-    text: "Commande simple, il repond vite sur WhatsApp. J'ai recu le tracking apres quelques jours. La casquette est propre, rien a dire. Je mets 4 etoiles juste pour le delai.",
+    text: "Commande simple, il répond vite sur WhatsApp. J'ai reçu le tracking après quelques jours. La casquette est propre, rien à dire. Je mets 4 étoiles juste pour le délai.",
     stars: 4,
     initials: 'SM',
   },
@@ -50,7 +50,7 @@ export default function Reviews() {
           <h2 className="font-display text-4xl sm:text-5xl font-800 tracking-tight text-dark">
             les avis
           </h2>
-          <p className="mt-3 text-dark/40">des retours clients simples, pas des phrases robot</p>
+          <p className="mt-3 text-dark/40">des retours clients simples, pas des phrases de robot</p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -87,13 +87,13 @@ export default function Reviews() {
 
               <div className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-dark/45">
                 <CheckCircle2 size={12} className="text-green-500" />
-                Commande verifiee
+                Commande vérifiée
               </div>
 
               <p className="text-dark/60 text-sm leading-relaxed mb-5">"{r.text}"</p>
 
               <div className="border-t border-dark/5 pt-4">
-                <div className="text-[10px] uppercase tracking-wider text-dark/25 font-bold">Produit achete</div>
+                <div className="text-[10px] uppercase tracking-wider text-dark/25 font-bold">Produit acheté</div>
                 <div className="text-sm font-semibold text-dark/70 mt-1">{r.product}</div>
               </div>
             </div>
@@ -103,8 +103,8 @@ export default function Reviews() {
         <div className="mt-12 flex flex-wrap justify-center gap-10 lg:gap-16">
           {[
             { val: '4.7/5', label: 'note moyenne' },
-            { val: '120+', label: 'commandes traitees' },
-            { val: '24h', label: 'reponse moyenne' },
+            { val: '120+', label: 'commandes traitées' },
+            { val: '24h', label: 'réponse moyenne' },
           ].map((s) => (
             <div key={s.label} className="text-center">
               <div className="text-2xl font-display font-800 text-dark">{s.val}</div>
