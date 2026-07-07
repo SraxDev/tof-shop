@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Space Grotesk', sans-serif;
+  --font-display: 'Syne', sans-serif;
+  --color-bg: #f6f5f2;
+  --color-dark: #111111;
+  --color-accent: #e84d1a;
+  --color-accent-light: #ff6b3d;
+  --color-muted: #888888;
+  --color-card: #ffffff;
+  --color-subtle: #eeede9;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Space Grotesk', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background: #f6f5f2;
+  color: #111111;
+}
+
+::selection {
+  background: #e84d1a;
+  color: white;
+}
+
+img.emoji {
+  display: inline-block;
+  height: 1.2em;
+  width: 1.2em;
+  margin: 0 0.06em;
+  vertical-align: -0.2em;
+  object-fit: contain;
+}
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: #f6f5f2; }
+::-webkit-scrollbar-thumb { background: #ccc; border-radius: 2px; }
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(40px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+@keyframes blob {
+  0%, 100% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
+  50% { border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%; }
+}
+
+.anim-fade-up {
+  animation: fade-up 0.7s ease-out forwards;
+}
+.anim-fade-in {
+  animation: fade-in 0.8s ease-out forwards;
+}
+.anim-slide-up {
+  animation: slide-up 0.8s ease-out forwards;
+}
+.anim-marquee {
+  animation: marquee 25s linear infinite;
+}
+.anim-float {
+  animation: float 4s ease-in-out infinite;
+}
+.anim-blob {
+  animation: blob 8s ease-in-out infinite;
+}
+
+.delay-100 { animation-delay: 0.1s; }
+.delay-200 { animation-delay: 0.2s; }
+.delay-300 { animation-delay: 0.3s; }
+.delay-400 { animation-delay: 0.4s; }
+.delay-500 { animation-delay: 0.5s; }
+.delay-600 { animation-delay: 0.6s; }
+.delay-700 { animation-delay: 0.7s; }
+.delay-800 { animation-delay: 0.8s; }
