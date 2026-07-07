@@ -41,7 +41,7 @@ export default function Contact() {
               </div>
               <h3 className="mt-6 font-display text-3xl font-800 tracking-tight">WhatsApp</h3>
               <p className="mt-2 text-white/75 text-sm leading-relaxed">
-                Mets ici ton lien WhatsApp plus tard. Ideal pour finaliser les commandes et envoyer le paiement.
+                Clique ici pour finaliser une commande, envoyer un paiement ou poser une question rapidement.
               </p>
             </div>
             <span className="relative mt-6 text-sm font-bold">Ouvrir WhatsApp →</span>
@@ -58,7 +58,7 @@ export default function Contact() {
               </div>
               <h3 className="mt-6 font-display text-3xl font-800 tracking-tight">Snapchat</h3>
               <p className="mt-2 text-dark/55 text-sm leading-relaxed">
-                Mets ici ton Snap plus tard. Parfait pour les drops, questions rapides et suivis clients.
+                Ajoute-nous sur Snap pour suivre les drops, voir les nouveautes et nous contacter rapidement.
               </p>
             </div>
             <span className="relative mt-6 text-sm font-bold">Ajouter sur Snap →</span>
@@ -66,7 +66,7 @@ export default function Contact() {
         </div>
 
         <p className={`mt-8 text-center text-xs text-dark/30 ${isInView ? 'anim-fade-up opacity-0 delay-400' : 'opacity-0'}`}>
-          Les liens Snap et WhatsApp se configurent directement dans le panel admin.
+          Reponse rapide sur WhatsApp et Snap pendant nos horaires d'ouverture.
         </p>
       </div>
     </section>
