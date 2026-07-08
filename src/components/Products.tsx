@@ -427,36 +427,60 @@ export default function Products() {
             <div className="flex-1 flex flex-col sm:flex-row min-h-0 overflow-hidden">
               
               {/* Section Image - Gauche */}
-              <div className="relative w-full sm:w-[55%] h-[45vh] sm:h-auto bg-[#F9F9F9] flex items-center justify-center p-6 sm:p-12">
-                {activeImage || quickAdd.imageUrl ? (
-                  <img 
-                    src={activeImage || getProductImages(quickAdd)[0]} 
-                    alt={quickAdd.name} 
-                    className="max-h-full max-w-full w-auto h-auto object-contain drop-shadow-2xl anim-fade-in" 
-                    key={activeImage}
-                  />
-                ) : (
-                  <div className="h-full w-full flex items-center justify-center">
-                    <AppleEmoji emoji={emojiForCategory(quickAdd.category)} size={120} />
+              <div className="relative w-full sm:w-[55%] h-[50vh] sm:h-auto bg-[#F9F9F9] flex flex-col items-center justify-center p-6 sm:p-12 min-h-0">
+                <div className="flex-1 flex items-center justify-center w-full min-h-0 relative group">
+                  {activeImage || (quickAdd && getProductImages(quickAdd)[0]) ? (
+                    <img 
+                      src={activeImage || getProductImages(quickAdd!)[0]} 
+                      alt={quickAdd!.name} 
+                      className="max-h-full max-w-full w-auto h-auto object-contain drop-shadow-2xl anim-fade-in" 
+                      key={activeImage}
+                    />
+                  ) : (
+                    <div className="h-full w-full flex items-center justify-center">
+                      <AppleEmoji emoji={emojiForCategory(quickAdd!.category)} size={120} />
+                    </div>
+                  )}
+
+                  {/* Badges Flottants */}
+                  <div className="absolute top-0 left-0 flex flex-col gap-2 z-10">
+                    {(() => {
+                      const badge = getBadge(quickAdd!);
+                      return badge ? (
+                        <span className={`self-start ${badge.color} text-white text-[10px] font-black px-3 py-1.5 rounded-full shadow-lg uppercase tracking-wider`}>
+                          {badge.text}
+                        </span>
+                      ) : null;
+                    })()}
+                  </div>
+                </div>
+
+                {/* Galerie de Miniatures Interactives */}
+                {quickAdd && getProductImages(quickAdd).length > 1 && (
+                  <div className="flex gap-2.5 mt-8 px-2 overflow-x-auto no-scrollbar max-w-full pb-2">
+                    {getProductImages(quickAdd).map((url, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setActiveImage(url)}
+                        className={`h-14 w-14 rounded-xl border-2 transition-all flex-shrink-0 overflow-hidden bg-white shadow-sm hover:scale-105 active:scale-95 ${
+                          (activeImage === url || (!activeImage && idx === 0))
+                            ? 'border-accent ring-4 ring-accent/10'
+                            : 'border-transparent opacity-60 hover:opacity-100'
+                        }`}
+                      >
+                        <img src={url} alt="" className="h-full w-full object-contain p-1" />
+                      </button>
+                    ))}
                   </div>
                 )}
                 
                 {/* Fermer Mobile */}
                 <button 
                   onClick={() => setQuickAdd(null)} 
-                  className="absolute top-4 left-4 z-50 h-10 w-10 rounded-full bg-white/90 backdrop-blur-md flex sm:hidden items-center justify-center text-dark/60 shadow-sm"
+                  className="absolute top-4 left-4 z-50 h-10 w-10 rounded-full bg-white/90 backdrop-blur-md flex sm:hidden items-center justify-center text-dark/60 shadow-sm border border-dark/5"
                 >
                   <X size={20} />
                 </button>
-
-                {(() => {
-                  const badge = getBadge(quickAdd);
-                  return badge ? (
-                    <span className={`absolute top-6 left-6 ${badge.color} text-white text-[11px] font-bold px-3 py-1.5 rounded-full shadow-lg`}>
-                      {badge.text}
-                    </span>
-                  ) : null;
-                })()}
               </div>
 
               {/* Section Infos - Droite */}
