@@ -11,71 +11,51 @@ type BotRule = { keywords: string[]; reply: string; followUp?: string[] };
 
 const botRules: BotRule[] = [
   { keywords: ['salut', 'bonjour', 'hello', 'yo', 'hey', 'wesh', 'slt', 'bjr', 'cc', 'coucou'],
-    reply: "Salut ! Bienvenue sur tof. 🔥 Comment je peux t'aider ?",
-    followUp: ['Comment commander ?', 'Voir les marques', 'Délai de livraison', 'Comment payer ?'] },
+    reply: "Salut ! Ravi de te voir sur tof. 🔥 Comment puis-je t'aider aujourd'hui ?",
+    followUp: ['🛒 Comment commander ?', '📦 Délai de livraison', '💳 Moyens de paiement'] },
 
-  { keywords: ['prix', 'combien', 'coûte', 'coute', 'cher', 'tarif', 'budget'],
-    reply: "Les prix sont affichés sur chaque produit dans le shop. Si tu veux un prix sur un article pas encore en ligne, envoie-nous le lien sur WhatsApp et on te fait un devis rapide." },
+  { keywords: ['prix', 'combien', 'coûte', 'coute', 'cher', 'tarif', 'budget', 'euro', '€'],
+    reply: "Tous nos prix sont indiqués directement sur les fiches produits. Ils incluent déjà les taxes. Si tu as un budget spécifique ou si tu cherches un pack, on peut en discuter sur WhatsApp ! 💸" },
 
-  { keywords: ['livraison', 'delai', 'délai', 'combien de temps', 'expédition', 'expedition', 'recevoir', 'jours', 'semaine', 'quand'],
-    reply: "📦 Délai de livraison : 7 à 20 jours selon la ligne.\n\n• Economy : 15-20 jours (moins cher)\n• Standard : 10-15 jours\n• Express : 7-10 jours\n\nTu recevras ton tracking sur WhatsApp dès l'expédition.",
-    followUp: ['C\'est suivi ?', 'Livraison gratuite ?', 'Comment commander ?'] },
+  { keywords: ['livraison', 'delai', 'délai', 'combien de temps', 'expédition', 'expedition', 'recevoir', 'jours', 'semaine', 'quand', 'arrive', 'envoi'],
+    reply: "🚀 On sait que tu as hâte ! Voici nos délais :\n\n• Standard : 10-15 jours ouvrés\n• Express : 7-10 jours (idéal pour les cadeaux)\n\nDès que ton colis quitte l'entrepôt, tu reçois ton numéro de suivi par message. 😉",
+    followUp: ['C\'est suivi ?', 'Livraison gratuite ?'] },
 
-  { keywords: ['track', 'suivi', 'colis', 'suivre'],
-    reply: "Oui, chaque commande a un numéro de tracking ! On te l'envoie directement sur WhatsApp dès que c'est expédié. Tu peux suivre ton colis en temps réel." },
+  { keywords: ['track', 'suivi', 'colis', 'suivre', 'numero', 'numéro'],
+    reply: "Absolument ! Toutes nos expéditions sont suivies. Tu recevras un lien de tracking personnalisé dès que ta commande sera en route. 📍" },
 
-  { keywords: ['gratuit', 'offert', 'livraison gratuite', 'frais'],
-    reply: "La livraison est offerte à partir de 100€ d'achat ! En dessous, les frais sont de 7,90€." },
+  { keywords: ['gratuit', 'offert', 'livraison gratuite', 'frais', 'port'],
+    reply: "Bonne nouvelle ! La livraison standard est offerte pour toute commande supérieure à 100€. 🎉" },
 
-  { keywords: ['paiement', 'payer', 'paypal', 'virement', 'carte', 'cb', 'apple pay', 'revolut'],
-    reply: "💳 On accepte le paiement via PayPal.\n\n1. Tu commandes sur le site\n2. Tu reçois un message WhatsApp avec le lien PayPal\n3. Tu paies\n4. On lance ta commande\n\nSimple et sécurisé !",
-    followUp: ['C\'est sécurisé ?', 'Comment commander ?', 'Délai de livraison'] },
+  { keywords: ['paiement', 'payer', 'paypal', 'virement', 'carte', 'cb', 'apple pay', 'revolut', 'moyen'],
+    reply: "💳 Pour ta sécurité, on privilégie PayPal. C'est simple :\n\n1. Tu valides ton panier sur le site.\n2. On t'envoie les infos de paiement sur WhatsApp.\n3. Une fois payé, on prépare ton colis immédiatement.\n\nBesoin d'un autre moyen ? Demande-nous ! 💬",
+    followUp: ['C\'est sécurisé ?', 'Contacter WhatsApp'] },
 
-  { keywords: ['sécurisé', 'securise', 'confiance', 'arnaque', 'fiable', 'legit', 'vrai', 'faux', 'scam'],
-    reply: "On est 100% sérieux. Tu peux voir nos avis clients sur le site. On fait du QC (contrôle qualité) avant chaque envoi et on t'envoie les photos. Si y'a un problème, on gère ensemble sur WhatsApp." },
+  { keywords: ['sécurisé', 'securise', 'confiance', 'arnaque', 'fiable', 'legit', 'vrai', 'faux', 'scam', 'sérieux', 'serieux'],
+    reply: "On comprend tes doutes ! On travaille dur pour votre satisfaction : \n✅ Avis clients vérifiables\n✅ Photos QC (Qualité) envoyées avant envoi\n✅ Support réactif 7j/7\nOn ne te laisse jamais sans réponse. ❤️" },
 
-  { keywords: ['retour', 'rembours', 'échange', 'echange', 'problème', 'probleme', 'casse', 'abîme', 'abime', 'erreur'],
-    reply: "Si tu as un souci avec ta commande :\n\n1. Contacte-nous sur WhatsApp avec ton numéro de commande\n2. Envoie des photos du problème\n3. On trouve une solution ensemble (échange, remboursement, etc.)\n\nOn fait toujours au mieux !",
-    followUp: ['Contacter WhatsApp', 'Contacter Snap'] },
+  { keywords: ['retour', 'rembours', 'échange', 'echange', 'problème', 'probleme', 'casse', 'abîme', 'abime', 'erreur', 'tromper'],
+    reply: "Une erreur de taille ou un article abîmé ? Pas de panique. Contacte-nous sous 14 jours avec ton numéro de commande et on règle ça ensemble (remplacement ou remboursement). On veut que tu sois 100% satisfait. 🤝" },
 
-  { keywords: ['taille', 'size', 'guide', 'mesure', 'pointure', 'grand', 'petit', 'taille bien'],
-    reply: "📐 Guide des tailles :\n\n• Vêtements : les tailles sont en S/M/L/XL. En cas de doute, prends ta taille habituelle.\n• Sneakers : ça taille normalement. Prends ta pointure habituelle.\n• Sacs/accessoires : taille unique.\n\nSi tu hésites entre 2 tailles, prends la plus grande.",
-    followUp: ['Comment commander ?', 'Voir le shop'] },
+  { keywords: ['taille', 'size', 'guide', 'mesure', 'pointure', 'grand', 'petit', 'taille bien', 'chausse'],
+    reply: "📐 On conseille généralement de prendre ta taille habituelle.\n\n• Sneakers : TTS (True To Size).\n• Sapes : Coupe standard européenne.\n\nSi tu es entre deux tailles, choisis la plus grande pour plus de confort. Besoin de mesures précises ? Contacte-nous ! 📏" },
 
-  { keywords: ['commande', 'commander', 'acheter', 'comment', 'étape', 'etape', 'processus'],
-    reply: "🛒 Pour commander, c'est super simple :\n\n1. Choisis ton article dans le shop\n2. Sélectionne taille et couleur\n3. Ajoute au panier\n4. Valide ta commande\n5. Finalise le paiement sur WhatsApp\n\nEt c'est tout ! On s'occupe du reste.",
-    followUp: ['Comment payer ?', 'Délai de livraison', 'Voir le shop'] },
+  { keywords: ['commande', 'commander', 'acheter', 'comment', 'étape', 'etape', 'processus', 'faire'],
+    reply: "C'est très simple :\n1️⃣ Ajoute tes coups de cœur au panier.\n2️⃣ Remplis tes infos de livraison.\n3️⃣ On te contacte sur WhatsApp pour le paiement.\n4️⃣ On expédie et tu kiffes ! 🛍️",
+    followUp: ['Voir le shop', '💳 Comment payer ?'] },
 
-  { keywords: ['snap', 'snapchat'],
-    reply: "📸 Notre Snap : @tofh2b\nAjoute-nous pour suivre les drops et les nouveautés !" },
+  { keywords: ['snap', 'snapchat', 'réseau', 'reseau', 'social', 'insta', 'instagram'],
+    reply: "Suis-nous pour ne rien rater ! 📸\nSnapchat : @tofh2b (exclus & drops)\nOn y poste les nouveautés en avant-première ! ✨" },
 
-  { keywords: ['whatsapp', 'contact', 'joindre', 'appeler', 'telephone', 'tel'],
-    reply: "💬 Tu peux nous contacter sur WhatsApp pour :\n• Finaliser un paiement\n• Suivre ta commande\n• Poser une question\n\nLe lien est en bas du site !" },
+  { keywords: ['whatsapp', 'contact', 'joindre', 'appeler', 'telephone', 'tel', 'numéro', 'numero'],
+    reply: "💬 Notre support WhatsApp est le moyen le plus rapide de nous joindre. Tu peux cliquer sur le bouton vert en bas à droite du site !" },
 
-  { keywords: ['marque', 'gucci', 'louis', 'vuitton', 'prada', 'nike', 'jordan', 'dior', 'balenciaga', 'versace', 'burberry', 'off-white', 'amiri', 'moncler'],
-    reply: "🏷️ On propose les plus grandes marques :\nGucci, Louis Vuitton, Prada, Nike, Jordan, Dior, Balenciaga, Versace, Burberry, Off-White, Amiri, Moncler, et bien d'autres !\n\nCheck le shop pour voir tout le catalogue.",
-    followUp: ['Voir le shop', 'Comment commander ?'] },
-
-  { keywords: ['nouveau', 'nouveauté', 'drop', 'arrivage', 'new'],
-    reply: "🔥 On ajoute de nouvelles pièces chaque semaine ! Suis-nous sur Snap (@tofh2b) pour être alerté des drops.\n\nTu peux aussi checker la section \"Drop de la semaine\" sur le site.",
-    followUp: ['Voir le shop', 'Ajouter sur Snap'] },
-
-  { keywords: ['qualité', 'qualite', 'matière', 'matiere', 'bien', 'qc', 'photo'],
-    reply: "On fait un QC (contrôle qualité) sur chaque article avant l'envoi. On peut t'envoyer les photos sur WhatsApp pour que tu valides avant l'expédition." },
-
-  { keywords: ['stock', 'dispo', 'disponible', 'rupture', 'reste'],
-    reply: "La disponibilité est indiquée sur chaque produit dans le shop. Si un article t'intéresse mais n'est plus dispo, contacte-nous sur WhatsApp, on peut peut-être le retrouver !" },
-
-  { keywords: ['france', 'belgique', 'suisse', 'europe', 'pays', 'international'],
-    reply: "🌍 On livre dans toute la France et en Europe ! Les délais peuvent varier selon le pays." },
+  { keywords: ['marque', 'gucci', 'louis', 'vuitton', 'prada', 'nike', 'jordan', 'dior', 'balenciaga', 'versace', 'burberry', 'off-white', 'amiri', 'moncler', 'luxe'],
+    reply: "On source le meilleur du luxe et du streetwear : Nike, Jordan, LV, Gucci, Prada... 💎\n\nTu cherches un modèle précis qui n'est pas sur le site ? Envoie-nous une photo, on peut sûrement te le trouver !" },
 
   { keywords: ['merci', 'thanks', 'cool', 'top', 'parfait', 'super', 'nickel', 'genial', 'génial', 'ok', 'dac', 'd\'accord'],
-    reply: "Avec plaisir ! N'hésite pas si tu as d'autres questions 💪",
-    followUp: ['Voir le shop', 'Comment commander ?'] },
-
-  { keywords: ['aide', 'help', 'aidez', 'question', 'info', 'renseignement'],
-    reply: "Bien sûr ! Je suis là pour t'aider. Voici ce que je peux faire :",
-    followUp: ['Comment commander ?', 'Délai de livraison', 'Comment payer ?', 'Guide des tailles', 'Contacter WhatsApp'] },
+    reply: "Avec grand plaisir ! Profite bien de ta visite sur tof. 💪🔥",
+    followUp: ['Voir le shop'] },
 ];
 
 const quickButtons = [
@@ -180,6 +160,12 @@ export default function ChatWidget() {
     await sendChatMessage(clientMsg);
     scrollToBottom();
 
+    // Vérifier si un administrateur a déjà répondu dans cette conversation
+    const hasAdminReplied = messages.some(m => m.sender === 'admin');
+    
+    // Si un humain a déjà pris le relais, le bot reste silencieux
+    if (hasAdminReplied) return;
+
     const botResult = getBotReply(text);
     if (botResult) {
       setTyping(true);
@@ -204,13 +190,13 @@ export default function ChatWidget() {
           id: `m-${Date.now()}-bot`,
           conversation_id: conversationId,
           sender: 'bot',
-          message: "Je n'ai pas la réponse exacte, mais l'équipe va te répondre rapidement ! En attendant, tu peux essayer une de ces questions :",
+          message: "Je n'ai pas la réponse exacte, mais notre équipe support a été notifiée et va te répondre ici-même très rapidement ! ✨",
           client_name: name,
         };
         setMessages((prev) => [...prev, fallbackMsg]);
         await sendChatMessage(fallbackMsg);
         setTyping(false);
-        setSuggestions(['Comment commander ?', 'Délai de livraison', 'Comment payer ?', 'Contacter WhatsApp']);
+        setSuggestions(['Comment commander ?', 'Délai de livraison', 'Contacter WhatsApp']);
         scrollToBottom();
       }, 1000);
     }
