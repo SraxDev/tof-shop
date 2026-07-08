@@ -590,36 +590,6 @@ export default function Products() {
           </div>
         </div>
       )}
-
-            {/* Panier Sticky */}
-            <div className="p-6 sm:p-8 border-t border-dark/5 bg-white/80 backdrop-blur-md pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)] sticky bottom-0 z-20">
-              <button
-                onClick={handleAddToCart}
-                disabled={!canAdd()}
-                className={`w-full h-16 rounded-2xl text-[15px] font-900 text-white transition-all duration-300 flex items-center justify-center gap-3 shadow-xl ${
-                  addedId 
-                    ? 'bg-green-500 shadow-green-200' 
-                    : !canAdd() 
-                      ? 'bg-dark/10 text-dark/20 cursor-not-allowed shadow-none' 
-                      : 'bg-dark hover:bg-accent hover:scale-[1.02] active:scale-[0.98] shadow-dark/20'
-                }`}
-              >
-                {addedId ? (
-                  <>
-                    <span className="text-xl">✓</span>
-                    <span>AJOUTÉ AU PANIER !</span>
-                  </>
-                ) : (
-                  <>
-                    <ShoppingBag size={20} strokeWidth={2.5} />
-                    <span>AJOUTER AU PANIER — {formatPrice(quickAdd.salePrice)}</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </section>
   );
 }
