@@ -22,7 +22,7 @@ import ToastContainer from './components/Toast';
 import ChatWidget from './components/ChatWidget';
 
 
-const ADMIN_PASSWORD = 'tofadmin';
+const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || 'tofadmin';
 
 function AdminAccess() {
   const [password, setPassword] = useState('');

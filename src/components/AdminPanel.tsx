@@ -347,7 +347,20 @@ function rootOrderId(id: string) {
 }
 
 export default function AdminPanel() {
+  const [isAdminAuthed] = useState(() => sessionStorage.getItem('tof-admin-auth') === 'true');
+  
   const [products, setProducts] = useState<Product[]>(initialProducts);
+  // ... other states
+
+  if (!isAdminAuthed) {
+    return (
+      <div className="p-10 text-center">
+        <h2 className="text-red-500 font-bold">Accès non autorisé</h2>
+        <p className="text-white/40 mt-2">Veuillez vous connecter via le panel admin.</p>
+      </div>
+    );
+  }
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'products' | 'drop' | 'promos' | 'settings' | 'estimate' | 'notes' | 'chat'>('dashboard');
