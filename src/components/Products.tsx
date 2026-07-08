@@ -132,6 +132,7 @@ export default function Products() {
   const [search, setSearch] = useState('');
   const [liked, setLiked] = useState<Set<string>>(new Set());
   const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true); // État de chargement
   const [quickAdd, setQuickAdd] = useState<Product | null>(null);
   const [addedId, setAddedId] = useState('');
   const [selectedSize, setSelectedSize] = useState('');
@@ -148,9 +149,11 @@ export default function Products() {
 
   useEffect(() => {
     const loadAndSync = async () => {
+      setLoading(true);
       const loaded = await loadProducts();
       setProducts(loaded);
       syncCartWithProducts(loaded.map((p) => p.id));
+      setLoading(false);
     };
     loadAndSync();
     const sync = () => { loadAndSync(); };
@@ -168,6 +171,14 @@ export default function Products() {
       return true;
     });
   }, [products, activeGender, activeCategory, search]);
+
+  // Produits suggérés (même catégorie, sauf l'actuel)
+  const relatedProducts = useMemo(() => {
+    if (!quickAdd) return [];
+    return products
+      .filter(p => p.id !== quickAdd.id && p.category === quickAdd.category && p.status === 'active')
+      .slice(0, 3);
+  }, [products, quickAdd]);
 
   const visibleProducts = showAll ? allFiltered : allFiltered.slice(0, INITIAL_SHOW);
   const totalFiltered = allFiltered.length;
@@ -194,6 +205,10 @@ export default function Products() {
     setSelectedColor(colors[0] || '');
     setActiveImage(images[0] || '');
     setShowSizeGuide(false);
+    
+    // Scroll en haut de la modal si elle était déjà ouverte
+    const scrollContainer = document.querySelector('.custom-scrollbar');
+    if (scrollContainer) scrollContainer.scrollTop = 0;
   };
 
   const handleColorSelect = (color: string, index: number) => {
@@ -306,52 +321,64 @@ export default function Products() {
 
         {/* Grille produits */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5">
-          {visibleProducts.map((p, i) => (
-            <div
-              key={p.id}
-              className={`group cursor-pointer ${isInView ? 'anim-fade-up opacity-0' : 'opacity-0'}`}
-              style={{ animationDelay: `${i * 0.05}s` }}
-            >
-              <div className="relative aspect-[3/4] rounded-2xl bg-subtle overflow-hidden border border-dark/5 shadow-sm shadow-dark/5 group-hover:shadow-lg group-hover:shadow-dark/10 transition-shadow duration-300 flex items-center justify-center p-4">
-                <div className="h-full w-full flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
-                  {p.imageUrl ? (
-                    <img src={getProductImages(p)[0]} alt={p.name} className="max-h-full max-w-full w-auto h-auto object-contain" />
-                  ) : (
-                    <AppleEmoji emoji={emojiForCategory(p.category)} size={48} />
-                  )}
-                </div>
-                {(() => {
-                  const badge = getBadge(p);
-                  return badge ? <span className={`absolute top-3 left-3 ${badge.color} text-white text-[10px] font-bold px-2.5 py-1 rounded-full z-10`}>{badge.text}</span> : null;
-                })()}
-                <button
-                  onClick={(e) => { e.stopPropagation(); toggleLike(p.id); }}
-                  className={`absolute top-3 right-3 h-8 w-8 rounded-full flex items-center justify-center transition-all z-10 ${
-                    liked.has(p.id) ? 'bg-red-500 text-white' : 'bg-white/80 backdrop-blur text-dark/30 opacity-0 group-hover:opacity-100'
-                  }`}
-                >
-                  <Heart size={14} fill={liked.has(p.id) ? 'currentColor' : 'none'} />
-                </button>
-                <div className="absolute bottom-0 inset-x-0 p-3 translate-y-0 sm:translate-y-full sm:group-hover:translate-y-0 transition-transform duration-300">
-                  <button
-                    onClick={() => openQuickAdd(p)}
-                    className="w-full bg-dark hover:bg-accent text-white text-xs font-semibold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-1.5"
-                  >
-                    <ShoppingBag size={13} /> Ajouter
-                  </button>
-                </div>
+          {loading ? (
+            // Skeleton Loaders
+            Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="animate-pulse">
+                <div className="aspect-[3/4] rounded-2xl bg-dark/5 mb-3" />
+                <div className="h-3 w-12 bg-dark/5 rounded-full mb-2" />
+                <div className="h-4 w-3/4 bg-dark/5 rounded-full mb-2" />
+                <div className="h-4 w-1/3 bg-dark/5 rounded-full" />
               </div>
-              <button onClick={() => openQuickAdd(p)} className="pt-3 px-1 text-left w-full">
-                <span className="text-[10px] font-bold text-accent uppercase tracking-wider">{p.brand}</span>
-                <h3 className="text-sm font-medium text-dark/80 mt-0.5 leading-snug">{p.name}</h3>
-                <span className="text-sm font-800 text-dark mt-1 block">{formatPrice(p.salePrice)}</span>
-              </button>
-            </div>
-          ))}
+            ))
+          ) : (
+            visibleProducts.map((p, i) => (
+              <div
+                key={p.id}
+                className={`group cursor-pointer ${isInView ? 'anim-fade-up opacity-0' : 'opacity-0'}`}
+                style={{ animationDelay: `${i * 0.05}s` }}
+              >
+                <div className="relative aspect-[3/4] rounded-2xl bg-subtle overflow-hidden border border-dark/5 shadow-sm shadow-dark/5 group-hover:shadow-lg group-hover:shadow-dark/10 transition-shadow duration-300 flex items-center justify-center p-4">
+                  <div className="h-full w-full flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
+                    {p.imageUrl ? (
+                      <img src={getProductImages(p)[0]} alt={p.name} className="max-h-full max-w-full w-auto h-auto object-contain" />
+                    ) : (
+                      <AppleEmoji emoji={emojiForCategory(p.category)} size={48} />
+                    )}
+                  </div>
+                  {(() => {
+                    const badge = getBadge(p);
+                    return badge ? <span className={`absolute top-3 left-3 ${badge.color} text-white text-[10px] font-bold px-2.5 py-1 rounded-full z-10`}>{badge.text}</span> : null;
+                  })()}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); toggleLike(p.id); }}
+                    className={`absolute top-3 right-3 h-8 w-8 rounded-full flex items-center justify-center transition-all z-10 ${
+                      liked.has(p.id) ? 'bg-red-500 text-white' : 'bg-white/80 backdrop-blur text-dark/30 opacity-0 group-hover:opacity-100'
+                    }`}
+                  >
+                    <Heart size={14} fill={liked.has(p.id) ? 'currentColor' : 'none'} />
+                  </button>
+                  <div className="absolute bottom-0 inset-x-0 p-3 translate-y-0 sm:translate-y-full sm:group-hover:translate-y-0 transition-transform duration-300">
+                    <button
+                      onClick={() => openQuickAdd(p)}
+                      className="w-full bg-dark hover:bg-accent text-white text-xs font-semibold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-1.5"
+                    >
+                      <ShoppingBag size={13} /> Ajouter
+                    </button>
+                  </div>
+                </div>
+                <button onClick={() => openQuickAdd(p)} className="pt-3 px-1 text-left w-full">
+                  <span className="text-[10px] font-bold text-accent uppercase tracking-wider">{p.brand}</span>
+                  <h3 className="text-sm font-medium text-dark/80 mt-0.5 leading-snug">{p.name}</h3>
+                  <span className="text-sm font-800 text-dark mt-1 block">{formatPrice(p.salePrice)}</span>
+                </button>
+              </div>
+            ))
+          )}
         </div>
 
         {/* Voir tout / moins */}
-        {totalFiltered > INITIAL_SHOW && (
+        {!loading && totalFiltered > INITIAL_SHOW && (
           <div className="text-center mt-10">
             <button
               onClick={() => setShowAll(!showAll)}
@@ -363,7 +390,7 @@ export default function Products() {
           </div>
         )}
 
-        {totalFiltered === 0 && (
+        {!loading && totalFiltered === 0 && (
           <div className="rounded-3xl bg-white border border-dark/5 p-10 text-center text-dark/40">
             Aucun produit ne correspond à <span className="font-semibold text-dark/60">{activeGender}</span> dans <span className="font-semibold text-dark/60">{activeCategory}</span>{search ? ` pour “${search}”` : ''}.
           </div>
@@ -523,6 +550,32 @@ export default function Products() {
                           {quickSizes.length > 0 && !selectedSize && quickColors.length > 0 && !selectedColor ? ' et ' : ''}
                           {quickColors.length > 0 && !selectedColor ? 'une couleur' : ''}
                         </p>
+                      </div>
+                    )}
+
+                    {/* Cross-selling Section */}
+                    {relatedProducts.length > 0 && (
+                      <div className="mt-12">
+                        <p className="text-[11px] font-black uppercase tracking-widest text-dark/25 mb-5">Tu pourrais aussi aimer</p>
+                        <div className="grid grid-cols-3 gap-3">
+                          {relatedProducts.map((p) => (
+                            <button 
+                              key={p.id} 
+                              onClick={() => openQuickAdd(p)}
+                              className="group text-left"
+                            >
+                              <div className="aspect-square rounded-2xl bg-bg border border-dark/[0.03] overflow-hidden flex items-center justify-center p-2 group-hover:border-accent/20 transition-all">
+                                <img 
+                                  src={getProductImages(p)[0]} 
+                                  alt={p.name} 
+                                  className="max-h-full max-w-full w-auto h-auto object-contain group-hover:scale-110 transition-transform" 
+                                />
+                              </div>
+                              <p className="text-[9px] font-bold text-dark/40 mt-2 truncate uppercase">{p.brand}</p>
+                              <p className="text-[10px] font-bold text-dark truncate">{formatPrice(p.salePrice)}</p>
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     )}
 
