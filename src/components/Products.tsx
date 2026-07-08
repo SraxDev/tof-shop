@@ -201,13 +201,13 @@ export default function Products() {
         </div>
 
         {/* Recherche */}
-        <div className="relative mb-4">
+        <div className="relative mb-3">
           <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-dark/25" />
           <input
             value={search}
             onChange={(e) => { setSearch(e.target.value); setShowAll(false); }}
-            placeholder="Rechercher un produit, une marque..."
-            className="w-full rounded-2xl bg-white border border-dark/5 pl-11 pr-4 py-3 text-sm outline-none focus:border-accent/30 transition-colors"
+            placeholder="Rechercher..."
+            className="w-full rounded-2xl bg-white border border-dark/5 pl-10 pr-10 py-3 text-sm outline-none focus:border-accent/30 transition-colors"
           />
           {search && (
             <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 h-6 w-6 rounded-full bg-dark/5 flex items-center justify-center text-dark/40 hover:text-dark">
@@ -216,50 +216,39 @@ export default function Products() {
           )}
         </div>
 
-        {/* Filtres genre */}
-        <div className="mb-2">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-dark/25 mb-2">Genre</div>
-          <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
-            {genderFilters.map((filter) => (
-              <button
-                key={filter}
-                onClick={() => { setActiveGender(filter); setShowAll(false); }}
-                className={`px-4 py-2.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap flex-shrink-0 ${
-                  activeGender === filter ? 'bg-dark text-white' : 'bg-dark/5 text-dark/50 hover:bg-dark/10'
-                }`}
-              >
-                {filter}
-              </button>
-            ))}
-          </div>
+        {/* Filtres */}
+        <div className="flex gap-1.5 overflow-x-auto pb-2 mb-1 -mx-1 px-1">
+          {genderFilters.map((filter) => (
+            <button
+              key={filter}
+              onClick={() => { setActiveGender(filter); setShowAll(false); }}
+              className={`px-3 py-2 rounded-full text-[11px] font-semibold transition-all whitespace-nowrap flex-shrink-0 ${
+                activeGender === filter ? 'bg-dark text-white' : 'bg-dark/5 text-dark/50 hover:bg-dark/10'
+              }`}
+            >
+              {filter}
+            </button>
+          ))}
         </div>
 
-        {/* Filtres catégorie */}
-        <div className="mb-6">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-dark/25 mb-2">Catégorie</div>
-          <div className="flex gap-2 overflow-x-auto pb-3 -mx-1 px-1">
-            {categoryFilters.map((filter) => (
-              <button
-                key={filter}
-                onClick={() => { setActiveCategory(filter); setShowAll(false); }}
-                className={`px-4 py-2.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap flex-shrink-0 ${
-                  activeCategory === filter ? 'bg-dark text-white' : 'bg-dark/5 text-dark/50 hover:bg-dark/10'
-                }`}
-              >
-                {filter}
-              </button>
-            ))}
-          </div>
+        <div className="flex gap-1.5 overflow-x-auto pb-2 mb-4 -mx-1 px-1">
+          {categoryFilters.map((filter) => (
+            <button
+              key={filter}
+              onClick={() => { setActiveCategory(filter); setShowAll(false); }}
+              className={`px-3 py-2 rounded-full text-[11px] font-semibold transition-all whitespace-nowrap flex-shrink-0 ${
+                activeCategory === filter ? 'bg-accent text-white' : 'bg-dark/5 text-dark/50 hover:bg-dark/10'
+              }`}
+            >
+              {filter}
+            </button>
+          ))}
         </div>
 
         <div className="flex flex-wrap items-center gap-2 mb-4 text-xs">
-          <span className="text-dark/35">Affichage :</span>
-          <span className="rounded-full bg-dark/5 px-3 py-1 font-semibold text-dark/60">{activeGender}</span>
-          <span className="text-dark/20">•</span>
-          <span className="rounded-full bg-dark/5 px-3 py-1 font-semibold text-dark/60">{activeCategory}</span>
+          <span className="text-dark/30">{totalFiltered} produit{totalFiltered > 1 ? 's' : ''}</span>
           {search && (
             <>
-              <span className="text-dark/20">•</span>
               <span className="rounded-full bg-accent/10 px-3 py-1 font-semibold text-accent">“{search}”</span>
             </>
           )}
