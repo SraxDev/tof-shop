@@ -18,6 +18,16 @@ export type DbProduct = {
   created_at?: string;
 };
 
+export type DbOrderItem = {
+  productId: string;
+  brand: string;
+  name: string;
+  size: string;
+  color: string;
+  quantity: number;
+  price: number;
+};
+
 export type DbOrder = {
   id: string;
   product_id: string;
@@ -34,6 +44,7 @@ export type DbOrder = {
   status: string;
   payment_status: string;
   tracking: string | null;
+  items_json?: string;
   created_at?: string;
 };
 
@@ -138,4 +149,28 @@ export async function fetchDrop(): Promise<DbDrop | null> {
 export async function saveDrop(drop: DbDrop) {
   await supabase.from('featured_drop').upsert({ ...drop, id: 1 });
   window.dispatchEvent(new CustomEvent('tof-drop-updated'));
+}
+
+// ─── Realtime ────────────────────────────────────────────
+
+export function subscribeToOrders(callback: () => void) {
+  const channel = supabase
+    .channel('orders-realtime')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+      callback();
+    })
+    .subscribe();
+
+  return () => { supabase.removeChannel(channel); };
+}
+
+export function subscribeToProducts(callback: () => void) {
+  const channel = supabase
+    .channel('products-realtime')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
+      callback();
+    })
+    .subscribe();
+
+  return () => { supabase.removeChannel(channel); };
 }

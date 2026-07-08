@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Copy, ExternalLink, Package, Pencil, Plus, Save, Trash2, Truck } from 'lucide-react';
 import { defaultDrop, type FeaturedDropConfig } from './FeaturedDrop';
 import { defaultSettings, readSiteSettings, saveSiteSettings, hydrateSiteSettings, type SiteSettings } from '../lib/siteSettings';
-import { fetchProducts, upsertProduct, deleteProduct as dbDeleteProduct, fetchOrders, updateOrder, insertOrder as dbInsertOrder, fetchDrop, saveDrop as dbSaveDrop, fetchNotes, upsertNote, deleteNote as dbDeleteNote, type DbProduct, type DbOrder, type DbDrop, type DbNote } from '../lib/db';
+import { fetchProducts, upsertProduct, deleteProduct as dbDeleteProduct, fetchOrders, updateOrder, insertOrder as dbInsertOrder, fetchDrop, saveDrop as dbSaveDrop, fetchNotes, upsertNote, deleteNote as dbDeleteNote, subscribeToOrders, subscribeToProducts, type DbProduct, type DbOrder, type DbDrop, type DbNote } from '../lib/db';
 import { showToast } from './Toast';
 
 type Product = {
@@ -22,6 +22,16 @@ type Product = {
 
 type OrderStatus = 'new' | 'to_order' | 'ordered' | 'qc_received' | 'shipped' | 'done';
 
+type OrderItem = {
+  productId: string;
+  brand: string;
+  name: string;
+  size: string;
+  color: string;
+  quantity: number;
+  price: number;
+};
+
 type Order = {
   id: string;
   productId: string;
@@ -38,6 +48,7 @@ type Order = {
   status: OrderStatus;
   paymentStatus?: 'pending' | 'paid' | 'cancelled';
   tracking?: string;
+  items?: OrderItem[];
 };
 
 // Legacy keys kept for reference
@@ -170,12 +181,17 @@ function orderToDb(o: Order): DbOrder {
 }
 
 function dbToOrder(d: DbOrder): Order {
+  let items: OrderItem[] | undefined;
+  try {
+    if (d.items_json) items = JSON.parse(d.items_json) as OrderItem[];
+  } catch { /* ignore */ }
   return {
     id: d.id, productId: d.product_id, size: d.size, color: d.color,
     quantity: d.quantity, customerName: d.customer_name, phone: d.phone,
     address: d.address, city: d.city, zip: d.zip, country: d.country,
     snapOrWhatsapp: d.snap_or_whatsapp, status: d.status as OrderStatus,
     paymentStatus: d.payment_status as Order['paymentStatus'], tracking: d.tracking || undefined,
+    items,
   };
 }
 
@@ -378,9 +394,20 @@ export default function AdminPanel() {
     const refresh = () => { loadAll(); };
     window.addEventListener('tof-orders-updated', refresh);
     window.addEventListener('tof-products-updated', refresh);
+
+    const unsubOrders = subscribeToOrders(() => {
+      fetchOrders().then((data) => setOrders(data.map(dbToOrder)));
+      showToast('Nouvelle commande reçue !');
+    });
+    const unsubProducts = subscribeToProducts(() => {
+      fetchProducts().then((data) => setProducts(data.map(dbToProduct).map(normalizedProduct)));
+    });
+
     return () => {
       window.removeEventListener('tof-orders-updated', refresh);
       window.removeEventListener('tof-products-updated', refresh);
+      unsubOrders();
+      unsubProducts();
     };
   }, [loadAll]);
 
@@ -657,9 +684,22 @@ export default function AdminPanel() {
   }, [orders, products]);
 
   const orderText = (order: Order) => {
+    let productsBlock = '';
+
+    if (order.items && order.items.length > 0) {
+      productsBlock = order.items.map((item, idx) => {
+        const p = getProduct(item.productId);
+        return `ARTICLE ${idx + 1}\nBrand: ${item.brand}\nName: ${item.name}\nSource link: ${p.sourceUrl}\nSize: ${item.size}\nColor: ${item.color}\nQuantity: ${item.quantity}\nPrice: ${euro(item.price)}`;
+      }).join('\n\n');
+    } else {
+      const product = getProduct(order.productId);
+      productsBlock = `ARTICLE 1\nBrand: ${product.brand}\nName: ${product.name}\nSource link: ${product.sourceUrl}\nSource price: ${product.sourcePriceCny} CNY\nSize: ${order.size}\nColor: ${order.color}\nQuantity: ${order.quantity}`;
+    }
+
     const product = getProduct(order.productId);
     const margin = estimateNetMargin(product, order.quantity);
-    return `ORDER ${rootOrderId(order.id)}\n\nPRODUCT\nBrand: ${product.brand}\nName: ${product.name}\nSource link: ${product.sourceUrl}\nSource price: ${product.sourcePriceCny} CNY (${euro(margin.sourceCost)})\nSize: ${order.size}\nColor: ${order.color}\nQuantity: ${order.quantity}\nPackaging: ${packagingLabels[product.packaging || 'none']}\nEstimated weight: ${margin.effectiveWeight}g\n\nCUSTOMER\nName: ${order.customerName}\nPhone: ${order.phone}\nAddress: ${order.address}\nCity: ${order.city}\nZip: ${order.zip}\nCountry: ${order.country}\nSnap/WhatsApp: ${order.snapOrWhatsapp}\n\nSHIPPING\nPreferred line: ${margin.shipping.label}\nEstimated shipping: ${euro(margin.shipping.low)} - ${euro(margin.shipping.high)}\nSafety shipping used for margin (+20%): ${euro(margin.shippingWithSafety)}\nEstimated net margin: ${euro(margin.net)}\nPackaging: discreet, no invoice\nQC: please send photos before shipping`;
+
+    return `ORDER ${rootOrderId(order.id)}\n\n${productsBlock}\n\nCUSTOMER\nName: ${order.customerName}\nPhone: ${order.phone}\nAddress: ${order.address}\nCity: ${order.city}\nZip: ${order.zip}\nCountry: ${order.country}\nSnap/WhatsApp: ${order.snapOrWhatsapp}\n\nSHIPPING\nEstimated shipping: ${euro(margin.shipping.low)} - ${euro(margin.shipping.high)}\nPackaging: discreet, no invoice\nQC: please send photos before shipping`;
   };
 
   const copyOrder = async (order: Order) => {
@@ -670,10 +710,20 @@ export default function AdminPanel() {
   };
 
   const clientMessage = (order: Order, type: 'payment' | 'paid' | 'tracking' | 'delay') => {
-    const product = getProduct(order.productId);
-    const amount = euro(product.salePrice * order.quantity);
+    let itemsText = '';
+    let totalAmount = '';
+
+    if (order.items && order.items.length > 0) {
+      itemsText = order.items.map((i) => `- ${i.brand} ${i.name} (${i.size}/${i.color}) ×${i.quantity} = ${euro(i.price * i.quantity)}`).join('\n');
+      totalAmount = euro(order.items.reduce((s, i) => s + i.price * i.quantity, 0));
+    } else {
+      const product = getProduct(order.productId);
+      itemsText = `- ${product.brand} ${product.name} (${order.size}/${order.color}) ×${order.quantity}`;
+      totalAmount = euro(product.salePrice * order.quantity);
+    }
+
     if (type === 'payment') {
-      return `Salut ${order.customerName}, ta commande ${rootOrderId(order.id)} est bien réservée.\n\nProduit : ${product.brand} - ${product.name}\nTaille/couleur : ${order.size} / ${order.color}\nMontant : ${amount}\n\nPaiement PayPal : ${siteSettings.paypalUrl}\n\nEnvoie une capture ici quand c'est fait et je lance la commande.`;
+      return `Salut ${order.customerName}, ta commande ${rootOrderId(order.id)} est bien réservée.\n\n${itemsText}\n\nTotal : ${totalAmount}\n\nPaiement PayPal : ${siteSettings.paypalUrl}\n\nEnvoie une capture ici quand c'est fait et je lance la commande.`;
     }
     if (type === 'paid') {
       return `Paiement reçu pour ta commande ${rootOrderId(order.id)}, merci.\nJe lance la commande et je te tiens au courant pour le QC / suivi.`;
@@ -884,9 +934,15 @@ export default function AdminPanel() {
                             {statusLabels[order.status]}
                           </span>
                         </div>
-                        <h3 className="font-bold">{product.brand} - {product.name}</h3>
+                        <h3 className="font-bold">
+                          {order.items && order.items.length > 1
+                            ? `${order.items.length} articles`
+                            : `${product.brand} - ${product.name}`}
+                        </h3>
                         <p className="text-sm text-dark/45 mt-1">
-                          {order.size} / {order.color} / x{order.quantity} pour {order.customerName}
+                          {order.items && order.items.length > 1
+                            ? `pour ${order.customerName}`
+                            : `${order.size} / ${order.color} / x${order.quantity} pour ${order.customerName}`}
                         </p>
                       </div>
                       <div className="flex flex-col sm:flex-row gap-2">
@@ -914,6 +970,26 @@ export default function AdminPanel() {
                         </select>
                       </div>
                     </div>
+
+                    {order.items && order.items.length > 1 && (
+                      <div className="mt-4 space-y-2">
+                        <div className="text-xs font-bold text-dark/35">Articles de la commande</div>
+                        {order.items.map((item, idx) => (
+                          <div key={idx} className="flex items-center justify-between gap-3 rounded-xl bg-bg p-3">
+                            <div className="flex-1 min-w-0">
+                              <span className="text-[10px] font-bold text-accent uppercase">{item.brand}</span>
+                              <div className="text-sm font-semibold text-dark truncate">{item.name}</div>
+                              <div className="text-xs text-dark/40">{item.size} / {item.color} × {item.quantity}</div>
+                            </div>
+                            <span className="text-sm font-800 text-dark flex-shrink-0">{euro(item.price * item.quantity)}</span>
+                          </div>
+                        ))}
+                        <div className="flex justify-between rounded-xl bg-dark/5 p-3">
+                          <span className="text-xs font-bold text-dark/50">Total commande</span>
+                          <span className="text-sm font-800 text-dark">{euro(order.items.reduce((s, i) => s + i.price * i.quantity, 0))}</span>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="grid sm:grid-cols-3 gap-3 mt-5 text-sm">
                       <div className="rounded-2xl bg-bg p-4">

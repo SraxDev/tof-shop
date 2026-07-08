@@ -60,25 +60,36 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
 
     const orderId = `TOF-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    for (const item of cart) {
-      await insertOrder({
-        id: `${orderId}-${item.productId}-${item.size}-${item.color}`,
-        product_id: item.productId,
-        size: item.size,
-        color: item.color,
-        quantity: item.quantity,
-        customer_name: form.customerName,
-        phone: form.phone,
-        address: form.address,
-        city: form.city,
-        zip: form.zip,
-        country: form.country,
-        snap_or_whatsapp: form.snapOrWhatsapp,
-        status: 'to_order',
-        payment_status: 'pending',
-        tracking: null,
-      });
-    }
+    const itemsJson = JSON.stringify(cart.map((item) => ({
+      productId: item.productId,
+      brand: item.brand,
+      name: item.name,
+      size: item.size,
+      color: item.color,
+      quantity: item.quantity,
+      price: item.salePrice,
+    })));
+
+    const firstItem = cart[0];
+
+    await insertOrder({
+      id: orderId,
+      product_id: firstItem.productId,
+      size: cart.map((i) => `${i.size}`).join(', '),
+      color: cart.map((i) => `${i.color}`).join(', '),
+      quantity: cart.reduce((sum, i) => sum + i.quantity, 0),
+      customer_name: form.customerName,
+      phone: form.phone,
+      address: form.address,
+      city: form.city,
+      zip: form.zip,
+      country: form.country,
+      snap_or_whatsapp: form.snapOrWhatsapp,
+      status: 'to_order',
+      payment_status: 'pending',
+      tracking: null,
+      items_json: itemsJson,
+    });
 
     setSavedCart([...cart]);
     setSavedTotal(grandTotal);
