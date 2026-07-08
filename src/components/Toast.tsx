@@ -1,5 +1,6 @@
 import { CheckCircle2, AlertTriangle, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { playSuccess, playError, playWarning } from '../lib/sounds';
 
 export type ToastType = 'success' | 'error' | 'warning';
 
@@ -7,13 +8,14 @@ type ToastData = {
   id: number;
   message: string;
   type: ToastType;
+  sound?: boolean;
 };
 
 let toastId = 0;
 const listeners: Set<(t: ToastData) => void> = new Set();
 
-export function showToast(message: string, type: ToastType = 'success') {
-  const data: ToastData = { id: ++toastId, message, type };
+export function showToast(message: string, type: ToastType = 'success', sound = true) {
+  const data: ToastData = { id: ++toastId, message, type, sound };
   listeners.forEach((fn) => fn(data));
 }
 
@@ -23,6 +25,11 @@ export default function ToastContainer() {
   useEffect(() => {
     const handler = (t: ToastData) => {
       setToasts((prev) => [...prev, t]);
+      if (t.sound !== false) {
+        if (t.type === 'success') playSuccess();
+        if (t.type === 'error') playError();
+        if (t.type === 'warning') playWarning();
+      }
       setTimeout(() => {
         setToasts((prev) => prev.filter((item) => item.id !== t.id));
       }, 3000);

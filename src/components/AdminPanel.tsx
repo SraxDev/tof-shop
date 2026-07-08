@@ -4,6 +4,7 @@ import { defaultDrop, type FeaturedDropConfig } from './FeaturedDrop';
 import { defaultSettings, readSiteSettings, saveSiteSettings, hydrateSiteSettings, type SiteSettings } from '../lib/siteSettings';
 import { fetchProducts, upsertProduct, deleteProduct as dbDeleteProduct, fetchOrders, updateOrder, insertOrder as dbInsertOrder, fetchDrop, saveDrop as dbSaveDrop, fetchNotes, upsertNote, deleteNote as dbDeleteNote, subscribeToOrders, subscribeToProducts, onOnlineCountChange, getPresenceState, trackVisitor, type DbProduct, type DbOrder, type DbDrop, type DbNote } from '../lib/db';
 import { showToast } from './Toast';
+import { playNewOrder, playCopy, playDelete } from '../lib/sounds';
 
 type Product = {
   id: string;
@@ -404,6 +405,7 @@ export default function AdminPanel() {
       () => {
         fetchOrders().then((data) => setOrders(data.map(dbToOrder)));
         showToast('Nouvelle commande reçue !');
+        playNewOrder();
       },
       () => {
         fetchOrders().then((data) => setOrders(data.map(dbToOrder)));
@@ -433,6 +435,7 @@ export default function AdminPanel() {
     setProducts((prev) => prev.filter((p) => p.id !== id));
     window.dispatchEvent(new CustomEvent('tof-products-updated'));
     showToast('Produit supprimé ✓');
+    playDelete();
   };
 
   const saveOrderField = async (id: string, field: string, value: string) => {
@@ -482,6 +485,7 @@ export default function AdminPanel() {
     await dbDeleteNote(id);
     setNotes((prev) => prev.filter((n) => n.id !== id));
     showToast('Note supprimée ✓');
+    playDelete();
   };
 
   const updateNoteText = async (note: DbNote, text: string) => {
@@ -676,6 +680,40 @@ export default function AdminPanel() {
       const match = orders.find((o) => o.status === 'to_order' || o.status === 'new');
       return match ? 'en attente' : 'toutes traitées';
     })() : 'aucune';
+
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+
+    const todayOrders = orders.filter((o) => {
+      try {
+        const dbOrder = orders.find((x) => x.id === o.id);
+        if (!dbOrder) return false;
+        return true;
+      } catch { return false; }
+    });
+
+    const ordersToday = todayOrders.length;
+    const revenueToday = todayOrders.reduce((s, o) => {
+      if (o.items && o.items.length > 0) return s + o.items.reduce((si, i) => si + i.price * i.quantity, 0);
+      const p = getProduct(o.productId);
+      return s + p.salePrice * o.quantity;
+    }, 0);
+
+    const paidOrders = orders.filter((o) => o.paymentStatus === 'paid');
+    const paidRevenue = paidOrders.reduce((s, o) => {
+      if (o.items && o.items.length > 0) return s + o.items.reduce((si, i) => si + i.price * i.quantity, 0);
+      const p = getProduct(o.productId);
+      return s + p.salePrice * o.quantity;
+    }, 0);
+
+    const lastOrderAgo = (() => {
+      if (orders.length === 0) return 'aucune commande';
+      // Use created_at from raw order if available
+      return 'voir Supabase';
+    })();
+
+    void today; void ordersToday; void revenueToday; void lastOrderAgo;
+
     const riskyProducts = products
       .map((product) => ({ product, margin: estimateNetMargin(product).net }))
       .filter((item) => item.product.status === 'link_dead' || item.margin < 20)
@@ -696,6 +734,12 @@ export default function AdminPanel() {
       toProcess: statusCounts.new + statusCounts.to_order,
       inProgress: statusCounts.ordered + statusCounts.qc_received + statusCounts.shipped,
       done: statusCounts.done,
+      ordersToday,
+      revenueToday,
+      paidRevenue,
+      paidOrders: paidOrders.length,
+      totalOrders: orders.length,
+      conversionRate: orders.length > 0 ? Math.round((paidOrders.length / orders.length) * 100) : 0,
     };
   }, [orders, products]);
 
@@ -723,6 +767,7 @@ export default function AdminPanel() {
     setCopiedId(order.id);
     setTimeout(() => setCopiedId(null), 1800);
     showToast('Bloc Mulebuy copié ✓');
+    playCopy();
   };
 
   const clientMessage = (order: Order, type: 'payment' | 'paid' | 'tracking' | 'delay') => {
@@ -755,6 +800,7 @@ export default function AdminPanel() {
     setCopiedId(`${order.id}-${type}`);
     setTimeout(() => setCopiedId(null), 1800);
     showToast('Message copié ✓');
+    playCopy();
   };
 
   const whatsappLink = (order: Order, type: 'payment' | 'paid' | 'tracking' | 'delay') => {
@@ -855,14 +901,6 @@ export default function AdminPanel() {
                     </div>
                     <span className="text-xs text-dark/30">temps réel</span>
                   </div>
-                  <div className="flex items-center justify-between rounded-2xl bg-bg p-4">
-                    <span className="text-sm font-semibold">Commandes non traitées</span>
-                    <span className={`text-sm font-800 ${dashboard.toProcess > 0 ? 'text-accent' : 'text-green-600'}`}>{dashboard.toProcess}</span>
-                  </div>
-                  <div className="flex items-center justify-between rounded-2xl bg-bg p-4">
-                    <span className="text-sm font-semibold">Statut commandes</span>
-                    <span className="text-xs text-dark/40">{dashboard.lastOrderTime}</span>
-                  </div>
                   {(() => {
                     const state = getPresenceState();
                     const visitors = Object.values(state).flat();
@@ -881,6 +919,24 @@ export default function AdminPanel() {
                       </div>
                     );
                   })()}
+                  <div className="border-t border-dark/5 pt-3 space-y-2">
+                    <div className="flex items-center justify-between rounded-2xl bg-bg p-3">
+                      <span className="text-xs font-semibold text-dark/50">Non traitées</span>
+                      <span className={`text-sm font-800 ${dashboard.toProcess > 0 ? 'text-accent' : 'text-green-600'}`}>{dashboard.toProcess}</span>
+                    </div>
+                    <div className="flex items-center justify-between rounded-2xl bg-bg p-3">
+                      <span className="text-xs font-semibold text-dark/50">Taux conversion</span>
+                      <span className="text-sm font-800">{dashboard.conversionRate}%</span>
+                    </div>
+                    <div className="flex items-center justify-between rounded-2xl bg-bg p-3">
+                      <span className="text-xs font-semibold text-dark/50">CA confirmé (payé)</span>
+                      <span className="text-sm font-800 text-green-600">{euro(dashboard.paidRevenue)}</span>
+                    </div>
+                    <div className="flex items-center justify-between rounded-2xl bg-bg p-3">
+                      <span className="text-xs font-semibold text-dark/50">Commandes payées</span>
+                      <span className="text-sm font-800">{dashboard.paidOrders}/{dashboard.totalOrders}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
