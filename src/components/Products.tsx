@@ -182,8 +182,7 @@ export default function Products() {
 
   const getProductImages = (p: Product) => {
     if (!p.imageUrl) return [];
-    // Nettoyer les espaces et filtrer les entrées vides
-    return p.imageUrl.split(',').map(s => s.trim()).filter(url => url && url.startsWith('http') || url.startsWith('data:image'));
+    return p.imageUrl.split('|').map(s => s.trim()).filter(url => url && (url.startsWith('http') || url.startsWith('data:image')));
   };
 
   const openQuickAdd = (p: Product) => {

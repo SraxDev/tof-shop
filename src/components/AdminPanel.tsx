@@ -1435,8 +1435,8 @@ export default function AdminPanel() {
                                   });
 
                                   Promise.all(readers).then(results => {
-                                    const currentImages = current.imageUrl ? current.imageUrl.split(',').map(s => s.trim()).filter(Boolean) : [];
-                                    const nextImages = [...currentImages, ...results].join(', ');
+                                    const currentImages = current.imageUrl ? current.imageUrl.split('|').map(s => s.trim()).filter(Boolean) : [];
+                                    const nextImages = [...currentImages, ...results].join('|');
                                     setDraftProduct({ ...current, imageUrl: nextImages });
                                   });
                                 }} />
@@ -1453,7 +1453,7 @@ export default function AdminPanel() {
                         
                         {current.imageUrl && (
                           <div className="flex flex-wrap gap-2 mt-2">
-                            {current.imageUrl.split(',').map((url, idx) => {
+                            {current.imageUrl.split('|').map((url, idx) => {
                               const trimmedUrl = url.trim();
                               if (!trimmedUrl) return null;
                               return (
@@ -1463,9 +1463,9 @@ export default function AdminPanel() {
                                     <button 
                                       type="button"
                                       onClick={() => {
-                                        const urls = current.imageUrl.split(',').map(s => s.trim()).filter(Boolean);
+                                        const urls = current.imageUrl.split('|').map(s => s.trim()).filter(Boolean);
                                         urls.splice(idx, 1);
-                                        setDraftProduct({ ...current, imageUrl: urls.join(', ') });
+                                        setDraftProduct({ ...current, imageUrl: urls.join('|') });
                                       }}
                                       className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 text-white rounded-full text-[8px] flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity z-10"
                                     >
