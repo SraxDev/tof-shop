@@ -304,6 +304,9 @@ export default function AdminPanel() {
   const [notes, setNotes] = useState<DbNote[]>([]);
   const [noteFilter, setNoteFilter] = useState<'all' | 'idea' | 'todo' | 'urgent' | 'done'>('all');
   const [newNote, setNewNote] = useState({ text: '', category: 'todo' });
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editingNoteText, setEditingNoteText] = useState('');
+  const [noteSort, setNoteSort] = useState<'priority' | 'date'>('priority');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftProduct, setDraftProduct] = useState<Product | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -439,6 +442,38 @@ export default function AdminPanel() {
     showToast('Note supprimée ✓');
   };
 
+  const updateNoteText = async (note: DbNote, text: string) => {
+    const updated = { ...note, text };
+    await upsertNote(updated);
+    setNotes((prev) => prev.map((n) => n.id === note.id ? updated : n));
+    setEditingNoteId(null);
+    showToast('Note modifiée ✓');
+  };
+
+  const changeNoteCategory = async (note: DbNote, category: string) => {
+    const updated = { ...note, category, done: category === 'done', priority: category === 'urgent' ? 0 : category === 'todo' ? 1 : 2 };
+    await upsertNote(updated);
+    setNotes((prev) => prev.map((n) => n.id === note.id ? updated : n));
+    showToast('Catégorie mise à jour ✓');
+  };
+
+  const markAllDone = async () => {
+    const toUpdate = notes.filter((n) => !n.done);
+    for (const n of toUpdate) {
+      const updated = { ...n, done: true, category: 'done' };
+      await upsertNote(updated);
+    }
+    setNotes((prev) => prev.map((n) => ({ ...n, done: true, category: 'done' })));
+    showToast(`${toUpdate.length} notes marquées comme faites ✓`);
+  };
+
+  const clearDone = async () => {
+    const toDelete = notes.filter((n) => n.done);
+    for (const n of toDelete) await dbDeleteNote(n.id);
+    setNotes((prev) => prev.filter((n) => !n.done));
+    showToast(`${toDelete.length} notes terminées supprimées ✓`);
+  };
+
   const filteredNotes = notes.filter((n) => {
     if (noteFilter === 'all') return true;
     if (noteFilter === 'done') return n.done;
@@ -446,6 +481,10 @@ export default function AdminPanel() {
     if (noteFilter === 'todo') return n.category === 'todo' && !n.done;
     if (noteFilter === 'urgent') return n.category === 'urgent' && !n.done;
     return true;
+  }).sort((a, b) => {
+    if (noteSort === 'date') return (b.created_at || '').localeCompare(a.created_at || '');
+    if (a.done !== b.done) return a.done ? 1 : -1;
+    return a.priority - b.priority;
   });
 
   const noteStats = {
@@ -455,6 +494,8 @@ export default function AdminPanel() {
     todo: notes.filter((n) => n.category === 'todo' && !n.done).length,
     idea: notes.filter((n) => n.category === 'idea' && !n.done).length,
   };
+
+  const progressPercent = noteStats.total > 0 ? Math.round((noteStats.done / noteStats.total) * 100) : 0;
 
   const saveSettings = async () => {
     await saveSiteSettings(siteSettings);
@@ -1421,24 +1462,55 @@ export default function AdminPanel() {
 
         {activeTab === 'notes' && (
           <div className="space-y-5">
-            {/* Stats */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-3">
-              {[
-                { label: 'Total', value: noteStats.total, filter: 'all' as const, color: 'bg-white/5' },
-                { label: 'Urgent', value: noteStats.urgent, filter: 'urgent' as const, color: 'bg-red-500/10' },
-                { label: 'À faire', value: noteStats.todo, filter: 'todo' as const, color: 'bg-amber-400/10' },
-                { label: 'Idées', value: noteStats.idea, filter: 'idea' as const, color: 'bg-blue-400/10' },
-                { label: 'Fait', value: noteStats.done, filter: 'done' as const, color: 'bg-green-500/10' },
-              ].map((s) => (
-                <button
-                  key={s.label}
-                  onClick={() => setNoteFilter(s.filter)}
-                  className={`rounded-2xl p-3 sm:p-4 text-center transition-all ${s.color} border ${noteFilter === s.filter ? 'border-accent' : 'border-white/10'}`}
-                >
-                  <div className="text-xl sm:text-2xl font-800 text-white">{s.value}</div>
-                  <div className="text-[10px] sm:text-[11px] text-white/40">{s.label}</div>
+            {/* Barre de progression */}
+            {noteStats.total > 0 && (
+              <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-bold text-white">{progressPercent}% terminé</span>
+                  <span className="text-xs text-white/30">{noteStats.done}/{noteStats.total} tâches</span>
+                </div>
+                <div className="h-2.5 rounded-full bg-white/5 overflow-hidden">
+                  <div className="h-full rounded-full bg-gradient-to-r from-accent to-green-500 transition-all duration-500" style={{ width: `${progressPercent}%` }} />
+                </div>
+              </div>
+            )}
+
+            {/* Stats + actions */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <div className="flex gap-2 overflow-x-auto pb-1 flex-1">
+                {[
+                  { label: `Tout (${noteStats.total})`, filter: 'all' as const },
+                  { label: `🔴 Urgent (${noteStats.urgent})`, filter: 'urgent' as const },
+                  { label: `🟡 À faire (${noteStats.todo})`, filter: 'todo' as const },
+                  { label: `💡 Idées (${noteStats.idea})`, filter: 'idea' as const },
+                  { label: `✅ Fait (${noteStats.done})`, filter: 'done' as const },
+                ].map((s) => (
+                  <button
+                    key={s.filter}
+                    onClick={() => setNoteFilter(s.filter)}
+                    className={`rounded-full px-3 py-2 text-xs font-semibold whitespace-nowrap flex-shrink-0 transition-all ${
+                      noteFilter === s.filter ? 'bg-accent text-white' : 'bg-white/5 text-white/40 hover:bg-white/10'
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-2 flex-shrink-0">
+                <button onClick={() => setNoteSort(noteSort === 'priority' ? 'date' : 'priority')} className="rounded-full bg-white/5 px-3 py-2 text-xs font-semibold text-white/40 hover:bg-white/10 transition-colors">
+                  Tri : {noteSort === 'priority' ? 'Priorité' : 'Date'}
                 </button>
-              ))}
+                {noteStats.done > 0 && (
+                  <button onClick={clearDone} className="rounded-full bg-white/5 px-3 py-2 text-xs font-semibold text-white/40 hover:bg-white/10 transition-colors">
+                    Vider fait
+                  </button>
+                )}
+                {noteStats.total > noteStats.done && (
+                  <button onClick={markAllDone} className="rounded-full bg-white/5 px-3 py-2 text-xs font-semibold text-white/40 hover:bg-white/10 transition-colors">
+                    Tout fait
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="grid lg:grid-cols-3 gap-5">
@@ -1465,20 +1537,47 @@ export default function AdminPanel() {
                       {note.done && <span className="text-xs">✓</span>}
                     </button>
                     <div className="flex-1 min-w-0">
-                      <p className={`text-sm leading-relaxed ${note.done ? 'text-white/30 line-through' : ''}`}>
-                        {note.text}
-                      </p>
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                          note.category === 'urgent' ? 'bg-red-500/10 text-red-400' :
-                          note.category === 'todo' ? 'bg-amber-400/10 text-amber-400' :
-                          note.category === 'idea' ? 'bg-blue-400/10 text-blue-400' :
-                          'bg-green-500/10 text-green-400'
-                        }`}>
-                          {note.category === 'urgent' ? '🔴 Urgent' :
-                           note.category === 'todo' ? '🟡 À faire' :
-                           note.category === 'idea' ? '💡 Idée' : '✅ Fait'}
-                        </span>
+                      {editingNoteId === note.id ? (
+                        <div className="space-y-2">
+                          <textarea
+                            value={editingNoteText}
+                            onChange={(e) => setEditingNoteText(e.target.value)}
+                            className="w-full rounded-xl bg-bg px-3 py-2 text-sm outline-none resize-none"
+                            rows={2}
+                            autoFocus
+                          />
+                          <div className="flex gap-2">
+                            <button onClick={() => updateNoteText(note, editingNoteText)} className="rounded-full bg-accent px-3 py-1 text-xs font-bold text-white">Sauvegarder</button>
+                            <button onClick={() => setEditingNoteId(null)} className="rounded-full bg-dark/5 px-3 py-1 text-xs font-bold text-dark/40">Annuler</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p
+                          onClick={() => { if (!note.done) { setEditingNoteId(note.id); setEditingNoteText(note.text); } }}
+                          className={`text-sm leading-relaxed cursor-pointer ${note.done ? 'text-white/30 line-through' : 'hover:text-accent/80'}`}
+                        >
+                          {note.text}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        {['urgent', 'todo', 'idea'].map((cat) => (
+                          <button
+                            key={cat}
+                            onClick={() => changeNoteCategory(note, cat)}
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold transition-all ${
+                              note.category === cat
+                                ? cat === 'urgent' ? 'bg-red-500/15 text-red-400' : cat === 'todo' ? 'bg-amber-400/15 text-amber-400' : 'bg-blue-400/15 text-blue-400'
+                                : note.done ? 'bg-white/5 text-white/15' : 'bg-dark/5 text-dark/20 hover:text-dark/40'
+                            }`}
+                          >
+                            {cat === 'urgent' ? '🔴' : cat === 'todo' ? '🟡' : '💡'}
+                          </button>
+                        ))}
+                        {note.created_at && (
+                          <span className={`text-[10px] ml-auto ${note.done ? 'text-white/15' : 'text-dark/20'}`}>
+                            {new Date(note.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <button
@@ -1502,8 +1601,9 @@ export default function AdminPanel() {
                   placeholder="Ta note, idée, tâche..."
                   rows={4}
                   className="w-full rounded-xl bg-white/10 border border-white/10 px-4 py-3 text-sm text-white placeholder-white/25 outline-none resize-none"
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addNote(); } }}
                 />
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   {[
                     { value: 'urgent', label: '🔴 Urgent', color: 'bg-red-500/20 text-red-300' },
                     { value: 'todo', label: '🟡 À faire', color: 'bg-amber-400/20 text-amber-300' },
@@ -1528,7 +1628,7 @@ export default function AdminPanel() {
                 </button>
 
                 <div className="border-t border-white/5 pt-4 mt-4">
-                  <h4 className="font-bold text-white/60 text-sm mb-3">Suggestions</h4>
+                  <h4 className="font-bold text-white/60 text-sm mb-3">Suggestions rapides</h4>
                   <div className="space-y-2">
                     {[
                       'Ajouter mes vrais produits avec liens 1688',
