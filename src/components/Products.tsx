@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useInView } from '../hooks/useInView';
 import AppleEmoji from './AppleEmoji';
 import { addToCart, syncCartWithProducts } from '../lib/cart';
-import { fetchProducts, type DbProduct } from '../lib/db';
+import { fetchProducts, fetchOrders, type DbProduct } from '../lib/db';
 
 type Product = {
   id: string;
@@ -16,6 +16,8 @@ type Product = {
   colors?: string;
   imageUrl?: string;
   status: string;
+  createdAt?: string;
+  orderCount?: number;
 };
 
 const INITIAL_SHOW = 8;
@@ -59,16 +61,33 @@ function matchesCategory(category: string, activeCategory: string) {
 }
 
 function dbToShopProduct(d: DbProduct): Product {
-  return { id: d.id, brand: d.brand, name: d.name, category: d.category, gender: d.gender || 'mixte', salePrice: d.sale_price, sizes: d.sizes, colors: d.colors, imageUrl: d.image_url || '', status: d.status };
+  return { id: d.id, brand: d.brand, name: d.name, category: d.category, gender: d.gender || 'mixte', salePrice: d.sale_price, sizes: d.sizes, colors: d.colors, imageUrl: d.image_url || '', status: d.status, createdAt: d.created_at };
 }
 
 async function loadProducts(): Promise<Product[]> {
   try {
-    const data = await fetchProducts();
-    return data.map(dbToShopProduct);
+    const [data, orders] = await Promise.all([fetchProducts(), fetchOrders()]);
+    const orderCounts = new Map<string, number>();
+    orders.forEach((o) => {
+      orderCounts.set(o.product_id, (orderCounts.get(o.product_id) || 0) + 1);
+    });
+    return data.map((d) => ({ ...dbToShopProduct(d), orderCount: orderCounts.get(d.id) || 0 }));
   } catch {
     return [];
   }
+}
+
+function isNew(product: Product) {
+  if (!product.createdAt) return false;
+  const diff = Date.now() - new Date(product.createdAt).getTime();
+  return diff < 7 * 24 * 60 * 60 * 1000; // 7 jours
+}
+
+function getBadge(product: Product): { text: string; color: string } | null {
+  if ((product.orderCount || 0) >= 5) return { text: 'Best-seller', color: 'bg-green-600' };
+  if ((product.orderCount || 0) >= 2) return { text: 'Populaire', color: 'bg-accent' };
+  if (isNew(product)) return { text: 'Nouveau', color: 'bg-dark' };
+  return null;
 }
 
 function emojiForCategory(category: string) {
@@ -270,9 +289,13 @@ export default function Products() {
                     <AppleEmoji emoji={emojiForCategory(p.category)} size={48} />
                   )}
                 </div>
+                {(() => {
+                  const badge = getBadge(p);
+                  return badge ? <span className={`absolute top-3 left-3 ${badge.color} text-white text-[10px] font-bold px-2.5 py-1 rounded-full z-10`}>{badge.text}</span> : null;
+                })()}
                 <button
                   onClick={(e) => { e.stopPropagation(); toggleLike(p.id); }}
-                  className={`absolute top-3 right-3 h-8 w-8 rounded-full flex items-center justify-center transition-all ${
+                  className={`absolute top-3 right-3 h-8 w-8 rounded-full flex items-center justify-center transition-all z-10 ${
                     liked.has(p.id) ? 'bg-red-500 text-white' : 'bg-white/80 backdrop-blur text-dark/30 opacity-0 group-hover:opacity-100'
                   }`}
                 >
@@ -316,85 +339,128 @@ export default function Products() {
         )}
       </div>
 
-      {/* Popup ajout au panier */}
+      {/* Page détail produit */}
       {quickAdd && (
-        <div className="fixed inset-0 z-[80] bg-dark/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-5">
-          <div className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl max-h-[92vh] overflow-y-auto">
-            <div className="flex items-start gap-4 mb-5">
+        <div className="fixed inset-0 z-[80] bg-white sm:bg-dark/60 sm:backdrop-blur-sm flex items-stretch sm:items-center justify-center p-0 sm:p-5">
+          <div className="bg-white w-full sm:max-w-lg sm:rounded-3xl shadow-2xl overflow-y-auto max-h-full flex flex-col">
+            {/* Image */}
+            <div className="relative aspect-square sm:aspect-[4/3] bg-subtle flex-shrink-0">
               {quickAdd.imageUrl ? (
-                <img src={quickAdd.imageUrl} alt={quickAdd.name} className="h-16 w-16 rounded-xl object-cover flex-shrink-0" />
+                <img src={quickAdd.imageUrl} alt={quickAdd.name} className="h-full w-full object-cover" />
               ) : (
-                <div className="h-16 w-16 rounded-xl bg-bg flex items-center justify-center flex-shrink-0">
-                  <AppleEmoji emoji={emojiForCategory(quickAdd.category)} size={32} />
+                <div className="h-full w-full flex items-center justify-center">
+                  <AppleEmoji emoji={emojiForCategory(quickAdd.category)} size={80} />
                 </div>
               )}
-              <div className="flex-1 min-w-0">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-accent">{quickAdd.brand}</span>
-                <h3 className="font-display text-lg font-800 text-dark mt-0.5 leading-tight">{quickAdd.name}</h3>
-                <p className="text-lg font-800 text-dark mt-1">{formatPrice(quickAdd.salePrice)}</p>
-              </div>
-              <button onClick={() => setQuickAdd(null)} className="h-9 w-9 rounded-full bg-dark/5 flex items-center justify-center text-dark/40 hover:text-dark flex-shrink-0">
-                <X size={18} />
+              <button onClick={() => setQuickAdd(null)} className="absolute top-4 left-4 h-10 w-10 rounded-full bg-white/90 backdrop-blur flex items-center justify-center text-dark/60 hover:text-dark shadow-sm">
+                <X size={20} />
               </button>
+              {(() => {
+                const badge = getBadge(quickAdd);
+                return badge ? <span className={`absolute top-4 right-4 ${badge.color} text-white text-xs font-bold px-3 py-1.5 rounded-full`}>{badge.text}</span> : null;
+              })()}
             </div>
 
-            {/* Tailles */}
-            {quickSizes.length > 0 && (
-              <div className="mb-4">
-                <label className="text-xs font-bold text-dark/40 block mb-2">Taille</label>
-                <div className="flex flex-wrap gap-2">
-                  {quickSizes.map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => setSelectedSize(s)}
-                      className={`h-10 min-w-11 rounded-xl px-3 text-sm font-semibold border transition-all ${
-                        selectedSize === s ? 'bg-dark text-white border-dark' : 'bg-bg text-dark/60 border-dark/10 hover:border-dark/30'
-                      }`}
-                    >
-                      {s}
-                    </button>
-                  ))}
+            {/* Infos */}
+            <div className="p-5 sm:p-6 flex-1">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-accent">{quickAdd.brand}</span>
+              <h2 className="font-display text-2xl font-800 text-dark mt-1 leading-tight">{quickAdd.name}</h2>
+
+              <div className="flex items-center gap-3 mt-3">
+                <span className="text-2xl font-800 text-dark">{formatPrice(quickAdd.salePrice)}</span>
+                <span className="text-xs text-dark/30 rounded-full bg-dark/5 px-2.5 py-1">{quickAdd.category}</span>
+              </div>
+
+              {/* Infos livraison */}
+              <div className="flex flex-wrap gap-2 mt-4">
+                <div className="flex items-center gap-1.5 text-[11px] font-semibold text-dark/40 bg-bg rounded-full px-3 py-1.5">
+                  <span className="text-green-500">✓</span> Livraison suivie
+                </div>
+                <div className="flex items-center gap-1.5 text-[11px] font-semibold text-dark/40 bg-bg rounded-full px-3 py-1.5">
+                  <span className="text-green-500">✓</span> QC avant envoi
+                </div>
+                <div className="flex items-center gap-1.5 text-[11px] font-semibold text-dark/40 bg-bg rounded-full px-3 py-1.5">
+                  <span className="text-green-500">✓</span> Paiement WhatsApp
                 </div>
               </div>
-            )}
 
-            {/* Couleurs */}
-            {quickColors.length > 0 && (
-              <div className="mb-4">
-                <label className="text-xs font-bold text-dark/40 block mb-2">Couleur</label>
-                <div className="flex flex-wrap gap-2">
-                  {quickColors.map((c) => (
-                    <button
-                      key={c}
-                      onClick={() => setSelectedColor(c)}
-                      className={`h-10 rounded-xl px-4 text-sm font-semibold border transition-all ${
-                        selectedColor === c ? 'bg-dark text-white border-dark' : 'bg-bg text-dark/60 border-dark/10 hover:border-dark/30'
-                      }`}
-                    >
-                      {c}
-                    </button>
-                  ))}
+              {/* Tailles */}
+              {quickSizes.length > 0 && (
+                <div className="mt-5">
+                  <label className="text-xs font-bold text-dark/45 block mb-2">Taille</label>
+                  <div className="flex flex-wrap gap-2">
+                    {quickSizes.map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => setSelectedSize(s)}
+                        className={`h-11 min-w-12 rounded-xl px-3.5 text-sm font-semibold border-2 transition-all ${
+                          selectedSize === s ? 'bg-dark text-white border-dark' : 'bg-white text-dark/60 border-dark/10 hover:border-dark/30'
+                        }`}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Couleurs */}
+              {quickColors.length > 0 && (
+                <div className="mt-4">
+                  <label className="text-xs font-bold text-dark/45 block mb-2">Couleur</label>
+                  <div className="flex flex-wrap gap-2">
+                    {quickColors.map((c) => (
+                      <button
+                        key={c}
+                        onClick={() => setSelectedColor(c)}
+                        className={`h-11 rounded-xl px-4 text-sm font-semibold border-2 transition-all ${
+                          selectedColor === c ? 'bg-dark text-white border-dark' : 'bg-white text-dark/60 border-dark/10 hover:border-dark/30'
+                        }`}
+                      >
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {!canAdd() && (quickSizes.length > 0 || quickColors.length > 0) && (
+                <p className="text-xs text-accent font-semibold mt-4">
+                  {quickSizes.length > 0 && !selectedSize ? 'Sélectionne une taille' : ''}
+                  {quickSizes.length > 0 && !selectedSize && quickColors.length > 0 && !selectedColor ? ' et ' : ''}
+                  {quickColors.length > 0 && !selectedColor ? 'une couleur' : ''}
+                </p>
+              )}
+
+              {/* Détails */}
+              <div className="mt-5 pt-5 border-t border-dark/5 space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-dark/40">Délai de livraison</span>
+                  <span className="font-semibold text-dark/70">7 à 20 jours</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-dark/40">Livraison offerte dès</span>
+                  <span className="font-semibold text-dark/70">100€</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-dark/40">Retours</span>
+                  <span className="font-semibold text-dark/70">14 jours</span>
                 </div>
               </div>
-            )}
+            </div>
 
-            {!canAdd() && (quickSizes.length > 0 || quickColors.length > 0) && (
-              <p className="text-xs text-accent font-semibold mb-4">
-                {quickSizes.length > 0 && !selectedSize ? 'Sélectionne une taille' : ''}
-                {quickSizes.length > 0 && !selectedSize && quickColors.length > 0 && !selectedColor ? ' et ' : ''}
-                {quickColors.length > 0 && !selectedColor ? 'Sélectionne une couleur' : ''}
-              </p>
-            )}
-
-            <button
-              onClick={handleAddToCart}
-              disabled={!canAdd()}
-              className={`w-full rounded-full px-7 py-3.5 text-sm font-bold text-white transition-colors flex items-center justify-center gap-2 ${
-                addedId ? 'bg-green-500' : !canAdd() ? 'bg-dark/20 cursor-not-allowed' : 'bg-dark hover:bg-accent'
-              }`}
-            >
-              {addedId ? '✓ Ajouté au panier !' : <><ShoppingBag size={15} /> Ajouter au panier</>}
-            </button>
+            {/* Bouton sticky */}
+            <div className="sticky bottom-0 bg-white border-t border-dark/5 p-4 safe-bottom">
+              <button
+                onClick={handleAddToCart}
+                disabled={!canAdd()}
+                className={`w-full rounded-full px-7 py-4 text-sm font-bold text-white transition-colors flex items-center justify-center gap-2 ${
+                  addedId ? 'bg-green-500' : !canAdd() ? 'bg-dark/20 cursor-not-allowed' : 'bg-dark hover:bg-accent'
+                }`}
+              >
+                {addedId ? '✓ Ajouté au panier !' : <><ShoppingBag size={16} /> Ajouter au panier — {formatPrice(quickAdd.salePrice)}</>}
+              </button>
+            </div>
           </div>
         </div>
       )}

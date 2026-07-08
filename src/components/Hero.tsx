@@ -63,22 +63,43 @@ export default function Hero() {
             <div className="anim-fade-up opacity-0 delay-600 flex flex-wrap gap-3">
               <a
                 href="#shop"
-                className="bg-dark text-white px-7 py-3.5 rounded-full text-sm font-semibold hover:bg-accent transition-colors"
+                className="bg-dark text-white px-7 py-4 rounded-full text-sm font-bold hover:bg-accent transition-colors shadow-lg shadow-dark/10"
               >
                 Voir le shop →
               </a>
               <a
-                href="#marques"
-                className="border-2 border-dark/10 text-dark px-7 py-3.5 rounded-full text-sm font-semibold hover:border-accent hover:text-accent transition-colors"
+                href="#contact"
+                className="border-2 border-dark/10 text-dark px-7 py-4 rounded-full text-sm font-bold hover:border-accent hover:text-accent transition-colors"
               >
-                Les marques
+                Nous contacter
               </a>
             </div>
 
-            {/* Mini trust */}
-            <div className="anim-fade-up opacity-0 delay-700 flex items-center gap-3 sm:gap-5 pt-2 text-xs sm:text-sm text-dark/35">
-              <span className="flex items-center gap-1.5">✓ Livraison suivie</span>
-              <span className="flex items-center gap-1.5">✓ Paiement WhatsApp</span>
+            {/* Trust badges */}
+            <div className="anim-fade-up opacity-0 delay-700 flex flex-wrap items-center gap-3 pt-4">
+              <div className="flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-1.5 text-[11px] font-semibold text-dark/50 border border-dark/5">
+                <span className="text-green-500">✓</span> Livraison suivie
+              </div>
+              <div className="flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-1.5 text-[11px] font-semibold text-dark/50 border border-dark/5">
+                <span className="text-green-500">✓</span> Paiement sécurisé
+              </div>
+              <div className="flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-1.5 text-[11px] font-semibold text-dark/50 border border-dark/5">
+                <span className="text-green-500">✓</span> QC avant envoi
+              </div>
+            </div>
+
+            {/* Social proof mini */}
+            <div className="anim-fade-up opacity-0 delay-800 flex items-center gap-3 pt-3">
+              <div className="flex -space-x-2">
+                {['Y', 'L', 'A', 'S'].map((initial, idx) => (
+                  <div key={idx} className="h-7 w-7 rounded-full bg-dark text-white text-[10px] font-bold flex items-center justify-center border-2 border-bg">
+                    {initial}
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-dark/40">
+                <span className="font-bold text-dark/60">120+</span> clients satisfaits
+              </p>
             </div>
           </div>
 

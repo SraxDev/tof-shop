@@ -21,6 +21,7 @@ import MobileStickyBar from './components/MobileStickyBar';
 import ToastContainer from './components/Toast';
 import ChatWidget from './components/ChatWidget';
 
+
 const ADMIN_PASSWORD = 'tofadmin';
 
 function AdminAccess() {
@@ -124,17 +125,18 @@ export default function App() {
       <LaunchTimer />
       <Hero />
       <BrandMarquee />
-      <CTA />
       <Products />
       <FeaturedDrop />
       <Brands />
-      <WhyUs />
       <Reviews />
+      <WhyUs />
+      <CTA />
       <Contact />
       <Footer />
       <BackToTop />
       <MobileStickyBar />
       <ChatWidget />
+
       <ToastContainer />
     </div>
   );
