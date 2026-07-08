@@ -10,6 +10,7 @@ type Product = {
   brand: string;
   name: string;
   category: string;
+  gender: string;
   salePrice: number;
   sizes?: string;
   colors?: string;
@@ -19,18 +20,46 @@ type Product = {
 
 const INITIAL_SHOW = 8;
 
-const filters = [
-  { label: 'Tout', match: () => true },
-  { label: 'Homme', match: (c: string) => !['robe', 'jupe'].some((w) => c.includes(w)) },
-  { label: 'Femme', match: (c: string) => ['robe', 'jupe', 't-shirt', 'hoodie', 'pull', 'veste', 'jean', 'pantalon', 'ensemble', 'maillot', 'sac', 'bijoux', 'lunettes'].some((w) => c.includes(w)) },
-  { label: 'Sneakers', match: (c: string) => ['sneaker', 'chaussure', 'claquette'].some((w) => c.includes(w)) },
-  { label: 'Vêtements', match: (c: string) => ['t-shirt', 'polo', 'chemise', 'hoodie', 'pull', 'veste', 'doudoune', 'jean', 'pantalon', 'short', 'jogging', 'maillot', 'ensemble', 'robe', 'jupe', 'sous-vêtement'].some((w) => c.includes(w)) },
-  { label: 'Sacs', match: (c: string) => ['sac', 'sacoche'].some((w) => c.includes(w)) },
-  { label: 'Accessoires', match: (c: string) => ['casquette', 'bonnet', 'ceinture', 'lunettes', 'bijoux', 'montre', 'portefeuille', 'écharpe', 'parfum'].some((w) => c.includes(w)) },
-];
+const genderFilters = ['Tout', 'Homme', 'Femme', 'Mixte'] as const;
+const categoryFilters = [
+  'Tout',
+  'T-shirts',
+  'Hoodies & pulls',
+  'Vestes',
+  'Pantalons',
+  'Maillots',
+  'Robes & jupes',
+  'Sneakers',
+  'Sacs',
+  'Accessoires',
+] as const;
+
+function matchesGender(productGender: string, activeGender: string) {
+  const g = (productGender || 'mixte').toLowerCase();
+  if (activeGender === 'Tout') return true;
+  if (activeGender === 'Homme') return g === 'homme';
+  if (activeGender === 'Femme') return g === 'femme';
+  if (activeGender === 'Mixte') return g === 'mixte';
+  return true;
+}
+
+function matchesCategory(category: string, activeCategory: string) {
+  const c = category.toLowerCase();
+  if (activeCategory === 'Tout') return true;
+  if (activeCategory === 'T-shirts') return ['t-shirt', 'polo', 'chemise'].some((w) => c.includes(w));
+  if (activeCategory === 'Hoodies & pulls') return ['hoodie', 'pull', 'jogging', 'ensemble'].some((w) => c.includes(w));
+  if (activeCategory === 'Vestes') return ['veste', 'doudoune'].some((w) => c.includes(w));
+  if (activeCategory === 'Pantalons') return ['jean', 'pantalon', 'short'].some((w) => c.includes(w));
+  if (activeCategory === 'Maillots') return ['maillot'].some((w) => c.includes(w));
+  if (activeCategory === 'Robes & jupes') return ['robe', 'jupe'].some((w) => c.includes(w));
+  if (activeCategory === 'Sneakers') return ['sneaker', 'chaussure', 'claquette'].some((w) => c.includes(w));
+  if (activeCategory === 'Sacs') return ['sac', 'sacoche', 'portefeuille'].some((w) => c.includes(w));
+  if (activeCategory === 'Accessoires') return ['casquette', 'bonnet', 'ceinture', 'lunettes', 'bijoux', 'montre', 'écharpe', 'parfum'].some((w) => c.includes(w));
+  return true;
+}
 
 function dbToShopProduct(d: DbProduct): Product {
-  return { id: d.id, brand: d.brand, name: d.name, category: d.category, salePrice: d.sale_price, sizes: d.sizes, colors: d.colors, imageUrl: d.image_url || '', status: d.status };
+  return { id: d.id, brand: d.brand, name: d.name, category: d.category, gender: d.gender || 'mixte', salePrice: d.sale_price, sizes: d.sizes, colors: d.colors, imageUrl: d.image_url || '', status: d.status };
 }
 
 async function loadProducts(): Promise<Product[]> {
@@ -77,7 +106,8 @@ function needsColor(product: Product) {
 
 export default function Products() {
   const { ref, isInView } = useInView(0.05);
-  const [active, setActive] = useState('Tout');
+  const [activeGender, setActiveGender] = useState<(typeof genderFilters)[number]>('Tout');
+  const [activeCategory, setActiveCategory] = useState<(typeof categoryFilters)[number]>('Tout');
   const [showAll, setShowAll] = useState(false);
   const [search, setSearch] = useState('');
   const [liked, setLiked] = useState<Set<string>>(new Set());
@@ -99,17 +129,16 @@ export default function Products() {
     return () => { window.removeEventListener('tof-products-updated', sync); };
   }, []);
 
-  const activeFilter = filters.find((f) => f.label === active) || filters[0];
-
   const allFiltered = useMemo(() => {
     const q = search.toLowerCase().trim();
     return products.filter((p) => {
       if (p.status !== 'active') return false;
-      if (!activeFilter.match(p.category.toLowerCase())) return false;
+      if (!matchesGender(p.gender, activeGender)) return false;
+      if (!matchesCategory(p.category, activeCategory)) return false;
       if (q && !`${p.brand} ${p.name} ${p.category}`.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [products, active, search, activeFilter]);
+  }, [products, activeGender, activeCategory, search]);
 
   const visibleProducts = showAll ? allFiltered : allFiltered.slice(0, INITIAL_SHOW);
   const totalFiltered = allFiltered.length;
@@ -187,19 +216,53 @@ export default function Products() {
           )}
         </div>
 
-        {/* Filtres */}
-        <div className="flex gap-2 overflow-x-auto pb-3 mb-6 -mx-1 px-1">
-          {filters.map((f) => (
-            <button
-              key={f.label}
-              onClick={() => { setActive(f.label); setShowAll(false); }}
-              className={`px-4 py-2.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap flex-shrink-0 ${
-                active === f.label ? 'bg-dark text-white' : 'bg-dark/5 text-dark/50 hover:bg-dark/10'
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
+        {/* Filtres genre */}
+        <div className="mb-2">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-dark/25 mb-2">Genre</div>
+          <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
+            {genderFilters.map((filter) => (
+              <button
+                key={filter}
+                onClick={() => { setActiveGender(filter); setShowAll(false); }}
+                className={`px-4 py-2.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap flex-shrink-0 ${
+                  activeGender === filter ? 'bg-dark text-white' : 'bg-dark/5 text-dark/50 hover:bg-dark/10'
+                }`}
+              >
+                {filter}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Filtres catégorie */}
+        <div className="mb-6">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-dark/25 mb-2">Catégorie</div>
+          <div className="flex gap-2 overflow-x-auto pb-3 -mx-1 px-1">
+            {categoryFilters.map((filter) => (
+              <button
+                key={filter}
+                onClick={() => { setActiveCategory(filter); setShowAll(false); }}
+                className={`px-4 py-2.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap flex-shrink-0 ${
+                  activeCategory === filter ? 'bg-dark text-white' : 'bg-dark/5 text-dark/50 hover:bg-dark/10'
+                }`}
+              >
+                {filter}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 mb-4 text-xs">
+          <span className="text-dark/35">Affichage :</span>
+          <span className="rounded-full bg-dark/5 px-3 py-1 font-semibold text-dark/60">{activeGender}</span>
+          <span className="text-dark/20">•</span>
+          <span className="rounded-full bg-dark/5 px-3 py-1 font-semibold text-dark/60">{activeCategory}</span>
+          {search && (
+            <>
+              <span className="text-dark/20">•</span>
+              <span className="rounded-full bg-accent/10 px-3 py-1 font-semibold text-accent">“{search}”</span>
+            </>
+          )}
         </div>
 
         {/* Grille produits */}
@@ -259,7 +322,7 @@ export default function Products() {
 
         {totalFiltered === 0 && (
           <div className="rounded-3xl bg-white border border-dark/5 p-10 text-center text-dark/40">
-            Aucun produit dans cette catégorie.
+            Aucun produit ne correspond à <span className="font-semibold text-dark/60">{activeGender}</span> dans <span className="font-semibold text-dark/60">{activeCategory}</span>{search ? ` pour “${search}”` : ''}.
           </div>
         )}
       </div>

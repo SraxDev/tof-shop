@@ -11,6 +11,7 @@ type Product = {
   brand: string;
   name: string;
   category: string;
+  gender: 'homme' | 'femme' | 'mixte';
   salePrice: number;
   sourcePriceCny: number;
   weightGrams: number;
@@ -101,6 +102,7 @@ const initialProducts: Product[] = [
     brand: 'Nike x Off-White',
     name: 'Air Force 1 Low',
     category: 'Sneakers',
+    gender: 'mixte',
     salePrice: 320,
     sourcePriceCny: 260,
     weightGrams: 1200,
@@ -116,6 +118,7 @@ const initialProducts: Product[] = [
     brand: 'Gucci',
     name: 'T-shirt Logo Brode',
     category: 'T-shirt',
+    gender: 'mixte',
     salePrice: 490,
     sourcePriceCny: 120,
     weightGrams: 450,
@@ -131,6 +134,7 @@ const initialProducts: Product[] = [
     brand: 'Louis Vuitton',
     name: 'Hoodie Monogram',
     category: 'Hoodie / pull',
+    gender: 'mixte',
     salePrice: 1250,
     sourcePriceCny: 280,
     weightGrams: 900,
@@ -173,7 +177,7 @@ void _readStorage;
 
 function productToDb(p: Product): DbProduct {
   return {
-    id: p.id, brand: p.brand, name: p.name, category: p.category,
+    id: p.id, brand: p.brand, name: p.name, category: p.category, gender: p.gender || 'mixte',
     sale_price: p.salePrice, source_price_cny: p.sourcePriceCny,
     weight_grams: p.weightGrams, packaging: p.packaging,
     sizes: p.sizes, colors: p.colors, image_url: p.imageUrl || '',
@@ -183,7 +187,7 @@ function productToDb(p: Product): DbProduct {
 
 function dbToProduct(d: DbProduct): Product {
   return {
-    id: d.id, brand: d.brand, name: d.name, category: d.category,
+    id: d.id, brand: d.brand, name: d.name, category: d.category, gender: (d.gender || 'mixte') as Product['gender'],
     salePrice: d.sale_price, sourcePriceCny: d.source_price_cny,
     weightGrams: d.weight_grams, packaging: d.packaging as Product['packaging'],
     sizes: d.sizes, colors: d.colors, imageUrl: d.image_url || '',
@@ -265,6 +269,7 @@ function normalizedProduct(product: Product): Product {
     sizes: product.sizes || '39, 40, 41, 42, 43, 44, 45',
     colors: product.colors || 'Black, White',
     imageUrl: product.imageUrl || '',
+    gender: product.gender || 'mixte',
   };
 }
 
@@ -291,6 +296,7 @@ function suggestedSalePrice(sourcePriceCny: number, weightGrams: number, packagi
     sizes: '',
     colors: '',
     imageUrl: '',
+    gender: 'mixte',
     sourceUrl: '',
     status: 'active',
   };
@@ -381,6 +387,7 @@ export default function AdminPanel() {
     sizes: '39, 40, 41, 42, 43, 44, 45',
     colors: 'Black, White',
     imageUrl: '',
+    gender: 'mixte',
     sourceUrl: '',
   });
   const [dropDraft, setDropDraft] = useState<FeaturedDropConfig>(defaultDrop);
@@ -591,6 +598,7 @@ export default function AdminPanel() {
       brand: 'Nouvelle marque',
       name: 'Nouveau produit',
       category: 'Sneakers',
+      gender: 'mixte',
       salePrice: 99,
       sourcePriceCny: 100,
       weightGrams: 800,
@@ -662,7 +670,7 @@ export default function AdminPanel() {
     showToast('Commande créée ✓');
   };
 
-  const fallbackProduct: Product = { id: '', brand: '-', name: '-', category: 'T-shirt', salePrice: 0, sourcePriceCny: 0, weightGrams: 300, packaging: 'none', sizes: '', colors: '', imageUrl: '', sourceUrl: '', status: 'active' };
+  const fallbackProduct: Product = { id: '', brand: '-', name: '-', category: 'T-shirt', gender: 'mixte', salePrice: 0, sourcePriceCny: 0, weightGrams: 300, packaging: 'none', sizes: '', colors: '', imageUrl: '', sourceUrl: '', status: 'active' };
   const getProduct = (id: string) => products.find((product) => product.id === id) || products[0] || fallbackProduct;
 
   const dashboard = useMemo(() => {
@@ -1273,8 +1281,13 @@ export default function AdminPanel() {
                 <input value={quickProduct.name} onChange={(e) => setQuickProduct({ ...quickProduct, name: e.target.value })} placeholder="Nom produit *" className="rounded-xl bg-white px-4 py-3 text-sm outline-none border border-dark/5 sm:col-span-2" />
               </div>
 
-              {/* Étape 2 : Catégorie + Prix */}
-              <div className="grid grid-cols-3 gap-2 sm:gap-3 mt-2">
+              {/* Étape 2 : Genre + Catégorie + Prix */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mt-2">
+                <select value={quickProduct.gender} onChange={(e) => setQuickProduct({ ...quickProduct, gender: e.target.value as Product['gender'] })} className="rounded-xl bg-white px-3 py-3 text-sm outline-none border border-dark/5">
+                  <option value="homme">Homme</option>
+                  <option value="femme">Femme</option>
+                  <option value="mixte">Mixte</option>
+                </select>
                 <select value={quickProduct.category} onChange={(e) => updateQuickPreset(e.target.value)} className="rounded-xl bg-white px-3 py-3 text-sm outline-none border border-dark/5">
                   {categoryPresets.map((p) => <option key={p.label} value={p.label}>{p.label}</option>)}
                 </select>
@@ -1349,8 +1362,9 @@ export default function AdminPanel() {
                       </div>
                       <div className="space-y-3">
                         <input disabled={!isEditing} value={current.sourceUrl} onChange={(e) => setDraftProduct({ ...current, sourceUrl: e.target.value })} className="w-full rounded-xl bg-bg px-4 py-3 text-xs outline-none disabled:bg-bg text-dark/60" />
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                          <label className="text-xs text-dark/35">Categorie<select disabled={!isEditing} value={current.category} onChange={(e) => {
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
+                          <label className="text-xs text-dark/35">Genre<select disabled={!isEditing} value={current.gender || 'mixte'} onChange={(e) => setDraftProduct({ ...current, gender: e.target.value as Product['gender'] })} className="mt-1 w-full rounded-xl bg-bg px-3 py-2 text-sm text-dark outline-none"><option value="homme">Homme</option><option value="femme">Femme</option><option value="mixte">Mixte</option></select></label>
+                          <label className="text-xs text-dark/35">Catégorie<select disabled={!isEditing} value={current.category} onChange={(e) => {
                             const preset = categoryPresets.find((item) => item.label === e.target.value);
                             setDraftProduct({
                               ...current,
