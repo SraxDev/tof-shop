@@ -217,72 +217,78 @@ export default function ChatWidget() {
       )}
 
       {open && (
-        <div className="fixed inset-0 sm:inset-auto sm:bottom-6 sm:right-6 z-[80] w-full sm:w-96 h-[100dvh] sm:h-[600px] bg-white sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden sm:border border-dark/5 anim-slide-up">
+        <div className="fixed inset-0 sm:inset-auto sm:bottom-6 sm:right-6 z-[80] w-full sm:w-[380px] h-[100dvh] sm:h-[620px] bg-white sm:rounded-[32px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] flex flex-col overflow-hidden sm:border border-dark/5 anim-slide-up">
           {/* Header */}
-          <div className="bg-dark text-white px-5 py-4 flex items-center justify-between flex-shrink-0 safe-top">
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <div className="h-10 w-10 rounded-full bg-accent/20 flex items-center justify-center text-accent text-xl font-bold border border-accent/10">
+          <div className="bg-[#111111] text-white px-6 py-6 flex items-center justify-between flex-shrink-0 relative overflow-hidden">
+            <div className="flex items-center gap-4 relative z-10">
+              <div className="relative flex-shrink-0">
+                <div className="h-12 w-12 rounded-[18px] bg-gradient-to-br from-accent to-accent-light flex items-center justify-center text-white text-2xl font-black shadow-xl shadow-accent/20">
                   t.
                 </div>
-                <span className="absolute bottom-0 right-0 h-3 w-3 bg-green-400 rounded-full border-2 border-dark" />
+                <div className="absolute -bottom-1 -right-1 h-4.5 w-4.5 bg-green-500 rounded-full border-[4px] border-[#111111]" />
               </div>
-              <div>
-                <div className="font-display font-800 text-base">tof<span className="text-accent">.</span> Support</div>
-                <div className="text-[10px] text-white/40 uppercase tracking-widest font-bold">Réponse instantanée</div>
+              <div className="flex flex-col gap-0.5">
+                <span className="font-display font-800 text-[18px] leading-tight flex items-center gap-2">
+                  tof<span className="text-accent">.</span> Support
+                </span>
+                <div className="flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 bg-green-500 rounded-full animate-pulse" />
+                  <span className="text-[10px] text-white/40 uppercase tracking-[0.15em] font-bold">En ligne maintenant</span>
+                </div>
               </div>
             </div>
+
             <button 
               onClick={() => setOpen(false)} 
-              className="h-10 w-10 rounded-full bg-white/5 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all active:scale-90"
+              className="h-10 w-10 rounded-2xl bg-white/5 flex items-center justify-center text-white/30 hover:text-white hover:bg-white/10 transition-all active:scale-90 relative z-10 border border-white/5"
             >
               <X size={20} />
             </button>
           </div>
 
           {!nameSet ? (
-            <div className="flex-1 flex items-center justify-center p-8 bg-bg/30">
-              <div className="text-center space-y-6 w-full max-w-[280px]">
-                <div className="h-20 w-20 bg-white rounded-3xl shadow-xl flex items-center justify-center text-4xl mx-auto anim-float">👋</div>
-                <div>
-                  <h3 className="font-display text-2xl font-800 text-dark">Hello !</h3>
-                  <p className="text-sm text-dark/40 mt-1 leading-relaxed">Prêt à trouver ta pièce ? Donne-nous ton prénom.</p>
+            <div className="flex-1 flex items-center justify-center p-8 bg-[#FBFBFB]">
+              <div className="text-center space-y-8 w-full max-w-[280px]">
+                <div className="h-24 w-24 bg-white rounded-[32px] shadow-2xl flex items-center justify-center text-5xl mx-auto anim-float">👋</div>
+                <div className="space-y-2">
+                  <h3 className="font-display text-3xl font-800 text-dark">Bienvenue !</h3>
+                  <p className="text-[13px] text-dark/40 leading-relaxed font-medium">Dis-nous ton prénom pour débloquer le chat support.</p>
                 </div>
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <input
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && submitName()}
                     placeholder="Ton prénom..."
-                    className="w-full rounded-2xl bg-white border border-dark/5 px-5 py-4 text-sm outline-none text-center shadow-sm focus:border-accent/20 transition-all"
+                    className="w-full rounded-[20px] bg-white border border-dark/5 px-6 py-4 text-sm outline-none text-center shadow-sm focus:border-accent/30 focus:ring-4 focus:ring-accent/5 transition-all font-bold"
                     autoFocus
                   />
                   <button 
                     onClick={submitName} 
                     disabled={!name.trim()}
-                    className="w-full rounded-2xl bg-dark text-white py-4 text-sm font-bold shadow-lg shadow-dark/10 hover:bg-accent transition-all active:scale-[0.98] disabled:opacity-30"
+                    className="w-full rounded-2xl bg-dark text-white py-4.5 text-sm font-900 shadow-xl shadow-dark/20 hover:bg-accent transition-all active:scale-[0.98] disabled:opacity-30 uppercase tracking-widest"
                   >
-                    Lancer la discussion
+                    C'est parti !
                   </button>
                 </div>
               </div>
             </div>
           ) : (
             <>
-              <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-bg/20 custom-scrollbar">
+              <div className="flex-1 overflow-y-auto p-4 space-y-5 bg-[#F9F9F9] custom-scrollbar">
                 {messages.map((msg) => (
                   <div key={msg.id} className={`flex ${msg.sender === 'client' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[85%] rounded-[20px] px-4 py-3 text-sm leading-relaxed shadow-sm ${
+                    <div className={`max-w-[85%] rounded-[24px] px-5 py-3.5 text-[13.5px] leading-relaxed shadow-sm ${
                       msg.sender === 'client'
                         ? 'bg-dark text-white rounded-br-sm'
                         : msg.sender === 'admin'
                           ? 'bg-accent text-white rounded-bl-sm'
-                          : 'bg-white text-dark rounded-bl-sm border border-dark/5'
+                          : 'bg-white text-dark rounded-bl-sm border border-dark/[0.03]'
                     }`}>
-                      {msg.sender === 'admin' && <div className="text-[10px] font-bold text-white/50 mb-1 uppercase tracking-tighter">Support tof.</div>}
-                      {msg.sender === 'bot' && <div className="text-[10px] font-bold text-dark/20 mb-1 uppercase tracking-tighter">Assistant virtuel</div>}
+                      {msg.sender === 'admin' && <div className="text-[10px] font-black text-white/50 mb-1.5 uppercase tracking-tighter">Support tof.</div>}
+                      {msg.sender === 'bot' && <div className="text-[10px] font-black text-dark/20 mb-1.5 uppercase tracking-tighter">Assistant virtuel</div>}
                       <p className="whitespace-pre-wrap">{msg.message}</p>
-                      <div className={`text-[9px] mt-2 font-medium opacity-40 ${msg.sender === 'client' ? 'text-right' : 'text-left'}`}>
+                      <div className={`text-[9px] mt-2.5 font-bold opacity-30 ${msg.sender === 'client' ? 'text-right' : 'text-left'}`}>
                         {formatTime(msg.created_at)}
                       </div>
                     </div>
@@ -291,7 +297,7 @@ export default function ChatWidget() {
 
                 {typing && (
                   <div className="flex justify-start">
-                    <div className="bg-white border border-dark/5 rounded-[20px] rounded-bl-sm px-5 py-4 flex items-center gap-1.5 shadow-sm">
+                    <div className="bg-white border border-dark/[0.03] rounded-[24px] rounded-bl-sm px-6 py-4 flex items-center gap-2 shadow-sm">
                       <span className="h-1.5 w-1.5 bg-dark/20 rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
                       <span className="h-1.5 w-1.5 bg-dark/20 rounded-full animate-bounce" style={{ animationDelay: '0.15s' }} />
                       <span className="h-1.5 w-1.5 bg-dark/20 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }} />
@@ -303,37 +309,37 @@ export default function ChatWidget() {
               </div>
 
               {/* Suggestions & Input Area */}
-              <div className="bg-white border-t border-dark/5 p-3 sm:p-4 space-y-3 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)]">
+              <div className="bg-white border-t border-dark/5 p-4 sm:p-5 space-y-4 pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]">
                 
                 {/* Scrollable Suggestions */}
-                <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar -mx-1 px-1">
+                <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar -mx-2 px-2">
                   {(suggestions.length > 0 ? suggestions : (messages.length <= 2 ? quickButtons.map(b => b.label) : [])).map((s) => (
                     <button
                       key={s}
                       onClick={() => processMessage(s.includes('🛒') || s.includes('📦') ? quickButtons.find(b => b.label === s)?.text || s : s)}
-                      className="rounded-full bg-bg border border-dark/[0.03] text-dark/60 px-4 py-2 text-[11px] font-bold whitespace-nowrap flex-shrink-0 hover:bg-dark hover:text-white transition-all active:scale-95"
+                      className="rounded-full bg-[#F3F3F3] border border-dark/[0.02] text-dark/70 px-5 py-2.5 text-[11px] font-bold whitespace-nowrap flex-shrink-0 hover:bg-dark hover:text-white transition-all active:scale-95 shadow-sm"
                     >
                       {s}
                     </button>
                   ))}
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex gap-3">
                   <div className="flex-1 relative">
                     <input
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && processMessage(input)}
                       placeholder="Ta question..."
-                      className="w-full rounded-2xl bg-bg border border-dark/[0.03] px-5 py-4 text-sm outline-none focus:bg-white focus:border-accent/20 transition-all shadow-inner"
+                      className="w-full rounded-[22px] bg-[#F3F3F3] border border-dark/[0.02] px-6 py-4.5 text-sm outline-none focus:bg-white focus:border-accent/20 focus:ring-4 focus:ring-accent/5 transition-all shadow-inner font-medium"
                     />
                   </div>
                   <button
                     onClick={() => processMessage(input)}
                     disabled={!input.trim()}
-                    className="h-14 w-14 rounded-2xl bg-dark text-white flex items-center justify-center hover:bg-accent transition-all active:scale-[0.9] disabled:opacity-10 shadow-lg"
+                    className="h-14 w-14 rounded-[20px] bg-dark text-white flex items-center justify-center hover:bg-accent transition-all active:scale-[0.85] disabled:opacity-10 shadow-xl shadow-dark/10"
                   >
-                    <Send size={20} strokeWidth={2.5} />
+                    <Send size={22} strokeWidth={2.5} />
                   </button>
                 </div>
               </div>
