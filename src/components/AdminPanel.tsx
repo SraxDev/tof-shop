@@ -1408,26 +1408,69 @@ export default function AdminPanel() {
                         </div>
                         <div className="flex items-center gap-3">
                           <div className="flex-1">
-                            <label className="text-xs text-dark/35">Image produit
-                              <input disabled={!isEditing} value={current.imageUrl || ''} onChange={(e) => setDraftProduct({ ...current, imageUrl: e.target.value })} placeholder="URL image ou upload →" className="mt-1 w-full rounded-xl bg-bg px-3 py-2 text-sm text-dark outline-none" />
+                            <label className="text-xs text-dark/35">Images (Séparez les URLs par une virgule pour les coloris)
+                              <textarea 
+                                disabled={!isEditing} 
+                                value={current.imageUrl || ''} 
+                                onChange={(e) => setDraftProduct({ ...current, imageUrl: e.target.value })} 
+                                placeholder="URL1, URL2, URL3..." 
+                                className="mt-1 w-full rounded-xl bg-bg px-3 py-2 text-sm text-dark outline-none min-h-[80px]" 
+                              />
                             </label>
                           </div>
                           {isEditing && (
-                            <label className="mt-4 cursor-pointer rounded-xl bg-dark px-4 py-2 text-xs font-bold text-white hover:bg-accent transition-colors">
-                              Upload
-                              <input type="file" accept="image/*" className="hidden" onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (!file) return;
-                                const reader = new FileReader();
-                                reader.onload = () => setDraftProduct({ ...current, imageUrl: String(reader.result) });
-                                reader.readAsDataURL(file);
-                              }} />
-                            </label>
-                          )}
-                          {current.imageUrl && (
-                            <img src={current.imageUrl} alt="" className="mt-4 h-10 w-10 rounded-lg object-cover border border-dark/10" />
+                            <div className="flex flex-col gap-2">
+                              <label className="cursor-pointer rounded-xl bg-dark px-4 py-2 text-xs font-bold text-white hover:bg-accent transition-colors text-center">
+                                Upload
+                                <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => {
+                                  const files = Array.from(e.target.files || []);
+                                  if (files.length === 0) return;
+                                  
+                                  const readers = files.map(file => {
+                                    return new Promise<string>((resolve) => {
+                                      const reader = new FileReader();
+                                      reader.onload = () => resolve(String(reader.result));
+                                      reader.readAsDataURL(file);
+                                    });
+                                  });
+
+                                  Promise.all(readers).then(results => {
+                                    const existing = current.imageUrl ? current.imageUrl.split(/[|,]/).map(s => s.trim()) : [];
+                                    setDraftProduct({ ...current, imageUrl: [...existing, ...results].filter(Boolean).join(', ') });
+                                  });
+                                }} />
+                              </label>
+                              <button 
+                                onClick={() => setDraftProduct({ ...current, imageUrl: '' })}
+                                className="rounded-xl bg-red-500/10 px-4 py-2 text-[10px] font-bold text-red-500 hover:bg-red-500/20 transition-colors"
+                              >
+                                Vider
+                              </button>
+                            </div>
                           )}
                         </div>
+                        
+                        {current.imageUrl && (
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {current.imageUrl.split(/[|,]/).map((url, idx) => (
+                              <div key={idx} className="relative group/img">
+                                <img src={url.trim()} alt="" className="h-14 w-14 rounded-lg object-contain bg-subtle border border-dark/10" />
+                                {isEditing && (
+                                  <button 
+                                    onClick={() => {
+                                      const urls = current.imageUrl.split(/[|,]/).map(s => s.trim());
+                                      urls.splice(idx, 1);
+                                      setDraftProduct({ ...current, imageUrl: urls.join(', ') });
+                                    }}
+                                    className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 text-white rounded-full text-[8px] flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity"
+                                  >
+                                    ✕
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                         <div className="flex flex-wrap gap-2 text-xs">
                           <span className="rounded-full bg-dark/5 px-3 py-1 text-dark/45">Poids retenu {margin.effectiveWeight}g</span>
                           <span className="rounded-full bg-dark/5 px-3 py-1 text-dark/45">Livraison {euro(margin.shipping.low)} - {euro(margin.shipping.high)}</span>
