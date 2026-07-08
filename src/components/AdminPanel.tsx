@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Copy, ExternalLink, Package, Pencil, Plus, Save, Send, Trash2, Truck } from 'lucide-react';
 import { defaultDrop, type FeaturedDropConfig } from './FeaturedDrop';
 import { defaultSettings, readSiteSettings, saveSiteSettings, hydrateSiteSettings, type SiteSettings } from '../lib/siteSettings';
-import { fetchProducts, upsertProduct, deleteProduct as dbDeleteProduct, fetchOrders, updateOrder, insertOrder as dbInsertOrder, fetchDrop, saveDrop as dbSaveDrop, fetchNotes, upsertNote, deleteNote as dbDeleteNote, subscribeToOrders, subscribeToProducts, onOnlineCountChange, getPresenceState, trackVisitor, fetchConversations, sendChatMessage, subscribeToChatMessages, deleteConversation, deleteChatMessage, type DbProduct, type DbOrder, type DbDrop, type DbNote, type DbChatMessage } from '../lib/db';
+import { fetchProducts, upsertProduct, deleteProduct as dbDeleteProduct, fetchOrders, updateOrder, insertOrder as dbInsertOrder, fetchDrop, saveDrop as dbSaveDrop, fetchNotes, upsertNote, deleteNote as dbDeleteNote, subscribeToOrders, subscribeToProducts, onOnlineCountChange, getPresenceState, trackVisitor, fetchConversations, sendChatMessage, subscribeToChatMessages, deleteConversation, deleteChatMessage, fetchPromoCodes, upsertPromoCode, deletePromoCode, type DbProduct, type DbOrder, type DbDrop, type DbNote, type DbChatMessage, type DbPromoCode } from '../lib/db';
 import { showToast } from './Toast';
 import { playNewOrder, playCopy, playDelete } from '../lib/sounds';
 
@@ -350,7 +350,7 @@ export default function AdminPanel() {
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'products' | 'drop' | 'settings' | 'estimate' | 'notes' | 'chat'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'products' | 'drop' | 'promos' | 'settings' | 'estimate' | 'notes' | 'chat'>('dashboard');
   const [notes, setNotes] = useState<DbNote[]>([]);
   const [noteFilter, setNoteFilter] = useState<'all' | 'idea' | 'todo' | 'urgent' | 'done'>('all');
   const [newNote, setNewNote] = useState({ text: '', category: 'todo' });
@@ -361,6 +361,8 @@ export default function AdminPanel() {
   const [chatMessages, setChatMessages] = useState<DbChatMessage[]>([]);
   const [activeConvo, setActiveConvo] = useState<string | null>(null);
   const [chatReply, setChatReply] = useState('');
+  const [promoCodes, setPromoCodes] = useState<DbPromoCode[]>([]);
+  const [newPromo, setNewPromo] = useState({ code: '', discount: 15, maxUses: 0, expiresIn: '' });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftProduct, setDraftProduct] = useState<Product | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -412,13 +414,14 @@ export default function AdminPanel() {
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [dbProds, dbOrds, dbDr, dbNotes, dbChat] = await Promise.all([fetchProducts(), fetchOrders(), fetchDrop(), fetchNotes(), fetchConversations()]);
+      const [dbProds, dbOrds, dbDr, dbNotes, dbChat, dbPromos] = await Promise.all([fetchProducts(), fetchOrders(), fetchDrop(), fetchNotes(), fetchConversations(), fetchPromoCodes()]);
       await hydrateSiteSettings();
       setProducts(dbProds.map(dbToProduct).map(normalizedProduct));
       setOrders(dbOrds.map(dbToOrder));
       if (dbDr) setDropDraft(dbToDrop(dbDr));
       setNotes(dbNotes);
       setChatMessages(dbChat);
+      setPromoCodes(dbPromos);
       setSiteSettings(readSiteSettings());
     } catch (e) { console.error('load error', e); }
     setLoading(false);
@@ -892,6 +895,7 @@ export default function AdminPanel() {
             { id: 'orders', label: 'Commandes' },
             { id: 'products', label: 'Produits & liens' },
             { id: 'drop', label: 'Drop semaine' },
+            { id: 'promos', label: 'Promos' },
             { id: 'settings', label: 'Réglages' },
             { id: 'chat', label: 'Chat' },
             { id: 'notes', label: 'Notes & idées' },
@@ -1562,6 +1566,115 @@ export default function AdminPanel() {
               <p className="mt-4 text-xs text-white/35">
                 Pour une photo locale, place-la dans <span className="font-semibold">public/images/</span> et mets par exemple <span className="font-semibold">/images/drop.jpg</span>.
               </p>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'promos' && (
+          <div className="grid lg:grid-cols-3 gap-5">
+            {/* Liste des codes */}
+            <div className="lg:col-span-2 space-y-3">
+              {promoCodes.length === 0 && (
+                <div className="rounded-3xl bg-white/5 border border-white/10 p-8 text-center text-white/30">Aucun code promo. Crée ton premier code !</div>
+              )}
+              {promoCodes.map((promo) => {
+                const expired = promo.expires_at && new Date(promo.expires_at) < new Date();
+                const maxed = promo.max_uses > 0 && promo.uses >= promo.max_uses;
+                return (
+                  <div key={promo.id} className={`rounded-2xl p-4 flex items-center justify-between gap-4 ${promo.active && !expired && !maxed ? 'bg-white text-dark' : 'bg-white/5 text-white/40 border border-white/10'}`}>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-800 text-lg tracking-wider">{promo.code}</span>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${promo.active && !expired && !maxed ? 'bg-green-500/10 text-green-600' : 'bg-red-500/10 text-red-400'}`}>
+                          {expired ? 'Expiré' : maxed ? 'Épuisé' : promo.active ? 'Actif' : 'Désactivé'}
+                        </span>
+                      </div>
+                      <div className={`text-xs ${promo.active && !expired && !maxed ? 'text-dark/40' : 'text-white/25'}`}>
+                        -{promo.discount_percent}% · {promo.uses} utilisations{promo.max_uses > 0 ? ` / ${promo.max_uses} max` : ''}
+                        {promo.expires_at ? ` · Expire le ${new Date(promo.expires_at).toLocaleDateString('fr-FR')}` : ''}
+                      </div>
+                    </div>
+                    <div className="flex gap-2 flex-shrink-0">
+                      <button onClick={async () => {
+                        await upsertPromoCode({ ...promo, active: !promo.active });
+                        setPromoCodes((prev) => prev.map((p) => p.id === promo.id ? { ...p, active: !p.active } : p));
+                        showToast(promo.active ? 'Code désactivé' : 'Code activé ✓');
+                      }} className={`rounded-xl px-3 py-2 text-xs font-bold ${promo.active ? 'bg-dark/5 text-dark/50' : 'bg-green-500/10 text-green-600'}`}>
+                        {promo.active ? 'Désactiver' : 'Activer'}
+                      </button>
+                      <button onClick={async () => {
+                        await deletePromoCode(promo.id);
+                        setPromoCodes((prev) => prev.filter((p) => p.id !== promo.id));
+                        showToast('Code supprimé ✓');
+                        playDelete();
+                      }} className="rounded-xl px-3 py-2 text-xs font-bold bg-red-500/10 text-red-400">
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Créer un code */}
+            <div className="rounded-3xl bg-white/5 border border-white/10 p-5 h-fit space-y-4">
+              <h3 className="font-bold text-white text-lg">Créer un code promo</h3>
+              <input
+                value={newPromo.code}
+                onChange={(e) => setNewPromo({ ...newPromo, code: e.target.value.toUpperCase() })}
+                placeholder="Code (ex: TOFLAUNCH)"
+                className="w-full rounded-xl bg-white/10 border border-white/10 px-4 py-3 text-sm text-white placeholder-white/25 outline-none uppercase tracking-wider"
+              />
+              <div className="grid grid-cols-2 gap-3">
+                <label className="text-xs text-white/35">Réduction %
+                  <input type="number" value={newPromo.discount} onChange={(e) => setNewPromo({ ...newPromo, discount: Number(e.target.value) })} className="mt-1 w-full rounded-xl bg-white/10 border border-white/10 px-4 py-3 text-sm text-white outline-none" />
+                </label>
+                <label className="text-xs text-white/35">Max utilisations (0 = illimité)
+                  <input type="number" value={newPromo.maxUses} onChange={(e) => setNewPromo({ ...newPromo, maxUses: Number(e.target.value) })} className="mt-1 w-full rounded-xl bg-white/10 border border-white/10 px-4 py-3 text-sm text-white outline-none" />
+                </label>
+              </div>
+              <label className="text-xs text-white/35 block">Expire dans (heures, 0 = jamais)
+                <input type="number" value={newPromo.expiresIn} onChange={(e) => setNewPromo({ ...newPromo, expiresIn: e.target.value })} placeholder="48" className="mt-1 w-full rounded-xl bg-white/10 border border-white/10 px-4 py-3 text-sm text-white placeholder-white/15 outline-none" />
+              </label>
+              <button onClick={async () => {
+                if (!newPromo.code.trim()) return;
+                const hours = Number(newPromo.expiresIn);
+                const promo: DbPromoCode = {
+                  id: `promo-${Date.now()}`,
+                  code: newPromo.code.trim().toUpperCase(),
+                  discount_percent: newPromo.discount,
+                  active: true,
+                  uses: 0,
+                  max_uses: newPromo.maxUses,
+                  expires_at: hours > 0 ? new Date(Date.now() + hours * 3600000).toISOString() : null,
+                };
+                await upsertPromoCode(promo);
+                setPromoCodes((prev) => [promo, ...prev]);
+                setNewPromo({ code: '', discount: 15, maxUses: 0, expiresIn: '' });
+                showToast('Code promo créé ✓');
+              }} className="w-full rounded-full bg-accent px-5 py-3 text-sm font-bold text-white hover:bg-accent-light transition-colors">
+                Créer le code
+              </button>
+
+              <div className="border-t border-white/5 pt-4">
+                <h4 className="font-bold text-white/60 text-sm mb-3">Suggestions lancement</h4>
+                <div className="space-y-2">
+                  {[
+                    { code: 'TOFLAUNCH', discount: 15, label: '-15% lancement' },
+                    { code: 'FIRST10', discount: 10, label: '-10% premier achat' },
+                    { code: 'FLASH20', discount: 20, label: '-20% vente flash' },
+                    { code: 'VIP25', discount: 25, label: '-25% VIP' },
+                  ].map((s) => (
+                    <button
+                      key={s.code}
+                      onClick={() => setNewPromo({ ...newPromo, code: s.code, discount: s.discount })}
+                      className="block w-full text-left rounded-xl bg-white/5 hover:bg-white/10 px-3 py-2 text-xs text-white/35 hover:text-white/55 transition-colors"
+                    >
+                      <span className="font-bold">{s.code}</span> — {s.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         )}

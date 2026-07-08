@@ -117,6 +117,48 @@ export async function saveSettings(value: DbSettings) {
   window.dispatchEvent(new CustomEvent('tof-settings-updated'));
 }
 
+// ─── Promo codes ─────────────────────────────────────────
+
+export type DbPromoCode = {
+  id: string;
+  code: string;
+  discount_percent: number;
+  active: boolean;
+  uses: number;
+  max_uses: number;
+  expires_at: string | null;
+  created_at?: string;
+};
+
+export async function fetchPromoCodes(): Promise<DbPromoCode[]> {
+  const { data } = await supabase.from('promo_codes').select('*').order('created_at', { ascending: false });
+  return (data as DbPromoCode[]) || [];
+}
+
+export async function upsertPromoCode(code: DbPromoCode) {
+  await supabase.from('promo_codes').upsert(code);
+}
+
+export async function deletePromoCode(id: string) {
+  await supabase.from('promo_codes').delete().eq('id', id);
+}
+
+export async function validatePromoCode(code: string): Promise<DbPromoCode | null> {
+  const { data } = await supabase.from('promo_codes').select('*').eq('code', code.toUpperCase()).eq('active', true).single();
+  if (!data) return null;
+  const promo = data as DbPromoCode;
+  if (promo.max_uses > 0 && promo.uses >= promo.max_uses) return null;
+  if (promo.expires_at && new Date(promo.expires_at) < new Date()) return null;
+  return promo;
+}
+
+export async function incrementPromoUse(id: string) {
+  const { data } = await supabase.from('promo_codes').select('uses').eq('id', id).single();
+  if (data) {
+    await supabase.from('promo_codes').update({ uses: (data.uses || 0) + 1 }).eq('id', id);
+  }
+}
+
 // ─── Chat ────────────────────────────────────────────────
 
 export type DbChatMessage = {

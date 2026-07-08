@@ -2,7 +2,7 @@ import { Minus, Plus, ShoppingBag, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { readCart, removeFromCart, updateCartQuantity, clearCart, cartTotal, cartCount, type CartItem } from '../lib/cart';
 import { readSiteSettings } from '../lib/siteSettings';
-import { insertOrder } from '../lib/db';
+import { insertOrder, validatePromoCode, incrementPromoUse, type DbPromoCode } from '../lib/db';
 
 function formatPrice(value: number) {
   return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(value);
@@ -18,6 +18,9 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
   const [step, setStep] = useState<'cart' | 'checkout' | 'done'>('cart');
   const [shippingMode, setShippingMode] = useState<'standard' | 'express'>('standard');
   const [createdOrderId, setCreatedOrderId] = useState('');
+  const [promoInput, setPromoInput] = useState('');
+  const [appliedPromo, setAppliedPromo] = useState<DbPromoCode | null>(null);
+  const [promoError, setPromoError] = useState('');
   const [savedCart, setSavedCart] = useState<CartItem[]>([]);
   const [savedTotal, setSavedTotal] = useState(0);
   const [form, setForm] = useState({
@@ -53,15 +56,38 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
       setSavedCart([]);
       setSavedTotal(0);
       setCreatedOrderId('');
+      setAppliedPromo(null);
+      setPromoInput('');
+      setPromoError('');
     }
   }, [open]);
 
-  const total = cartTotal(cart);
+  const subtotal = cartTotal(cart);
   const count = cartCount(cart);
+  const discount = appliedPromo ? Math.round(subtotal * appliedPromo.discount_percent / 100) : 0;
+  const total = subtotal - discount;
   const baseShipping = total >= SHIPPING_FREE_THRESHOLD ? 0 : SHIPPING_FEE;
   const expressExtra = shippingMode === 'express' ? EXPRESS_FEE : 0;
   const shipping = baseShipping + expressExtra;
   const grandTotal = total + shipping;
+
+  const applyPromo = async () => {
+    setPromoError('');
+    if (!promoInput.trim()) return;
+    const promo = await validatePromoCode(promoInput.trim());
+    if (!promo) {
+      setPromoError('Code invalide ou expiré');
+      return;
+    }
+    setAppliedPromo(promo);
+    setPromoInput('');
+  };
+
+  const removePromo = () => {
+    setAppliedPromo(null);
+    setPromoInput('');
+    setPromoError('');
+  };
 
   const placeOrder = async () => {
     if (!form.customerName || !form.phone || !form.address) return;
@@ -99,10 +125,15 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
       items_json: itemsJson,
     });
 
+    if (appliedPromo) {
+      await incrementPromoUse(appliedPromo.id);
+    }
+
     setSavedCart([...cart]);
     setSavedTotal(grandTotal);
     setCreatedOrderId(orderId);
     clearCart();
+    setAppliedPromo(null);
     setStep('done');
   };
 
@@ -197,8 +228,38 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
                 <div className="sticky bottom-0 bg-white border-t border-dark/5 p-5 space-y-3">
                   <div className="flex justify-between text-sm">
                     <span className="text-dark/45">Sous-total</span>
-                    <span className="font-bold">{formatPrice(total)}</span>
+                    <span className="font-bold">{formatPrice(subtotal)}</span>
                   </div>
+
+                  {/* Code promo */}
+                  {appliedPromo ? (
+                    <div className="flex items-center justify-between rounded-xl bg-green-500/10 border border-green-500/20 px-3 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-green-600 text-xs font-bold">🎉 {appliedPromo.code}</span>
+                        <span className="text-green-600 text-xs">-{appliedPromo.discount_percent}%</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-green-600 text-sm font-800">-{formatPrice(discount)}</span>
+                        <button onClick={removePromo} className="text-green-600/40 hover:text-red-500 text-xs">✕</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="flex gap-2">
+                        <input
+                          value={promoInput}
+                          onChange={(e) => { setPromoInput(e.target.value.toUpperCase()); setPromoError(''); }}
+                          onKeyDown={(e) => e.key === 'Enter' && applyPromo()}
+                          placeholder="Code promo"
+                          className="flex-1 rounded-xl bg-bg px-3 py-2.5 text-xs outline-none uppercase tracking-wider"
+                        />
+                        <button onClick={applyPromo} className="rounded-xl bg-dark text-white px-4 py-2.5 text-xs font-bold hover:bg-accent transition-colors">
+                          Appliquer
+                        </button>
+                      </div>
+                      {promoError && <p className="text-xs text-red-500 font-semibold mt-1">{promoError}</p>}
+                    </div>
+                  )}
 
                   {/* Choix livraison */}
                   <div className="space-y-2">
