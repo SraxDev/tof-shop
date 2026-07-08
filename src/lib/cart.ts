@@ -58,6 +58,13 @@ export function clearCart() {
   saveCart([]);
 }
 
+export function syncCartWithProducts(validProductIds: string[]) {
+  const validIds = new Set(validProductIds);
+  const next = readCart().filter((item) => validIds.has(item.productId));
+  saveCart(next);
+  return next;
+}
+
 export function cartTotal(items: CartItem[]) {
   return items.reduce((sum, i) => sum + i.salePrice * i.quantity, 0);
 }

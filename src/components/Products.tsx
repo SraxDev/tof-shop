@@ -2,7 +2,7 @@ import { Heart, ShoppingBag, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useInView } from '../hooks/useInView';
 import AppleEmoji from './AppleEmoji';
-import { addToCart } from '../lib/cart';
+import { addToCart, syncCartWithProducts } from '../lib/cart';
 import { fetchProducts, type DbProduct } from '../lib/db';
 
 type Product = {
@@ -70,8 +70,14 @@ export default function Products() {
   const [selectedColor, setSelectedColor] = useState('');
 
   useEffect(() => {
-    loadProducts().then(setProducts);
-    const sync = () => { loadProducts().then(setProducts); };
+    const loadAndSync = async () => {
+      const loaded = await loadProducts();
+      setProducts(loaded);
+      syncCartWithProducts(loaded.map((product) => product.id));
+    };
+
+    loadAndSync();
+    const sync = () => { loadAndSync(); };
     window.addEventListener('tof-products-updated', sync);
     return () => {
       window.removeEventListener('tof-products-updated', sync);

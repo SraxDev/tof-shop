@@ -16,6 +16,8 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
   const [settings, setSettings] = useState(readSiteSettings);
   const [step, setStep] = useState<'cart' | 'checkout' | 'done'>('cart');
   const [createdOrderId, setCreatedOrderId] = useState('');
+  const [savedCart, setSavedCart] = useState<CartItem[]>([]);
+  const [savedTotal, setSavedTotal] = useState(0);
   const [form, setForm] = useState({
     customerName: '',
     phone: '',
@@ -78,6 +80,8 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
       });
     }
 
+    setSavedCart([...cart]);
+    setSavedTotal(grandTotal);
     setCreatedOrderId(orderId);
     clearCart();
     setStep('done');
@@ -86,12 +90,14 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
   const whatsappCheckoutLink = () => {
     const whatsappBase = settings.whatsappUrl.includes('wa.me') ? settings.whatsappUrl : 'https://wa.me/';
     const baseUrl = whatsappBase.split('?')[0];
-    const itemsList = cart.map((i) => `- ${i.brand} ${i.name} (${i.size}/${i.color}) x${i.quantity} = ${formatPrice(i.salePrice * i.quantity)}`).join('\n');
+    const items = savedCart.length > 0 ? savedCart : cart;
+    const finalTotal = savedTotal > 0 ? savedTotal : grandTotal;
+    const itemsList = items.map((i) => `- ${i.brand} ${i.name} (${i.size}/${i.color}) x${i.quantity} = ${formatPrice(i.salePrice * i.quantity)}`).join('\n');
     const msg = encodeURIComponent(
       `Salut, je viens de passer la commande ${createdOrderId} sur tof.\n\n` +
       `${itemsList}\n\n` +
-      `Total : ${formatPrice(grandTotal)}${shipping > 0 ? ` (dont ${formatPrice(shipping)} livraison)` : ' (livraison offerte)'}\n\n` +
-      `Je suis pret a payer, envoie-moi le lien PayPal.`
+      `Total : ${formatPrice(finalTotal)}\n\n` +
+      `Je suis prêt à payer, envoie-moi le lien PayPal.`
     );
     return `${baseUrl}?text=${msg}`;
   };

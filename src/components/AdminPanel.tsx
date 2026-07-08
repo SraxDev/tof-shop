@@ -296,6 +296,11 @@ function marginLabel(margin: number) {
   return 'Danger';
 }
 
+function rootOrderId(id: string) {
+  const match = id.match(/^TOF-\d+/);
+  return match ? match[0] : id;
+}
+
 export default function AdminPanel() {
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -654,7 +659,7 @@ export default function AdminPanel() {
   const orderText = (order: Order) => {
     const product = getProduct(order.productId);
     const margin = estimateNetMargin(product, order.quantity);
-    return `ORDER ${order.id}\n\nPRODUCT\nBrand: ${product.brand}\nName: ${product.name}\nSource link: ${product.sourceUrl}\nSource price: ${product.sourcePriceCny} CNY (${euro(margin.sourceCost)})\nSize: ${order.size}\nColor: ${order.color}\nQuantity: ${order.quantity}\nPackaging: ${packagingLabels[product.packaging || 'none']}\nEstimated weight: ${margin.effectiveWeight}g\n\nCUSTOMER\nName: ${order.customerName}\nPhone: ${order.phone}\nAddress: ${order.address}\nCity: ${order.city}\nZip: ${order.zip}\nCountry: ${order.country}\nSnap/WhatsApp: ${order.snapOrWhatsapp}\n\nSHIPPING\nPreferred line: ${margin.shipping.label}\nEstimated shipping: ${euro(margin.shipping.low)} - ${euro(margin.shipping.high)}\nSafety shipping used for margin (+20%): ${euro(margin.shippingWithSafety)}\nEstimated net margin: ${euro(margin.net)}\nPackaging: discreet, no invoice\nQC: please send photos before shipping`;
+    return `ORDER ${rootOrderId(order.id)}\n\nPRODUCT\nBrand: ${product.brand}\nName: ${product.name}\nSource link: ${product.sourceUrl}\nSource price: ${product.sourcePriceCny} CNY (${euro(margin.sourceCost)})\nSize: ${order.size}\nColor: ${order.color}\nQuantity: ${order.quantity}\nPackaging: ${packagingLabels[product.packaging || 'none']}\nEstimated weight: ${margin.effectiveWeight}g\n\nCUSTOMER\nName: ${order.customerName}\nPhone: ${order.phone}\nAddress: ${order.address}\nCity: ${order.city}\nZip: ${order.zip}\nCountry: ${order.country}\nSnap/WhatsApp: ${order.snapOrWhatsapp}\n\nSHIPPING\nPreferred line: ${margin.shipping.label}\nEstimated shipping: ${euro(margin.shipping.low)} - ${euro(margin.shipping.high)}\nSafety shipping used for margin (+20%): ${euro(margin.shippingWithSafety)}\nEstimated net margin: ${euro(margin.net)}\nPackaging: discreet, no invoice\nQC: please send photos before shipping`;
   };
 
   const copyOrder = async (order: Order) => {
@@ -668,15 +673,15 @@ export default function AdminPanel() {
     const product = getProduct(order.productId);
     const amount = euro(product.salePrice * order.quantity);
     if (type === 'payment') {
-      return `Salut ${order.customerName}, ta commande ${order.id} est bien reservee.\n\nProduit : ${product.brand} - ${product.name}\nTaille/couleur : ${order.size} / ${order.color}\nMontant : ${amount}\n\nPaiement PayPal : ${siteSettings.paypalUrl}\n\nEnvoie une capture ici quand c'est fait et je lance la commande.`;
+      return `Salut ${order.customerName}, ta commande ${rootOrderId(order.id)} est bien réservée.\n\nProduit : ${product.brand} - ${product.name}\nTaille/couleur : ${order.size} / ${order.color}\nMontant : ${amount}\n\nPaiement PayPal : ${siteSettings.paypalUrl}\n\nEnvoie une capture ici quand c'est fait et je lance la commande.`;
     }
     if (type === 'paid') {
-      return `Paiement recu pour ta commande ${order.id}, merci.\nJe lance la commande et je te tiens au courant pour le QC / suivi.`;
+      return `Paiement reçu pour ta commande ${rootOrderId(order.id)}, merci.\nJe lance la commande et je te tiens au courant pour le QC / suivi.`;
     }
     if (type === 'tracking') {
-      return `Ta commande ${order.id} est expediee.\nTracking : ${order.tracking || '[COLLE LE TRACKING ICI]'}\n\nDelai estime : 7-20 jours selon la ligne.`;
+      return `Ta commande ${rootOrderId(order.id)} est expédiée.\nTracking : ${order.tracking || '[COLLE LE TRACKING ICI]'}\n\nDélai estimé : 7-20 jours selon la ligne.`;
     }
-    return `Petit update pour ta commande ${order.id} : il y a un leger delai cote traitement/livraison. Je suis dessus et je t'envoie les nouvelles infos des que je les ai.`;
+    return `Petit update pour ta commande ${rootOrderId(order.id)} : il y a un léger délai côté traitement/livraison. Je suis dessus et je t'envoie les nouvelles infos dès que je les ai.`;
   };
 
   const copyClientMessage = async (order: Order, type: 'payment' | 'paid' | 'tracking' | 'delay') => {
@@ -874,7 +879,7 @@ export default function AdminPanel() {
                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                       <div>
                         <div className="flex items-center gap-2 mb-2">
-                          <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-bold text-accent">{order.id}</span>
+                          <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-bold text-accent">{rootOrderId(order.id)}</span>
                           <span className="rounded-full bg-dark/5 px-3 py-1 text-xs font-semibold text-dark/45">
                             {statusLabels[order.status]}
                           </span>
