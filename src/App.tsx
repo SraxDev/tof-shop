@@ -3,6 +3,7 @@ import { useTwemoji } from './hooks/useTwemoji';
 import { hydrateSiteSettings } from './lib/siteSettings';
 import { trackVisitor } from './lib/db';
 import AnnouncementBar from './components/AnnouncementBar';
+import LaunchTimer from './components/LaunchTimer';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import BrandMarquee from './components/BrandMarquee';
@@ -118,8 +119,9 @@ export default function App() {
 
   return (
     <div className="font-sans antialiased bg-bg text-dark">
-      <AnnouncementBar />
       <Navbar />
+      <AnnouncementBar />
+      <LaunchTimer />
       <Hero />
       <BrandMarquee />
       <CTA />
