@@ -199,25 +199,25 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="text-[10px] font-bold text-accent uppercase tracking-wider">{item.brand}</div>
-                        <div className="font-bold text-sm text-dark truncate">{item.name}</div>
-                        <div className="text-xs text-dark/40 mt-0.5">{item.size} / {item.color}</div>
-                        <div className="flex items-center justify-between mt-2">
-                          <div className="flex items-center gap-2">
+                        <div className="font-bold text-[13px] text-dark truncate leading-tight">{item.name}</div>
+                        <div className="text-[11px] text-dark/40 mt-0.5">{item.size} / {item.color}</div>
+                        <div className="flex items-center justify-between mt-2.5">
+                          <div className="flex items-center gap-1.5">
                             <button
                               onClick={() => updateCartQuantity(item.productId, item.size, item.color, item.quantity - 1)}
-                              className="h-7 w-7 rounded-lg bg-white border border-dark/10 flex items-center justify-center text-dark/40 hover:text-dark"
+                              className="h-8 w-8 rounded-xl bg-white border border-dark/10 flex items-center justify-center text-dark/40 hover:text-dark active:scale-90 transition-all"
                             >
-                              <Minus size={12} />
+                              <Minus size={14} />
                             </button>
-                            <span className="text-sm font-bold w-5 text-center">{item.quantity}</span>
+                            <span className="text-sm font-800 w-6 text-center">{item.quantity}</span>
                             <button
                               onClick={() => updateCartQuantity(item.productId, item.size, item.color, item.quantity + 1)}
-                              className="h-7 w-7 rounded-lg bg-white border border-dark/10 flex items-center justify-center text-dark/40 hover:text-dark"
+                              className="h-8 w-8 rounded-xl bg-white border border-dark/10 flex items-center justify-center text-dark/40 hover:text-dark active:scale-90 transition-all"
                             >
-                              <Plus size={12} />
+                              <Plus size={14} />
                             </button>
                           </div>
-                          <span className="font-800 text-sm">{formatPrice(item.salePrice * item.quantity)}</span>
+                          <span className="font-900 text-[13px]">{formatPrice(item.salePrice * item.quantity)}</span>
                         </div>
                       </div>
                       <button

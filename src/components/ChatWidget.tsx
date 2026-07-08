@@ -231,60 +231,72 @@ export default function ChatWidget() {
       )}
 
       {open && (
-        <div className="fixed inset-0 sm:inset-auto sm:bottom-6 sm:right-6 z-[80] w-full sm:w-96 h-[100dvh] sm:h-[560px] bg-white sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden sm:border border-dark/5">
-          <div className="bg-dark text-white px-4 py-3 sm:px-5 sm:py-4 flex items-center justify-between flex-shrink-0 safe-top">
+        <div className="fixed inset-0 sm:inset-auto sm:bottom-6 sm:right-6 z-[80] w-full sm:w-96 h-[100dvh] sm:h-[600px] bg-white sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden sm:border border-dark/5 anim-slide-up">
+          {/* Header */}
+          <div className="bg-dark text-white px-5 py-4 flex items-center justify-between flex-shrink-0 safe-top">
             <div className="flex items-center gap-3">
-              <button onClick={() => setOpen(false)} className="h-8 w-8 rounded-full bg-white/10 flex items-center justify-center text-white/60 hover:text-white sm:hidden">
-                <X size={16} />
-              </button>
-              <div>
-                <div className="font-display font-800 text-base sm:text-lg">tof<span className="text-accent">.</span> chat</div>
-                <div className="text-[11px] text-white/40 flex items-center gap-1.5">
-                  <span className="h-1.5 w-1.5 bg-green-400 rounded-full animate-pulse" />
-                  En ligne
+              <div className="relative">
+                <div className="h-10 w-10 rounded-full bg-accent/20 flex items-center justify-center text-accent text-xl font-bold border border-accent/10">
+                  t.
                 </div>
+                <span className="absolute bottom-0 right-0 h-3 w-3 bg-green-400 rounded-full border-2 border-dark" />
+              </div>
+              <div>
+                <div className="font-display font-800 text-base">tof<span className="text-accent">.</span> Support</div>
+                <div className="text-[10px] text-white/40 uppercase tracking-widest font-bold">Réponse instantanée</div>
               </div>
             </div>
-            <button onClick={() => setOpen(false)} className="hidden sm:flex h-8 w-8 rounded-full bg-white/10 items-center justify-center text-white/60 hover:text-white">
-              <X size={16} />
+            <button 
+              onClick={() => setOpen(false)} 
+              className="h-10 w-10 rounded-full bg-white/5 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all active:scale-90"
+            >
+              <X size={20} />
             </button>
           </div>
 
           {!nameSet ? (
-            <div className="flex-1 flex items-center justify-center p-6">
-              <div className="text-center space-y-4 w-full">
-                <div className="text-4xl">👋</div>
-                <h3 className="font-display text-xl font-800 text-dark">Bienvenue !</h3>
-                <p className="text-sm text-dark/40">Dis-nous ton prénom pour commencer</p>
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && submitName()}
-                  placeholder="Ton prénom"
-                  className="w-full rounded-xl bg-bg px-4 py-3 text-sm outline-none text-center"
-                  autoFocus
-                />
-                <button onClick={submitName} className="w-full rounded-full bg-dark text-white py-3 text-sm font-bold hover:bg-accent transition-colors">
-                  Commencer le chat
-                </button>
+            <div className="flex-1 flex items-center justify-center p-8 bg-bg/30">
+              <div className="text-center space-y-6 w-full max-w-[280px]">
+                <div className="h-20 w-20 bg-white rounded-3xl shadow-xl flex items-center justify-center text-4xl mx-auto anim-float">👋</div>
+                <div>
+                  <h3 className="font-display text-2xl font-800 text-dark">Hello !</h3>
+                  <p className="text-sm text-dark/40 mt-1 leading-relaxed">Prêt à trouver ta pièce ? Donne-nous ton prénom.</p>
+                </div>
+                <div className="space-y-3">
+                  <input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && submitName()}
+                    placeholder="Ton prénom..."
+                    className="w-full rounded-2xl bg-white border border-dark/5 px-5 py-4 text-sm outline-none text-center shadow-sm focus:border-accent/20 transition-all"
+                    autoFocus
+                  />
+                  <button 
+                    onClick={submitName} 
+                    disabled={!name.trim()}
+                    className="w-full rounded-2xl bg-dark text-white py-4 text-sm font-bold shadow-lg shadow-dark/10 hover:bg-accent transition-all active:scale-[0.98] disabled:opacity-30"
+                  >
+                    Lancer la discussion
+                  </button>
+                </div>
               </div>
             </div>
           ) : (
             <>
-              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-bg/20 custom-scrollbar">
                 {messages.map((msg) => (
                   <div key={msg.id} className={`flex ${msg.sender === 'client' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                    <div className={`max-w-[85%] rounded-[20px] px-4 py-3 text-sm leading-relaxed shadow-sm ${
                       msg.sender === 'client'
                         ? 'bg-dark text-white rounded-br-sm'
                         : msg.sender === 'admin'
                           ? 'bg-accent text-white rounded-bl-sm'
-                          : 'bg-bg text-dark rounded-bl-sm'
+                          : 'bg-white text-dark rounded-bl-sm border border-dark/5'
                     }`}>
-                      {msg.sender === 'admin' && <div className="text-[10px] font-bold text-white/60 mb-1">tof.</div>}
-                      {msg.sender === 'bot' && <div className="text-[10px] font-bold text-dark/30 mb-1">tof. bot</div>}
+                      {msg.sender === 'admin' && <div className="text-[10px] font-bold text-white/50 mb-1 uppercase tracking-tighter">Support tof.</div>}
+                      {msg.sender === 'bot' && <div className="text-[10px] font-bold text-dark/20 mb-1 uppercase tracking-tighter">Assistant virtuel</div>}
                       <p className="whitespace-pre-wrap">{msg.message}</p>
-                      <div className={`text-[10px] mt-1 ${msg.sender === 'client' ? 'text-white/30' : msg.sender === 'admin' ? 'text-white/40' : 'text-dark/20'}`}>
+                      <div className={`text-[9px] mt-2 font-medium opacity-40 ${msg.sender === 'client' ? 'text-right' : 'text-left'}`}>
                         {formatTime(msg.created_at)}
                       </div>
                     </div>
@@ -293,10 +305,10 @@ export default function ChatWidget() {
 
                 {typing && (
                   <div className="flex justify-start">
-                    <div className="bg-bg rounded-2xl rounded-bl-sm px-4 py-3 flex items-center gap-1.5">
-                      <span className="h-2 w-2 bg-dark/20 rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
-                      <span className="h-2 w-2 bg-dark/20 rounded-full animate-bounce" style={{ animationDelay: '0.15s' }} />
-                      <span className="h-2 w-2 bg-dark/20 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }} />
+                    <div className="bg-white border border-dark/5 rounded-[20px] rounded-bl-sm px-5 py-4 flex items-center gap-1.5 shadow-sm">
+                      <span className="h-1.5 w-1.5 bg-dark/20 rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
+                      <span className="h-1.5 w-1.5 bg-dark/20 rounded-full animate-bounce" style={{ animationDelay: '0.15s' }} />
+                      <span className="h-1.5 w-1.5 bg-dark/20 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }} />
                     </div>
                   </div>
                 )}
@@ -304,51 +316,40 @@ export default function ChatWidget() {
                 <div ref={bottomRef} />
               </div>
 
-              {/* Suggestions */}
-              {suggestions.length > 0 && (
-                <div className="px-3 pb-2 flex gap-2 overflow-x-auto flex-shrink-0">
-                  {suggestions.map((s) => (
+              {/* Suggestions & Input Area */}
+              <div className="bg-white border-t border-dark/5 p-3 sm:p-4 space-y-3 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)]">
+                
+                {/* Scrollable Suggestions */}
+                <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar -mx-1 px-1">
+                  {(suggestions.length > 0 ? suggestions : (messages.length <= 2 ? quickButtons.map(b => b.label) : [])).map((s) => (
                     <button
                       key={s}
-                      onClick={() => processMessage(s)}
-                      className="rounded-full bg-accent/10 text-accent px-3 py-1.5 text-[11px] font-semibold whitespace-nowrap flex-shrink-0 hover:bg-accent/20 transition-colors"
+                      onClick={() => processMessage(s.includes('🛒') || s.includes('📦') ? quickButtons.find(b => b.label === s)?.text || s : s)}
+                      className="rounded-full bg-bg border border-dark/[0.03] text-dark/60 px-4 py-2 text-[11px] font-bold whitespace-nowrap flex-shrink-0 hover:bg-dark hover:text-white transition-all active:scale-95"
                     >
                       {s}
                     </button>
                   ))}
                 </div>
-              )}
 
-              {/* Quick buttons pour premier contact */}
-              {messages.length <= 2 && suggestions.length === 0 && (
-                <div className="px-3 pb-2 flex gap-2 overflow-x-auto flex-shrink-0">
-                  {quickButtons.map((b) => (
-                    <button
-                      key={b.label}
-                      onClick={() => processMessage(b.text)}
-                      className="rounded-full bg-dark/5 text-dark/60 px-3 py-1.5 text-[11px] font-semibold whitespace-nowrap flex-shrink-0 hover:bg-dark/10 transition-colors"
-                    >
-                      {b.label}
-                    </button>
-                  ))}
+                <div className="flex gap-2">
+                  <div className="flex-1 relative">
+                    <input
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && processMessage(input)}
+                      placeholder="Ta question..."
+                      className="w-full rounded-2xl bg-bg border border-dark/[0.03] px-5 py-4 text-sm outline-none focus:bg-white focus:border-accent/20 transition-all shadow-inner"
+                    />
+                  </div>
+                  <button
+                    onClick={() => processMessage(input)}
+                    disabled={!input.trim()}
+                    className="h-14 w-14 rounded-2xl bg-dark text-white flex items-center justify-center hover:bg-accent transition-all active:scale-[0.9] disabled:opacity-10 shadow-lg"
+                  >
+                    <Send size={20} strokeWidth={2.5} />
+                  </button>
                 </div>
-              )}
-
-              <div className="border-t border-dark/5 p-3 flex gap-2 flex-shrink-0 safe-bottom">
-                <input
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && processMessage(input)}
-                  placeholder="Écris ton message..."
-                  className="flex-1 rounded-xl bg-bg px-4 py-3 text-sm outline-none"
-                />
-                <button
-                  onClick={() => processMessage(input)}
-                  disabled={!input.trim()}
-                  className="h-11 w-11 rounded-xl bg-dark text-white flex items-center justify-center hover:bg-accent transition-colors disabled:opacity-30"
-                >
-                  <Send size={16} />
-                </button>
               </div>
             </>
           )}

@@ -16,19 +16,19 @@ export default function MobileStickyBar() {
   }, []);
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 z-50 md:hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-      <div className="grid grid-cols-2 gap-2 rounded-full bg-dark/90 p-2 shadow-2xl shadow-dark/25 backdrop-blur-xl border border-white/10">
+    <div className="fixed bottom-6 left-4 right-4 z-50 md:hidden pb-[env(safe-area-inset-bottom,0px)]">
+      <div className="grid grid-cols-2 gap-3 rounded-[24px] bg-dark/90 p-2 shadow-[0_20px_50px_rgba(0,0,0,0.3)] backdrop-blur-xl border border-white/10 ring-1 ring-black/5">
         <a
           href="#shop"
-          className="flex items-center justify-center gap-2 rounded-full bg-white text-dark px-4 py-3 text-xs font-bold"
+          className="flex items-center justify-center gap-2 rounded-2xl bg-white text-dark py-4 text-[13px] font-900 active:scale-95 transition-all shadow-xl"
         >
-          <ShoppingBag size={15} /> Shop
+          <ShoppingBag size={16} strokeWidth={2.5} /> Boutique
         </a>
         <a
           href={settings.whatsappUrl}
-          className="flex items-center justify-center gap-2 rounded-full bg-[#25D366] text-white px-4 py-3 text-xs font-bold"
+          className="flex items-center justify-center gap-2 rounded-2xl bg-[#25D366] text-white py-4 text-[13px] font-900 active:scale-95 transition-all shadow-lg"
         >
-          <MessageCircle size={15} /> WhatsApp
+          <MessageCircle size={16} strokeWidth={2.5} /> WhatsApp
         </a>
       </div>
     </div>

@@ -62,17 +62,41 @@ export default function Navbar() {
         </div>
 
         {open && (
-          <div className="md:hidden bg-bg border-t border-dark/5 px-5 pb-6 pt-2">
-          {['Shop', 'Marques', 'À propos', 'Contact'].map((l) => (
-            <a
-              key={l}
-              href={`#${l.toLowerCase().replace('à propos', 'apropos')}`}
-              onClick={() => setOpen(false)}
-              className="block py-3 text-dark/70 font-medium border-b border-dark/5 last:border-0"
-            >
-              {l}
-            </a>
-          ))}
+          <div className="fixed inset-0 z-[60] bg-white anim-fade-in md:hidden flex flex-col p-6">
+            <div className="flex items-center justify-between mb-12">
+              <span className="font-display text-2xl font-800 tracking-tight text-dark">menu<span className="text-accent">.</span></span>
+              <button onClick={() => setOpen(false)} className="h-12 w-12 rounded-full bg-dark/5 flex items-center justify-center text-dark">
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="flex-1 flex flex-col gap-4">
+              {['Shop', 'Marques', 'À propos', 'Contact'].map((l, i) => (
+                <a
+                  key={l}
+                  href={`#${l.toLowerCase().replace('à propos', 'apropos')}`}
+                  onClick={() => setOpen(false)}
+                  className="text-4xl font-display font-800 text-dark hover:text-accent transition-all anim-slide-up"
+                  style={{ animationDelay: `${i * 0.1}s` }}
+                >
+                  {l}
+                </a>
+              ))}
+            </div>
+
+            <div className="mt-auto pt-8 border-t border-dark/5">
+              <p className="text-[10px] font-bold text-dark/30 uppercase tracking-[0.2em] mb-4">Rejoindre la communauté</p>
+              <div className="flex gap-4">
+                <div className="flex-1 bg-[#25D366]/10 p-4 rounded-2xl">
+                  <p className="text-[10px] font-bold text-[#25D366] uppercase mb-1">WhatsApp</p>
+                  <p className="text-xs font-medium text-dark/60">Support & Paiement</p>
+                </div>
+                <div className="flex-1 bg-[#FFFC00]/10 p-4 rounded-2xl">
+                  <p className="text-[10px] font-bold text-dark uppercase mb-1">Snapchat</p>
+                  <p className="text-xs font-medium text-dark/60">Drops & Exclus</p>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </nav>
