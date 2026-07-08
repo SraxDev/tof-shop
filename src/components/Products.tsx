@@ -182,7 +182,8 @@ export default function Products() {
 
   const getProductImages = (p: Product) => {
     if (!p.imageUrl) return [];
-    return p.imageUrl.split(/[|,]/).map(s => s.trim()).filter(Boolean);
+    // Nettoyer les espaces et filtrer les entrées vides
+    return p.imageUrl.split(',').map(s => s.trim()).filter(url => url && url.startsWith('http') || url.startsWith('data:image'));
   };
 
   const openQuickAdd = (p: Product) => {
@@ -386,19 +387,20 @@ export default function Products() {
             </button>
 
             {/* Conteneur unique pour le scroll mobile / layout divisé desktop */}
-            <div className="flex-1 flex flex-col sm:flex-row min-h-0 overflow-y-auto sm:overflow-hidden">
+            <div className="flex-1 flex flex-col sm:flex-row min-h-0 overflow-hidden">
               
-              {/* Section Image */}
-              <div className="relative w-full sm:w-1/2 h-[50vh] sm:h-auto bg-[#F9F9F9] flex-shrink-0 flex items-center justify-center p-4 sm:p-8">
+              {/* Section Image - Gauche */}
+              <div className="relative w-full sm:w-[55%] h-[45vh] sm:h-auto bg-[#F9F9F9] flex items-center justify-center p-6 sm:p-12">
                 {activeImage || quickAdd.imageUrl ? (
                   <img 
                     src={activeImage || getProductImages(quickAdd)[0]} 
                     alt={quickAdd.name} 
-                    className="max-h-full max-w-full w-auto h-auto object-contain drop-shadow-2xl" 
+                    className="max-h-full max-w-full w-auto h-auto object-contain drop-shadow-2xl anim-fade-in" 
+                    key={activeImage}
                   />
                 ) : (
                   <div className="h-full w-full flex items-center justify-center">
-                    <AppleEmoji emoji={emojiForCategory(quickAdd.category)} size={100} />
+                    <AppleEmoji emoji={emojiForCategory(quickAdd.category)} size={120} />
                   </div>
                 )}
                 
@@ -413,21 +415,21 @@ export default function Products() {
                 {(() => {
                   const badge = getBadge(quickAdd);
                   return badge ? (
-                    <span className={`absolute top-4 right-4 ${badge.color} text-white text-[11px] font-bold px-3 py-1.5 rounded-full shadow-lg`}>
+                    <span className={`absolute top-6 left-6 ${badge.color} text-white text-[11px] font-bold px-3 py-1.5 rounded-full shadow-lg`}>
                       {badge.text}
                     </span>
                   ) : null;
                 })()}
               </div>
 
-              {/* Section Infos */}
-              <div className="flex-1 flex flex-col min-h-0 bg-white sm:overflow-y-auto custom-scrollbar">
-                <div className="p-6 sm:p-8 md:p-10">
-                  <div className="max-w-lg mx-auto sm:mx-0">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-accent/80">{quickAdd.brand}</span>
+              {/* Section Infos - Droite */}
+              <div className="flex-1 flex flex-col min-h-0 bg-white border-l border-dark/[0.03]">
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                  <div className="p-6 sm:p-10">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-accent">{quickAdd.brand}</span>
                       <span className="h-1 w-1 rounded-full bg-dark/10" />
-                      <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-dark/40">{quickAdd.category}</span>
+                      <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-dark/30">{quickAdd.category}</span>
                     </div>
                     
                     <h2 className="font-display text-3xl sm:text-4xl font-800 text-dark leading-tight">{quickAdd.name}</h2>
@@ -437,18 +439,16 @@ export default function Products() {
                       <span className="text-sm text-dark/30 font-medium">TVA incluse</span>
                     </div>
 
-                    {/* Avantages */}
+                    {/* Avantages - Plus compact */}
                     <div className="grid grid-cols-1 gap-2 mt-8">
                       {[
-                        { icon: '📦', text: 'Livraison suivie & Express', sub: 'Arrivée estimée : 7-15 jours' },
-                        { icon: '💎', text: 'Qualité Premium Garantie', sub: 'Contrôle qualité rigoureux avant envoi' },
-                        { icon: '🛡️', text: 'Paiement Sécurisé', sub: 'Finalisation via WhatsApp' }
+                        { icon: '📦', text: 'Livraison suivie & Express', sub: '7-15 jours' },
+                        { icon: '🛡️', text: 'Paiement Sécurisé', sub: 'via WhatsApp' }
                       ].map((item, idx) => (
-                        <div key={idx} className="flex gap-4 p-3 rounded-2xl bg-bg/50 border border-dark/[0.03]">
-                          <span className="text-xl shrink-0">{item.icon}</span>
+                        <div key={idx} className="flex items-center gap-3 p-3 rounded-2xl bg-bg/50 border border-dark/[0.02]">
+                          <span className="text-lg">{item.icon}</span>
                           <div>
-                            <p className="text-xs font-bold text-dark/80">{item.text}</p>
-                            <p className="text-[10px] text-dark/40 font-medium">{item.sub}</p>
+                            <p className="text-[11px] font-bold text-dark/80">{item.text} <span className="text-dark/30 font-medium ml-1">· {item.sub}</span></p>
                           </div>
                         </div>
                       ))}
@@ -457,28 +457,22 @@ export default function Products() {
                     {/* Tailles */}
                     {quickSizes.length > 0 && (
                       <div className="mt-8">
-                        <div className="flex justify-between items-center mb-3">
-                          <label className="text-xs font-bold uppercase tracking-wider text-dark/60">Sélectionner la Taille</label>
+                        <div className="flex justify-between items-center mb-4">
+                          <label className="text-[11px] font-bold uppercase tracking-widest text-dark/40">Taille</label>
                           <button 
                             onClick={() => setShowSizeGuide(!showSizeGuide)}
-                            className="text-[10px] font-bold text-accent underline underline-offset-4"
+                            className="text-[10px] font-bold text-accent underline underline-offset-4 decoration-accent/30 hover:decoration-accent"
                           >
                             Guide des tailles
                           </button>
                         </div>
 
                         {showSizeGuide && (
-                          <div className="mb-4 p-4 bg-bg rounded-2xl border border-dark/5 anim-fade-in">
-                            <h4 className="text-[11px] font-bold mb-2 uppercase text-dark/40">Correspondances approximatives</h4>
-                            <div className="grid grid-cols-2 gap-4 text-[10px]">
-                              <div>
-                                <p className="font-bold text-dark/60">S / M / L</p>
-                                <p>Prenez votre taille habituelle.</p>
-                              </div>
-                              <div>
-                                <p className="font-bold text-dark/60">Sneakers</p>
-                                <p>TTS (True To Size) recommandé.</p>
-                              </div>
+                          <div className="mb-6 p-4 bg-bg rounded-2xl border border-dark/5 anim-fade-in text-[11px] leading-relaxed">
+                            <p className="font-bold text-dark/60 mb-2 uppercase tracking-tighter">Correspondances</p>
+                            <div className="space-y-1 text-dark/50">
+                              <p>• <span className="font-semibold text-dark/70">S/M/L</span> : Prenez votre taille habituelle.</p>
+                              <p>• <span className="font-semibold text-dark/70">Sneakers</span> : Taille normalement (TTS).</p>
                             </div>
                           </div>
                         )}
@@ -491,7 +485,7 @@ export default function Products() {
                               className={`h-12 rounded-xl text-sm font-bold border-2 transition-all duration-200 ${
                                 selectedSize === s 
                                   ? 'bg-dark text-white border-dark' 
-                                  : 'bg-white text-dark/80 border-dark/10 hover:border-dark/30 hover:bg-bg'
+                                  : 'bg-white text-dark/80 border-dark/10 hover:border-dark/30'
                               }`}
                             >
                               {s}
@@ -504,7 +498,7 @@ export default function Products() {
                     {/* Couleurs */}
                     {quickColors.length > 0 && (
                       <div className="mt-8">
-                        <label className="text-xs font-bold uppercase tracking-wider text-dark/60 block mb-3">Couleur</label>
+                        <label className="text-[11px] font-bold uppercase tracking-widest text-dark/40 block mb-4">Couleur</label>
                         <div className="flex flex-wrap gap-2">
                           {quickColors.map((c, idx) => (
                             <button
@@ -513,7 +507,7 @@ export default function Products() {
                               className={`h-11 rounded-xl px-5 text-sm font-bold border-2 transition-all duration-200 ${
                                 selectedColor === c 
                                   ? 'bg-dark text-white border-dark' 
-                                  : 'bg-white text-dark/80 border-dark/10 hover:border-dark/30 hover:bg-bg'
+                                  : 'bg-white text-dark/80 border-dark/10 hover:border-dark/30'
                               }`}
                             >
                               {c}
@@ -524,29 +518,56 @@ export default function Products() {
                     )}
 
                     {!canAdd() && (quickSizes.length > 0 || quickColors.length > 0) && (
-                      <div className="mt-6 p-3 rounded-xl bg-accent/5 border border-accent/10">
+                      <div className="mt-8 p-3 rounded-xl bg-accent/5 border border-accent/10">
                         <p className="text-[11px] text-accent font-bold text-center">
-                          {quickSizes.length > 0 && !selectedSize ? 'Veuillez choisir une taille' : ''}
+                          {quickSizes.length > 0 && !selectedSize ? 'Sélectionnez une taille' : ''}
                           {quickSizes.length > 0 && !selectedSize && quickColors.length > 0 && !selectedColor ? ' et ' : ''}
                           {quickColors.length > 0 && !selectedColor ? 'une couleur' : ''}
                         </p>
                       </div>
                     )}
 
-                    {/* Détails supplémentaires */}
-                    <div className="mt-10 pt-8 border-t border-dark/5 space-y-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-dark/40">Livraison</span>
-                        <span className="text-xs font-bold text-green-600">
-                          {settings.freeShipping ? 'Gratuite ✨' : settings.freeShippingThreshold > 0 ? `Offerte dès ${formatPrice(settings.freeShippingThreshold)}` : formatPrice(settings.standardShippingFee || 7.9)}
+                    {/* Détails bas */}
+                    <div className="mt-10 pt-8 border-t border-dark/5 space-y-3">
+                      <div className="flex items-center justify-between text-[11px] font-medium">
+                        <span className="text-dark/30">Livraison</span>
+                        <span className="text-green-600 font-bold">
+                          {settings.freeShipping ? 'Gratuite' : settings.freeShippingThreshold > 0 ? `Offerte dès ${formatPrice(settings.freeShippingThreshold)}` : formatPrice(settings.standardShippingFee || 7.9)}
                         </span>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-dark/40">Retours & Échanges</span>
-                        <span className="text-xs font-bold text-dark/70">Sous 14 jours</span>
+                      <div className="flex items-center justify-between text-[11px] font-medium">
+                        <span className="text-dark/30">Retours</span>
+                        <span className="text-dark/60 font-bold">Sous 14 jours</span>
                       </div>
                     </div>
                   </div>
+                </div>
+
+                {/* Panier Sticky */}
+                <div className="p-6 sm:p-8 border-t border-dark/5 bg-white/80 backdrop-blur-md">
+                  <button
+                    onClick={handleAddToCart}
+                    disabled={!canAdd()}
+                    className={`w-full h-16 rounded-2xl text-[14px] font-900 text-white transition-all duration-300 flex items-center justify-center gap-3 shadow-xl ${
+                      addedId 
+                        ? 'bg-green-500 shadow-green-200' 
+                        : !canAdd() 
+                          ? 'bg-dark/10 text-dark/20 cursor-not-allowed shadow-none' 
+                          : 'bg-dark hover:bg-accent hover:scale-[1.02] active:scale-[0.98] shadow-dark/20'
+                    }`}
+                  >
+                    {addedId ? (
+                      <>
+                        <span className="text-xl">✓</span>
+                        <span>AJOUTÉ !</span>
+                      </>
+                    ) : (
+                      <>
+                        <ShoppingBag size={18} strokeWidth={2.5} />
+                        <span>AJOUTER AU PANIER — {formatPrice(quickAdd.salePrice)}</span>
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
             </div>

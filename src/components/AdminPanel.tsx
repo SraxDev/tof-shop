@@ -1435,8 +1435,9 @@ export default function AdminPanel() {
                                   });
 
                                   Promise.all(readers).then(results => {
-                                    const existing = current.imageUrl ? current.imageUrl.split(/[|,]/).map(s => s.trim()) : [];
-                                    setDraftProduct({ ...current, imageUrl: [...existing, ...results].filter(Boolean).join(', ') });
+                                    const currentImages = current.imageUrl ? current.imageUrl.split(',').map(s => s.trim()).filter(Boolean) : [];
+                                    const nextImages = [...currentImages, ...results].join(', ');
+                                    setDraftProduct({ ...current, imageUrl: nextImages });
                                   });
                                 }} />
                               </label>
@@ -1452,23 +1453,28 @@ export default function AdminPanel() {
                         
                         {current.imageUrl && (
                           <div className="flex flex-wrap gap-2 mt-2">
-                            {current.imageUrl.split(/[|,]/).map((url, idx) => (
-                              <div key={idx} className="relative group/img">
-                                <img src={url.trim()} alt="" className="h-14 w-14 rounded-lg object-contain bg-subtle border border-dark/10" />
-                                {isEditing && (
-                                  <button 
-                                    onClick={() => {
-                                      const urls = current.imageUrl.split(/[|,]/).map(s => s.trim());
-                                      urls.splice(idx, 1);
-                                      setDraftProduct({ ...current, imageUrl: urls.join(', ') });
-                                    }}
-                                    className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 text-white rounded-full text-[8px] flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity"
-                                  >
-                                    ✕
-                                  </button>
-                                )}
-                              </div>
-                            ))}
+                            {current.imageUrl.split(',').map((url, idx) => {
+                              const trimmedUrl = url.trim();
+                              if (!trimmedUrl) return null;
+                              return (
+                                <div key={idx} className="relative group/img">
+                                  <img src={trimmedUrl} alt="" className="h-14 w-14 rounded-lg object-contain bg-subtle border border-dark/10" />
+                                  {isEditing && (
+                                    <button 
+                                      type="button"
+                                      onClick={() => {
+                                        const urls = current.imageUrl.split(',').map(s => s.trim()).filter(Boolean);
+                                        urls.splice(idx, 1);
+                                        setDraftProduct({ ...current, imageUrl: urls.join(', ') });
+                                      }}
+                                      className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 text-white rounded-full text-[8px] flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity z-10"
+                                    >
+                                      ✕
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
                         <div className="flex flex-wrap gap-2 text-xs">
