@@ -93,11 +93,7 @@ const categoryPresets = [
   { label: 'Parfum', weight: 400, packaging: 'with_box' as const, defaultSizes: '', defaultColors: '' },
 ];
 
-const packagingLabels: Record<Product['packaging'], string> = {
-  none: 'Standard',
-  without_box: 'Sans boite',
-  with_box: 'Avec boite',
-};
+// packagingLabels removed — no longer used in quick form
 
 const initialProducts: Product[] = [
   {
@@ -1267,91 +1263,42 @@ export default function AdminPanel() {
               </button>
             </div>
 
-            <div className="p-5 border-b border-dark/5 bg-bg/60">
-              <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-4">
-                <div>
-                  <h4 className="font-bold">Ajouter un produit en 30 secondes</h4>
-                  <p className="text-xs text-dark/40 mt-1">
-                    Minimum a remplir : marque, nom, lien source et prix CNY. Le poids, packaging et prix conseille se remplissent auto.
-                  </p>
-                </div>
-                <button
-                  onClick={autoPriceQuickProduct}
-                  className="rounded-full bg-white px-4 py-2 text-xs font-bold text-dark/60 hover:text-accent transition-colors"
-                >
-                  Recalculer prix conseille
-                </button>
+            <div className="p-4 sm:p-5 border-b border-dark/5 bg-bg/60">
+              <h4 className="font-bold mb-1">Ajout rapide</h4>
+              <p className="text-xs text-dark/40 mb-4">Remplis le minimum, le reste se calcule tout seul.</p>
+
+              {/* Étape 1 : Essentiel */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
+                <input value={quickProduct.brand} onChange={(e) => setQuickProduct({ ...quickProduct, brand: e.target.value })} placeholder="Marque *" className="rounded-xl bg-white px-4 py-3 text-sm outline-none border border-dark/5" />
+                <input value={quickProduct.name} onChange={(e) => setQuickProduct({ ...quickProduct, name: e.target.value })} placeholder="Nom produit *" className="rounded-xl bg-white px-4 py-3 text-sm outline-none border border-dark/5 sm:col-span-2" />
               </div>
 
-              <div className="grid md:grid-cols-2 lg:grid-cols-6 gap-3">
-                <input
-                  value={quickProduct.brand}
-                  onChange={(e) => setQuickProduct({ ...quickProduct, brand: e.target.value })}
-                  placeholder="Marque"
-                  className="rounded-xl bg-white px-4 py-3 text-sm outline-none border border-dark/5"
-                />
-                <input
-                  value={quickProduct.name}
-                  onChange={(e) => setQuickProduct({ ...quickProduct, name: e.target.value })}
-                  placeholder="Nom produit"
-                  className="rounded-xl bg-white px-4 py-3 text-sm outline-none border border-dark/5 lg:col-span-2"
-                />
-                <select
-                  value={quickProduct.category}
-                  onChange={(e) => updateQuickPreset(e.target.value)}
-                  className="rounded-xl bg-white px-4 py-3 text-sm outline-none border border-dark/5"
-                >
-                  {categoryPresets.map((preset) => (
-                    <option key={preset.label} value={preset.label}>{preset.label}</option>
-                  ))}
+              {/* Étape 2 : Catégorie + Prix */}
+              <div className="grid grid-cols-3 gap-2 sm:gap-3 mt-2">
+                <select value={quickProduct.category} onChange={(e) => updateQuickPreset(e.target.value)} className="rounded-xl bg-white px-3 py-3 text-sm outline-none border border-dark/5">
+                  {categoryPresets.map((p) => <option key={p.label} value={p.label}>{p.label}</option>)}
                 </select>
-                <input
-                  type="number"
-                  value={quickProduct.sourcePriceCny}
-                  onChange={(e) => {
-                    const sourcePriceCny = Number(e.target.value);
-                    setQuickProduct({
-                      ...quickProduct,
-                      sourcePriceCny,
-                      salePrice: suggestedSalePrice(sourcePriceCny, quickProduct.weightGrams, quickProduct.packaging),
-                    });
-                  }}
-                  placeholder="Prix CNY"
-                  className="rounded-xl bg-white px-4 py-3 text-sm outline-none border border-dark/5"
-                />
-                <input
-                  type="number"
-                  value={quickProduct.salePrice}
-                  onChange={(e) => setQuickProduct({ ...quickProduct, salePrice: Number(e.target.value) })}
-                  placeholder="Prix vente €"
-                  className="rounded-xl bg-white px-4 py-3 text-sm outline-none border border-dark/5"
-                />
+                <input type="number" value={quickProduct.sourcePriceCny} onChange={(e) => {
+                  const v = Number(e.target.value);
+                  setQuickProduct({ ...quickProduct, sourcePriceCny: v, salePrice: suggestedSalePrice(v, quickProduct.weightGrams, quickProduct.packaging) });
+                }} placeholder="Prix ¥ *" className="rounded-xl bg-white px-4 py-3 text-sm outline-none border border-dark/5" />
+                <div className="relative">
+                  <input type="number" value={quickProduct.salePrice} onChange={(e) => setQuickProduct({ ...quickProduct, salePrice: Number(e.target.value) })} placeholder="Prix €" className="rounded-xl bg-white px-4 py-3 text-sm outline-none border border-dark/5 w-full" />
+                  <button onClick={autoPriceQuickProduct} className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-accent">Auto</button>
+                </div>
               </div>
 
-              <div className="grid sm:grid-cols-2 gap-3 mt-3">
-                <input
-                  value={quickProduct.sizes}
-                  onChange={(e) => setQuickProduct({ ...quickProduct, sizes: e.target.value })}
-                  placeholder="Tailles: 39, 40, 41, 42..."
-                  className="rounded-xl bg-white px-4 py-3 text-sm outline-none border border-dark/5"
-                />
-                <input
-                  value={quickProduct.colors}
-                  onChange={(e) => setQuickProduct({ ...quickProduct, colors: e.target.value })}
-                  placeholder="Couleurs: Black, White..."
-                  className="rounded-xl bg-white px-4 py-3 text-sm outline-none border border-dark/5"
-                />
+              {/* Étape 3 : Tailles + Couleurs (pré-remplis par catégorie) */}
+              <div className="grid grid-cols-2 gap-2 sm:gap-3 mt-2">
+                <input value={quickProduct.sizes} onChange={(e) => setQuickProduct({ ...quickProduct, sizes: e.target.value })} placeholder="Tailles (auto selon catégorie)" className="rounded-xl bg-white px-4 py-3 text-sm outline-none border border-dark/5" />
+                <input value={quickProduct.colors} onChange={(e) => setQuickProduct({ ...quickProduct, colors: e.target.value })} placeholder="Couleurs" className="rounded-xl bg-white px-4 py-3 text-sm outline-none border border-dark/5" />
               </div>
 
-              <div className="grid lg:grid-cols-[1fr_auto_auto] gap-3 mt-3">
-                <input
-                  value={quickProduct.imageUrl}
-                  onChange={(e) => setQuickProduct({ ...quickProduct, imageUrl: e.target.value })}
-                  placeholder="URL image produit (optionnel)"
-                  className="rounded-xl bg-white px-4 py-3 text-sm outline-none border border-dark/5"
-                />
-                <label className="cursor-pointer rounded-xl bg-dark px-5 py-3 text-sm font-bold text-white text-center hover:bg-accent transition-colors flex items-center gap-2">
-                  Upload
+              {/* Étape 4 : Image + Lien */}
+              <div className="grid grid-cols-[1fr_auto] gap-2 mt-2">
+                <input value={quickProduct.sourceUrl} onChange={(e) => setQuickProduct({ ...quickProduct, sourceUrl: e.target.value })} placeholder="Lien 1688 / Taobao / Weidian *" className="rounded-xl bg-white px-4 py-3 text-sm outline-none border border-dark/5" />
+                <label className="cursor-pointer rounded-xl bg-dark/10 px-4 py-3 text-sm font-bold text-dark/50 hover:bg-dark/20 transition-colors flex items-center gap-2">
+                  📷
                   <input type="file" accept="image/*" className="hidden" onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
@@ -1360,40 +1307,32 @@ export default function AdminPanel() {
                     reader.readAsDataURL(file);
                   }} />
                 </label>
-                {quickProduct.imageUrl && (
-                  <img src={quickProduct.imageUrl} alt="" className="h-11 w-11 rounded-xl object-cover border border-dark/5" />
-                )}
               </div>
 
-              <div className="grid lg:grid-cols-[1fr_auto] gap-3 mt-3">
-                <input
-                  value={quickProduct.sourceUrl}
-                  onChange={(e) => setQuickProduct({ ...quickProduct, sourceUrl: e.target.value })}
-                  placeholder="Lien 1688 / Taobao / Weidian"
-                  className="rounded-xl bg-white px-4 py-3 text-sm outline-none border border-dark/5"
-                />
-                <button
-                  onClick={addQuickProduct}
-                  className="rounded-xl bg-dark px-6 py-3 text-sm font-bold text-white hover:bg-accent transition-colors"
-                >
-                  Ajouter au panel
+              {quickProduct.imageUrl && (
+                <div className="mt-2 flex items-center gap-3">
+                  <img src={quickProduct.imageUrl} alt="" className="h-12 w-12 rounded-xl object-cover border border-dark/5" />
+                  <button onClick={() => setQuickProduct({ ...quickProduct, imageUrl: '' })} className="text-xs text-red-500 font-bold">Retirer</button>
+                </div>
+              )}
+
+              {/* Preview marge + bouton */}
+              <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                {(() => {
+                  const preview: Product = { ...quickProduct, id: 'preview', status: 'active' };
+                  const margin = estimateNetMargin(preview);
+                  return (
+                    <div className="flex flex-wrap gap-2 text-[11px]">
+                      <span className="rounded-full bg-white px-2.5 py-1 text-dark/40">{margin.effectiveWeight}g</span>
+                      <span className="rounded-full bg-white px-2.5 py-1 text-dark/40">Livr. {euro(margin.shippingWithSafety)}</span>
+                      <span className={`rounded-full px-2.5 py-1 font-bold ${marginTone(margin.net)}`}>Marge {euro(margin.net)}</span>
+                    </div>
+                  );
+                })()}
+                <button onClick={addQuickProduct} className="rounded-xl bg-accent px-6 py-3 text-sm font-bold text-white hover:bg-accent-light transition-colors w-full sm:w-auto">
+                  Ajouter au shop
                 </button>
               </div>
-
-              {(() => {
-                const preview: Product = { ...quickProduct, id: 'preview', status: 'active' };
-                const margin = estimateNetMargin(preview);
-                return (
-                  <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                    <span className="rounded-full bg-white px-3 py-1 text-dark/45">Poids auto {margin.effectiveWeight}g</span>
-                    <span className="rounded-full bg-white px-3 py-1 text-dark/45">Packaging {packagingLabels[quickProduct.packaging]}</span>
-                    <span className="rounded-full bg-white px-3 py-1 text-dark/45">Livraison securisee {euro(margin.shippingWithSafety)}</span>
-                    <span className={`rounded-full px-3 py-1 font-bold ${marginTone(margin.net)}`}>
-                      Marge prevue {euro(margin.net)}
-                    </span>
-                  </div>
-                );
-              })()}
             </div>
 
             <div className="divide-y divide-dark/5">

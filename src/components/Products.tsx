@@ -1,4 +1,4 @@
-import { Heart, ShoppingBag, X, ChevronDown } from 'lucide-react';
+import { Heart, Search, ShoppingBag, X, ChevronDown } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useInView } from '../hooks/useInView';
 import AppleEmoji from './AppleEmoji';
@@ -79,6 +79,7 @@ export default function Products() {
   const { ref, isInView } = useInView(0.05);
   const [active, setActive] = useState('Tout');
   const [showAll, setShowAll] = useState(false);
+  const [search, setSearch] = useState('');
   const [liked, setLiked] = useState<Set<string>>(new Set());
   const [products, setProducts] = useState<Product[]>([]);
   const [quickAdd, setQuickAdd] = useState<Product | null>(null);
@@ -100,14 +101,18 @@ export default function Products() {
 
   const activeFilter = filters.find((f) => f.label === active) || filters[0];
 
-  const visibleProducts = useMemo(() => {
-    const filtered = products.filter((p) => p.status === 'active' && activeFilter.match(p.category.toLowerCase()));
-    return showAll ? filtered : filtered.slice(0, INITIAL_SHOW);
-  }, [products, active, showAll, activeFilter]);
+  const allFiltered = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    return products.filter((p) => {
+      if (p.status !== 'active') return false;
+      if (!activeFilter.match(p.category.toLowerCase())) return false;
+      if (q && !`${p.brand} ${p.name} ${p.category}`.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [products, active, search, activeFilter]);
 
-  const totalFiltered = useMemo(() => {
-    return products.filter((p) => p.status === 'active' && activeFilter.match(p.category.toLowerCase())).length;
-  }, [products, active, activeFilter]);
+  const visibleProducts = showAll ? allFiltered : allFiltered.slice(0, INITIAL_SHOW);
+  const totalFiltered = allFiltered.length;
 
   const toggleLike = (id: string) => {
     setLiked((prev) => {
@@ -164,6 +169,22 @@ export default function Products() {
             </h2>
             <p className="mt-2 text-dark/40">choisis ta pièce, ajoute au panier</p>
           </div>
+        </div>
+
+        {/* Recherche */}
+        <div className="relative mb-4">
+          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-dark/25" />
+          <input
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setShowAll(false); }}
+            placeholder="Rechercher un produit, une marque..."
+            className="w-full rounded-2xl bg-white border border-dark/5 pl-11 pr-4 py-3 text-sm outline-none focus:border-accent/30 transition-colors"
+          />
+          {search && (
+            <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 h-6 w-6 rounded-full bg-dark/5 flex items-center justify-center text-dark/40 hover:text-dark">
+              <X size={12} />
+            </button>
+          )}
         </div>
 
         {/* Filtres */}
