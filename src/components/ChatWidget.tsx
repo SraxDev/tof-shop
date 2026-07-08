@@ -231,16 +231,21 @@ export default function ChatWidget() {
       )}
 
       {open && (
-        <div className="fixed bottom-0 right-0 sm:bottom-6 sm:right-6 z-[80] w-full sm:w-96 h-[100dvh] sm:h-[560px] bg-white sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-dark/5">
-          <div className="bg-dark text-white px-5 py-4 flex items-center justify-between flex-shrink-0">
-            <div>
-              <div className="font-display font-800 text-lg">tof<span className="text-accent">.</span> chat</div>
-              <div className="text-xs text-white/40 flex items-center gap-1.5">
-                <span className="h-2 w-2 bg-green-400 rounded-full animate-pulse" />
-                En ligne — réponse instantanée
+        <div className="fixed inset-0 sm:inset-auto sm:bottom-6 sm:right-6 z-[80] w-full sm:w-96 h-[100dvh] sm:h-[560px] bg-white sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden sm:border border-dark/5">
+          <div className="bg-dark text-white px-4 py-3 sm:px-5 sm:py-4 flex items-center justify-between flex-shrink-0 safe-top">
+            <div className="flex items-center gap-3">
+              <button onClick={() => setOpen(false)} className="h-8 w-8 rounded-full bg-white/10 flex items-center justify-center text-white/60 hover:text-white sm:hidden">
+                <X size={16} />
+              </button>
+              <div>
+                <div className="font-display font-800 text-base sm:text-lg">tof<span className="text-accent">.</span> chat</div>
+                <div className="text-[11px] text-white/40 flex items-center gap-1.5">
+                  <span className="h-1.5 w-1.5 bg-green-400 rounded-full animate-pulse" />
+                  En ligne
+                </div>
               </div>
             </div>
-            <button onClick={() => setOpen(false)} className="h-8 w-8 rounded-full bg-white/10 flex items-center justify-center text-white/60 hover:text-white">
+            <button onClick={() => setOpen(false)} className="hidden sm:flex h-8 w-8 rounded-full bg-white/10 items-center justify-center text-white/60 hover:text-white">
               <X size={16} />
             </button>
           </div>

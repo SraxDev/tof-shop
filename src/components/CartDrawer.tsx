@@ -8,9 +8,7 @@ function formatPrice(value: number) {
   return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(value);
 }
 
-const SHIPPING_FREE_THRESHOLD = 100;
-const SHIPPING_FEE = 7.9;
-const EXPRESS_FEE = 14.9;
+// Shipping values come from settings now
 
 export default function CartDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [cart, setCart] = useState<CartItem[]>(readCart);
@@ -66,8 +64,9 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
   const count = cartCount(cart);
   const discount = appliedPromo ? Math.round(subtotal * appliedPromo.discount_percent / 100) : 0;
   const total = subtotal - discount;
-  const baseShipping = total >= SHIPPING_FREE_THRESHOLD ? 0 : SHIPPING_FEE;
-  const expressExtra = shippingMode === 'express' ? EXPRESS_FEE : 0;
+  const isFreeShipping = settings.freeShipping || total >= (settings.freeShippingThreshold || 100);
+  const baseShipping = isFreeShipping ? 0 : (settings.standardShippingFee || 7.9);
+  const expressExtra = shippingMode === 'express' ? (settings.expressShippingFee || 14.9) : 0;
   const shipping = baseShipping + expressExtra;
   const grandTotal = total + shipping;
 
@@ -274,8 +273,8 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
                         <div className="text-sm font-bold">📦 Standard</div>
                         <div className="text-[11px] text-dark/40">10-20 jours</div>
                       </div>
-                      <span className={`text-sm font-800 ${baseShipping === 0 ? 'text-green-600' : ''}`}>
-                        {baseShipping === 0 ? 'Gratuit' : formatPrice(baseShipping)}
+                      <span className="text-sm font-800 text-green-600">
+                        {isFreeShipping ? 'Offert 🎉' : formatPrice(baseShipping)}
                       </span>
                     </button>
                     <button
@@ -289,13 +288,13 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
                         <div className="text-[11px] text-dark/40">5-10 jours</div>
                       </div>
                       <span className="text-sm font-800 text-accent">
-                        +{formatPrice(EXPRESS_FEE)}
+                        +{formatPrice(settings.expressShippingFee || 14.9)}
                       </span>
                     </button>
                   </div>
 
-                  {baseShipping > 0 && shippingMode === 'standard' && (
-                    <p className="text-[11px] text-dark/30">Encore {formatPrice(SHIPPING_FREE_THRESHOLD - total)} pour la livraison standard offerte</p>
+                  {!isFreeShipping && shippingMode === 'standard' && (settings.freeShippingThreshold || 0) > 0 && total < (settings.freeShippingThreshold || 100) && (
+                    <p className="text-[11px] text-dark/30">Encore {formatPrice((settings.freeShippingThreshold || 100) - total)} pour la livraison standard offerte</p>
                   )}
 
                   <div className="flex justify-between text-lg font-800 pt-2 border-t border-dark/5">

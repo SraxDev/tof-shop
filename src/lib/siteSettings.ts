@@ -5,6 +5,10 @@ export type SiteSettings = {
   snapchatUrl: string;
   paypalUrl: string;
   paymentText: string;
+  freeShipping: boolean;
+  freeShippingThreshold: number;
+  standardShippingFee: number;
+  expressShippingFee: number;
   announcementEnabled: boolean;
   announcementText: string;
   heroBadge: string;
@@ -26,6 +30,10 @@ export const defaultSettings: SiteSettings = {
   snapchatUrl: 'https://t.snapchat.com/tofh2b',
   paypalUrl: '#',
   paymentText: 'Paiement PayPal, finalisation sur WhatsApp.',
+  freeShipping: true,
+  freeShippingThreshold: 0,
+  standardShippingFee: 7.9,
+  expressShippingFee: 14.9,
   announcementEnabled: true,
   announcementText: "Livraison offerte dès 150€ d'achat — Paiement PayPal, finalisation WhatsApp",
   heroBadge: '🔥 Drops chaque semaine',

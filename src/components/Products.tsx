@@ -4,6 +4,7 @@ import { useInView } from '../hooks/useInView';
 import AppleEmoji from './AppleEmoji';
 import { addToCart, syncCartWithProducts } from '../lib/cart';
 import { fetchProducts, fetchOrders, type DbProduct } from '../lib/db';
+import { readSiteSettings } from '../lib/siteSettings';
 
 type Product = {
   id: string;
@@ -135,6 +136,13 @@ export default function Products() {
   const [addedId, setAddedId] = useState('');
   const [selectedSize, setSelectedSize] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
+  const [settings, setSettings] = useState(readSiteSettings);
+
+  useEffect(() => {
+    const syncS = () => setSettings(readSiteSettings());
+    window.addEventListener('tof-settings-updated', syncS);
+    return () => window.removeEventListener('tof-settings-updated', syncS);
+  }, []);
 
   useEffect(() => {
     const loadAndSync = async () => {
@@ -341,10 +349,10 @@ export default function Products() {
 
       {/* Page détail produit */}
       {quickAdd && (
-        <div className="fixed inset-0 z-[80] bg-white sm:bg-dark/60 sm:backdrop-blur-sm flex items-stretch sm:items-center justify-center p-0 sm:p-5">
-          <div className="bg-white w-full sm:max-w-lg sm:rounded-3xl shadow-2xl overflow-y-auto max-h-full flex flex-col">
+        <div className="fixed inset-0 z-[80] bg-white sm:bg-dark/50 sm:backdrop-blur-sm flex items-stretch sm:items-center justify-center p-0 sm:p-6">
+          <div className="bg-white w-full sm:max-w-2xl sm:rounded-3xl shadow-2xl overflow-y-auto max-h-full flex flex-col sm:flex-row">
             {/* Image */}
-            <div className="relative aspect-square sm:aspect-[4/3] bg-subtle flex-shrink-0">
+            <div className="relative aspect-square sm:aspect-auto sm:w-[45%] bg-subtle flex-shrink-0">
               {quickAdd.imageUrl ? (
                 <img src={quickAdd.imageUrl} alt={quickAdd.name} className="h-full w-full object-cover" />
               ) : (
@@ -362,7 +370,7 @@ export default function Products() {
             </div>
 
             {/* Infos */}
-            <div className="p-5 sm:p-6 flex-1">
+            <div className="p-5 sm:p-6 flex-1 overflow-y-auto">
               <span className="text-[11px] font-bold uppercase tracking-wider text-accent">{quickAdd.brand}</span>
               <h2 className="font-display text-2xl font-800 text-dark mt-1 leading-tight">{quickAdd.name}</h2>
 
@@ -439,8 +447,10 @@ export default function Products() {
                   <span className="font-semibold text-dark/70">7 à 20 jours</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-dark/40">Livraison offerte dès</span>
-                  <span className="font-semibold text-dark/70">100€</span>
+                  <span className="text-dark/40">Livraison</span>
+                  <span className="font-semibold text-green-600">
+                    {settings.freeShipping ? 'Offerte 🎉' : settings.freeShippingThreshold > 0 ? `Offerte dès ${formatPrice(settings.freeShippingThreshold)}` : formatPrice(settings.standardShippingFee || 7.9)}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-dark/40">Retours</span>

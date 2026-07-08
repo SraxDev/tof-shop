@@ -1763,6 +1763,37 @@ export default function AdminPanel() {
                 </div>
 
                 <div className="rounded-2xl bg-bg p-4 space-y-4">
+                  <h4 className="font-bold text-sm">Livraison</h4>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-semibold text-dark/70">Livraison offerte sur tout</div>
+                      <div className="text-xs text-dark/35">Active ça pour l'offre d'ouverture. Désactive quand l'offre est finie.</div>
+                    </div>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={siteSettings.freeShipping}
+                        onChange={(e) => setSiteSettings({ ...siteSettings, freeShipping: e.target.checked })}
+                        className="h-5 w-5"
+                      />
+                    </label>
+                  </div>
+                  {!siteSettings.freeShipping && (
+                    <div className="grid grid-cols-3 gap-3">
+                      <label className="text-xs text-dark/35">Gratuit dès €
+                        <input type="number" value={siteSettings.freeShippingThreshold} onChange={(e) => setSiteSettings({ ...siteSettings, freeShippingThreshold: Number(e.target.value) })} className="mt-1 w-full rounded-xl bg-white px-3 py-2.5 text-sm text-dark outline-none border border-dark/5" />
+                      </label>
+                      <label className="text-xs text-dark/35">Standard €
+                        <input type="number" value={siteSettings.standardShippingFee} onChange={(e) => setSiteSettings({ ...siteSettings, standardShippingFee: Number(e.target.value) })} className="mt-1 w-full rounded-xl bg-white px-3 py-2.5 text-sm text-dark outline-none border border-dark/5" />
+                      </label>
+                      <label className="text-xs text-dark/35">Express €
+                        <input type="number" value={siteSettings.expressShippingFee} onChange={(e) => setSiteSettings({ ...siteSettings, expressShippingFee: Number(e.target.value) })} className="mt-1 w-full rounded-xl bg-white px-3 py-2.5 text-sm text-dark outline-none border border-dark/5" />
+                      </label>
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-2xl bg-bg p-4 space-y-4">
                   <h4 className="font-bold text-sm">Liens & paiement</h4>
                 <label className="block text-xs text-dark/35">Lien WhatsApp
                   <input
