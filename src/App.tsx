@@ -18,6 +18,7 @@ import Footer from './components/Footer';
 import BackToTop from './components/BackToTop';
 import MobileStickyBar from './components/MobileStickyBar';
 import ToastContainer from './components/Toast';
+import ChatWidget from './components/ChatWidget';
 
 const ADMIN_PASSWORD = 'tofadmin';
 
@@ -131,6 +132,7 @@ export default function App() {
       <Footer />
       <BackToTop />
       <MobileStickyBar />
+      <ChatWidget />
       <ToastContainer />
     </div>
   );

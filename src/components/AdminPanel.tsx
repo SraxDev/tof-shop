@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Copy, ExternalLink, Package, Pencil, Plus, Save, Trash2, Truck } from 'lucide-react';
+import { Copy, ExternalLink, Package, Pencil, Plus, Save, Send, Trash2, Truck } from 'lucide-react';
 import { defaultDrop, type FeaturedDropConfig } from './FeaturedDrop';
 import { defaultSettings, readSiteSettings, saveSiteSettings, hydrateSiteSettings, type SiteSettings } from '../lib/siteSettings';
-import { fetchProducts, upsertProduct, deleteProduct as dbDeleteProduct, fetchOrders, updateOrder, insertOrder as dbInsertOrder, fetchDrop, saveDrop as dbSaveDrop, fetchNotes, upsertNote, deleteNote as dbDeleteNote, subscribeToOrders, subscribeToProducts, onOnlineCountChange, getPresenceState, trackVisitor, type DbProduct, type DbOrder, type DbDrop, type DbNote } from '../lib/db';
+import { fetchProducts, upsertProduct, deleteProduct as dbDeleteProduct, fetchOrders, updateOrder, insertOrder as dbInsertOrder, fetchDrop, saveDrop as dbSaveDrop, fetchNotes, upsertNote, deleteNote as dbDeleteNote, subscribeToOrders, subscribeToProducts, onOnlineCountChange, getPresenceState, trackVisitor, fetchConversations, sendChatMessage, subscribeToChatMessages, type DbProduct, type DbOrder, type DbDrop, type DbNote, type DbChatMessage } from '../lib/db';
 import { showToast } from './Toast';
 import { playNewOrder, playCopy, playDelete } from '../lib/sounds';
 
@@ -350,7 +350,7 @@ export default function AdminPanel() {
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'products' | 'drop' | 'settings' | 'estimate' | 'notes'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'products' | 'drop' | 'settings' | 'estimate' | 'notes' | 'chat'>('dashboard');
   const [notes, setNotes] = useState<DbNote[]>([]);
   const [noteFilter, setNoteFilter] = useState<'all' | 'idea' | 'todo' | 'urgent' | 'done'>('all');
   const [newNote, setNewNote] = useState({ text: '', category: 'todo' });
@@ -358,6 +358,9 @@ export default function AdminPanel() {
   const [editingNoteText, setEditingNoteText] = useState('');
   const [noteSort, setNoteSort] = useState<'priority' | 'date'>('priority');
   const [onlineCount, setOnlineCount] = useState(0);
+  const [chatMessages, setChatMessages] = useState<DbChatMessage[]>([]);
+  const [activeConvo, setActiveConvo] = useState<string | null>(null);
+  const [chatReply, setChatReply] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftProduct, setDraftProduct] = useState<Product | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -409,12 +412,13 @@ export default function AdminPanel() {
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [dbProds, dbOrds, dbDr, dbNotes] = await Promise.all([fetchProducts(), fetchOrders(), fetchDrop(), fetchNotes()]);
+      const [dbProds, dbOrds, dbDr, dbNotes, dbChat] = await Promise.all([fetchProducts(), fetchOrders(), fetchDrop(), fetchNotes(), fetchConversations()]);
       await hydrateSiteSettings();
       setProducts(dbProds.map(dbToProduct).map(normalizedProduct));
       setOrders(dbOrds.map(dbToOrder));
       if (dbDr) setDropDraft(dbToDrop(dbDr));
       setNotes(dbNotes);
+      setChatMessages(dbChat);
       setSiteSettings(readSiteSettings());
     } catch (e) { console.error('load error', e); }
     setLoading(false);
@@ -445,11 +449,17 @@ export default function AdminPanel() {
       fetchProducts().then((data) => setProducts(data.map(dbToProduct).map(normalizedProduct)));
     });
 
+    const unsubChat = subscribeToChatMessages(() => {
+      fetchConversations().then(setChatMessages);
+      showToast('Nouveau message chat !');
+    });
+
     return () => {
       window.removeEventListener('tof-orders-updated', refresh);
       window.removeEventListener('tof-products-updated', refresh);
       unsubOrders();
       unsubProducts();
+      unsubChat();
     };
   }, [loadAll]);
 
@@ -883,6 +893,7 @@ export default function AdminPanel() {
             { id: 'products', label: 'Produits & liens' },
             { id: 'drop', label: 'Drop semaine' },
             { id: 'settings', label: 'Réglages' },
+            { id: 'chat', label: 'Chat' },
             { id: 'notes', label: 'Notes & idées' },
             { id: 'estimate', label: 'Estimation livraison' },
           ].map((tab) => (
@@ -1689,6 +1700,126 @@ export default function AdminPanel() {
             </div>
           </div>
         )}
+
+        {activeTab === 'chat' && (() => {
+          const convos = new Map<string, { name: string; messages: DbChatMessage[]; lastMsg: DbChatMessage }>();
+          chatMessages.forEach((m) => {
+            const existing = convos.get(m.conversation_id);
+            if (existing) {
+              existing.messages.push(m);
+              existing.lastMsg = m;
+            } else {
+              convos.set(m.conversation_id, { name: m.client_name || 'Anonyme', messages: [m], lastMsg: m });
+            }
+          });
+          const convoList = Array.from(convos.entries()).sort((a, b) => (b[1].lastMsg.created_at || '').localeCompare(a[1].lastMsg.created_at || ''));
+          const activeMessages = activeConvo ? convos.get(activeConvo)?.messages || [] : [];
+
+          const sendAdminReply = async () => {
+            if (!chatReply.trim() || !activeConvo) return;
+            const convo = convos.get(activeConvo);
+            const msg: DbChatMessage = {
+              id: `m-admin-${Date.now()}`,
+              conversation_id: activeConvo,
+              sender: 'admin',
+              message: chatReply.trim(),
+              client_name: convo?.name || '',
+            };
+            await sendChatMessage(msg);
+            setChatMessages((prev) => [...prev, msg]);
+            setChatReply('');
+            showToast('Réponse envoyée ✓');
+          };
+
+          return (
+            <div className="grid lg:grid-cols-3 gap-5" style={{ minHeight: 500 }}>
+              {/* Liste conversations */}
+              <div className="rounded-3xl bg-white text-dark overflow-hidden">
+                <div className="p-4 border-b border-dark/5">
+                  <h3 className="font-bold">Conversations ({convoList.length})</h3>
+                </div>
+                <div className="divide-y divide-dark/5 max-h-[500px] overflow-y-auto">
+                  {convoList.length === 0 && (
+                    <div className="p-6 text-center text-sm text-dark/30">Aucune conversation pour l'instant.</div>
+                  )}
+                  {convoList.map(([id, convo]) => {
+                    const unread = convo.messages.filter((m) => m.sender === 'client').length;
+                    return (
+                      <button
+                        key={id}
+                        onClick={() => setActiveConvo(id)}
+                        className={`w-full text-left p-4 hover:bg-bg transition-colors ${activeConvo === id ? 'bg-bg' : ''}`}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="h-9 w-9 rounded-full bg-accent/10 text-accent flex items-center justify-center text-xs font-bold flex-shrink-0">
+                              {convo.name[0]?.toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-bold text-sm truncate">{convo.name}</div>
+                              <div className="text-xs text-dark/40 truncate">{convo.lastMsg.message}</div>
+                            </div>
+                          </div>
+                          {unread > 0 && (
+                            <span className="h-5 min-w-5 bg-accent rounded-full text-[10px] font-bold text-white flex items-center justify-center flex-shrink-0 px-1">{unread}</span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Messages conversation */}
+              <div className="lg:col-span-2 rounded-3xl bg-white text-dark flex flex-col overflow-hidden" style={{ minHeight: 500 }}>
+                {!activeConvo ? (
+                  <div className="flex-1 flex items-center justify-center text-dark/30 text-sm">
+                    Sélectionne une conversation
+                  </div>
+                ) : (
+                  <>
+                    <div className="p-4 border-b border-dark/5 flex items-center justify-between">
+                      <div className="font-bold">{convos.get(activeConvo)?.name}</div>
+                      <button onClick={() => setActiveConvo(null)} className="text-xs text-dark/30 hover:text-dark lg:hidden">Retour</button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                      {activeMessages.map((msg) => (
+                        <div key={msg.id} className={`flex ${msg.sender === 'client' ? 'justify-start' : 'justify-end'}`}>
+                          <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                            msg.sender === 'client' ? 'bg-bg text-dark rounded-bl-md' :
+                            msg.sender === 'admin' ? 'bg-accent text-white rounded-br-md' :
+                            'bg-dark/5 text-dark/60 rounded-bl-md'
+                          }`}>
+                            {msg.sender === 'bot' && <div className="text-[10px] font-bold text-dark/30 mb-1">Bot</div>}
+                            {msg.sender === 'admin' && <div className="text-[10px] font-bold text-white/60 mb-1">Toi</div>}
+                            <p className="whitespace-pre-wrap">{msg.message}</p>
+                            {msg.created_at && (
+                              <div className={`text-[10px] mt-1 ${msg.sender === 'client' ? 'text-dark/20' : msg.sender === 'admin' ? 'text-white/40' : 'text-dark/20'}`}>
+                                {new Date(msg.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="border-t border-dark/5 p-3 flex gap-2">
+                      <input
+                        value={chatReply}
+                        onChange={(e) => setChatReply(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && sendAdminReply()}
+                        placeholder="Répondre..."
+                        className="flex-1 rounded-xl bg-bg px-4 py-3 text-sm outline-none"
+                      />
+                      <button onClick={sendAdminReply} disabled={!chatReply.trim()} className="h-11 w-11 rounded-xl bg-accent text-white flex items-center justify-center hover:bg-accent-light transition-colors disabled:opacity-30">
+                        <Send size={16} />
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
         {activeTab === 'notes' && (
           <div className="space-y-5">
