@@ -1306,9 +1306,11 @@ export default function AdminPanel() {
                   const v = Number(e.target.value);
                   setQuickProduct({ ...quickProduct, sourcePriceCny: v, salePrice: suggestedSalePrice(v, quickProduct.weightGrams, quickProduct.packaging) });
                 }} placeholder="Prix ¥ *" className="rounded-xl bg-white px-4 py-3 text-sm outline-none border border-dark/5" />
-                <div className="relative">
-                  <input type="number" value={quickProduct.salePrice} onChange={(e) => setQuickProduct({ ...quickProduct, salePrice: Number(e.target.value) })} placeholder="Prix €" className="rounded-xl bg-white px-4 py-3 text-sm outline-none border border-dark/5 w-full" />
-                  <button onClick={autoPriceQuickProduct} className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-accent">Auto</button>
+                <div className="flex gap-1.5">
+                  <input type="number" value={quickProduct.salePrice} onChange={(e) => setQuickProduct({ ...quickProduct, salePrice: Number(e.target.value) })} placeholder="Prix €" className="rounded-xl bg-white px-4 py-3 text-sm outline-none border border-dark/5 flex-1 min-w-0" />
+                  <button onClick={autoPriceQuickProduct} className="rounded-xl bg-accent text-white px-3 py-3 text-xs font-bold hover:bg-accent-light transition-colors flex-shrink-0">
+                    Auto
+                  </button>
                 </div>
               </div>
 

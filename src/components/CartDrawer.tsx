@@ -10,11 +10,13 @@ function formatPrice(value: number) {
 
 const SHIPPING_FREE_THRESHOLD = 100;
 const SHIPPING_FEE = 7.9;
+const EXPRESS_FEE = 14.9;
 
 export default function CartDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [cart, setCart] = useState<CartItem[]>(readCart);
   const [settings, setSettings] = useState(readSiteSettings);
   const [step, setStep] = useState<'cart' | 'checkout' | 'done'>('cart');
+  const [shippingMode, setShippingMode] = useState<'standard' | 'express'>('standard');
   const [createdOrderId, setCreatedOrderId] = useState('');
   const [savedCart, setSavedCart] = useState<CartItem[]>([]);
   const [savedTotal, setSavedTotal] = useState(0);
@@ -47,6 +49,7 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
     if (open) {
       setCart(readCart());
       setStep('cart');
+      setShippingMode('standard');
       setSavedCart([]);
       setSavedTotal(0);
       setCreatedOrderId('');
@@ -55,7 +58,9 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
 
   const total = cartTotal(cart);
   const count = cartCount(cart);
-  const shipping = total >= SHIPPING_FREE_THRESHOLD ? 0 : SHIPPING_FEE;
+  const baseShipping = total >= SHIPPING_FREE_THRESHOLD ? 0 : SHIPPING_FEE;
+  const expressExtra = shippingMode === 'express' ? EXPRESS_FEE : 0;
+  const shipping = baseShipping + expressExtra;
   const grandTotal = total + shipping;
 
   const placeOrder = async () => {
@@ -107,9 +112,11 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
     const items = savedCart.length > 0 ? savedCart : cart;
     const finalTotal = savedTotal > 0 ? savedTotal : grandTotal;
     const itemsList = items.map((i) => `- ${i.brand} ${i.name} (${i.size}/${i.color}) x${i.quantity} = ${formatPrice(i.salePrice * i.quantity)}`).join('\n');
+    const shippingLabel = shippingMode === 'express' ? 'Express ⚡ (5-10j)' : 'Standard 📦 (10-20j)';
     const msg = encodeURIComponent(
       `Salut, je viens de passer la commande ${createdOrderId} sur tof.\n\n` +
       `${itemsList}\n\n` +
+      `Livraison : ${shippingLabel}\n` +
       `Total : ${formatPrice(finalTotal)}\n\n` +
       `Je suis prêt à payer, envoie-moi le lien PayPal.`
     );
@@ -192,15 +199,44 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
                     <span className="text-dark/45">Sous-total</span>
                     <span className="font-bold">{formatPrice(total)}</span>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-dark/45">Livraison</span>
-                    <span className={`font-bold ${shipping === 0 ? 'text-green-600' : ''}`}>
-                      {shipping === 0 ? 'Offerte' : formatPrice(shipping)}
-                    </span>
+
+                  {/* Choix livraison */}
+                  <div className="space-y-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-dark/30">Livraison</span>
+                    <button
+                      onClick={() => setShippingMode('standard')}
+                      className={`w-full flex items-center justify-between rounded-xl p-3 border-2 transition-all text-left ${
+                        shippingMode === 'standard' ? 'border-dark bg-dark/5' : 'border-dark/10'
+                      }`}
+                    >
+                      <div>
+                        <div className="text-sm font-bold">📦 Standard</div>
+                        <div className="text-[11px] text-dark/40">10-20 jours</div>
+                      </div>
+                      <span className={`text-sm font-800 ${baseShipping === 0 ? 'text-green-600' : ''}`}>
+                        {baseShipping === 0 ? 'Gratuit' : formatPrice(baseShipping)}
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => setShippingMode('express')}
+                      className={`w-full flex items-center justify-between rounded-xl p-3 border-2 transition-all text-left ${
+                        shippingMode === 'express' ? 'border-accent bg-accent/5' : 'border-dark/10'
+                      }`}
+                    >
+                      <div>
+                        <div className="text-sm font-bold">⚡ Express</div>
+                        <div className="text-[11px] text-dark/40">5-10 jours</div>
+                      </div>
+                      <span className="text-sm font-800 text-accent">
+                        +{formatPrice(EXPRESS_FEE)}
+                      </span>
+                    </button>
                   </div>
-                  {shipping > 0 && (
-                    <p className="text-[11px] text-dark/30">Encore {formatPrice(SHIPPING_FREE_THRESHOLD - total)} pour la livraison offerte</p>
+
+                  {baseShipping > 0 && shippingMode === 'standard' && (
+                    <p className="text-[11px] text-dark/30">Encore {formatPrice(SHIPPING_FREE_THRESHOLD - total)} pour la livraison standard offerte</p>
                   )}
+
                   <div className="flex justify-between text-lg font-800 pt-2 border-t border-dark/5">
                     <span>Total</span>
                     <span>{formatPrice(grandTotal)}</span>
@@ -241,6 +277,10 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
                     <span className="font-bold flex-shrink-0">{formatPrice(item.salePrice * item.quantity)}</span>
                   </div>
                 ))}
+                <div className="flex justify-between text-dark/40">
+                  <span>Livraison {shippingMode === 'express' ? '⚡ Express' : '📦 Standard'}</span>
+                  <span className="font-bold">{shipping === 0 ? 'Gratuit' : formatPrice(shipping)}</span>
+                </div>
                 <div className="border-t border-dark/5 pt-2 flex justify-between font-800">
                   <span>Total</span>
                   <span>{formatPrice(grandTotal)}</span>
