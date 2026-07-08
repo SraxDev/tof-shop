@@ -7,6 +7,7 @@ export type CartItem = {
   size: string;
   color: string;
   quantity: number;
+  imageUrl?: string;
 };
 
 const CART_KEY = 'tof-cart-v1';

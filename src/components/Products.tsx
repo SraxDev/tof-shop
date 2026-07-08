@@ -136,6 +136,8 @@ export default function Products() {
   const [addedId, setAddedId] = useState('');
   const [selectedSize, setSelectedSize] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
+  const [activeImage, setActiveImage] = useState('');
+  const [showSizeGuide, setShowSizeGuide] = useState(false);
   const [settings, setSettings] = useState(readSiteSettings);
 
   useEffect(() => {
@@ -178,12 +180,32 @@ export default function Products() {
     });
   };
 
+  const getProductImages = (p: Product) => {
+    if (!p.imageUrl) return [];
+    return p.imageUrl.split(/[|,]/).map(s => s.trim()).filter(Boolean);
+  };
+
   const openQuickAdd = (p: Product) => {
     const sizes = parseSplit(p.sizes);
     const colors = parseSplit(p.colors);
+    const images = getProductImages(p);
     setQuickAdd(p);
     setSelectedSize(sizes[0] || '');
     setSelectedColor(colors[0] || '');
+    setActiveImage(images[0] || '');
+    setShowSizeGuide(false);
+  };
+
+  const handleColorSelect = (color: string, index: number) => {
+    setSelectedColor(color);
+    if (quickAdd) {
+      const images = getProductImages(quickAdd);
+      if (images[index]) {
+        setActiveImage(images[index]);
+      } else if (images[0]) {
+        setActiveImage(images[0]);
+      }
+    }
   };
 
   const canAdd = () => {
@@ -204,6 +226,7 @@ export default function Products() {
       size: selectedSize || 'Unique',
       color: selectedColor || 'Unique',
       quantity: 1,
+      imageUrl: activeImage || quickAdd.imageUrl,
     });
     setAddedId(quickAdd.id);
     setTimeout(() => {
@@ -289,10 +312,10 @@ export default function Products() {
               className={`group cursor-pointer ${isInView ? 'anim-fade-up opacity-0' : 'opacity-0'}`}
               style={{ animationDelay: `${i * 0.05}s` }}
             >
-              <div className="relative aspect-[3/4] rounded-2xl bg-subtle overflow-hidden border border-dark/5 shadow-sm shadow-dark/5 group-hover:shadow-lg group-hover:shadow-dark/10 transition-shadow duration-300">
-                <div className="absolute inset-0 flex items-center justify-center group-hover:scale-105 transition-transform duration-500">
+              <div className="relative aspect-[3/4] rounded-2xl bg-subtle overflow-hidden border border-dark/5 shadow-sm shadow-dark/5 group-hover:shadow-lg group-hover:shadow-dark/10 transition-shadow duration-300 flex items-center justify-center p-4">
+                <div className="h-full w-full flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
                   {p.imageUrl ? (
-                    <img src={p.imageUrl} alt={p.name} className="h-full w-full object-cover" />
+                    <img src={getProductImages(p)[0]} alt={p.name} className="max-h-full max-w-full w-auto h-auto object-contain" />
                   ) : (
                     <AppleEmoji emoji={emojiForCategory(p.category)} size={48} />
                   )}
@@ -349,11 +372,11 @@ export default function Products() {
 
       {/* Page détail produit */}
       {quickAdd && (
-        <div className="fixed inset-0 z-[80] bg-white sm:bg-dark/60 sm:backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 md:p-6">
+        <div className="fixed inset-0 z-[80] bg-white sm:bg-dark/60 sm:backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 md:p-6 overflow-hidden">
           {/* Overlay mobile close */}
           <div className="absolute inset-0 hidden sm:block" onClick={() => setQuickAdd(null)} />
           
-          <div className="bg-white w-full h-[92vh] sm:h-auto sm:max-h-[90vh] sm:max-w-4xl sm:rounded-[32px] shadow-2xl overflow-hidden flex flex-col sm:flex-row relative anim-slide-up">
+          <div className="bg-white w-full h-[100dvh] sm:h-auto sm:max-h-[90vh] sm:max-w-4xl sm:rounded-[32px] shadow-2xl overflow-hidden flex flex-col sm:flex-row relative anim-slide-up">
             {/* Fermer Desktop */}
             <button 
               onClick={() => setQuickAdd(null)} 
@@ -362,175 +385,204 @@ export default function Products() {
               <X size={20} />
             </button>
 
-            {/* Section Image - Gauche sur Desktop, Haut sur Mobile */}
-            <div className="relative w-full sm:w-1/2 h-[45vh] sm:h-auto bg-subtle flex-shrink-0 group">
-              {quickAdd.imageUrl ? (
-                <img src={quickAdd.imageUrl} alt={quickAdd.name} className="h-full w-full object-cover" />
-              ) : (
-                <div className="h-full w-full flex items-center justify-center bg-subtle">
-                  <AppleEmoji emoji={emojiForCategory(quickAdd.category)} size={100} />
-                </div>
-              )}
+            {/* Conteneur unique pour le scroll mobile / layout divisé desktop */}
+            <div className="flex-1 flex flex-col sm:flex-row min-h-0 overflow-y-auto sm:overflow-hidden">
               
-              {/* Fermer Mobile */}
-              <button 
-                onClick={() => setQuickAdd(null)} 
-                className="absolute top-4 left-4 z-50 h-10 w-10 rounded-full bg-white/90 backdrop-blur-md flex sm:hidden items-center justify-center text-dark/60 shadow-sm"
-              >
-                <X size={20} />
-              </button>
-
-              {(() => {
-                const badge = getBadge(quickAdd);
-                return badge ? (
-                  <span className={`absolute top-4 right-4 ${badge.color} text-white text-[11px] font-bold px-3 py-1.5 rounded-full shadow-lg`}>
-                    {badge.text}
-                  </span>
-                ) : null;
-              })()}
-            </div>
-
-            {/* Section Infos - Droite sur Desktop */}
-            <div className="flex-1 flex flex-col min-h-0 bg-white">
-              {/* Contenu scrollable */}
-              <div className="flex-1 overflow-y-auto p-6 sm:p-8 md:p-10 custom-scrollbar">
-                <div className="max-w-lg mx-auto sm:mx-0">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-accent/80">{quickAdd.brand}</span>
-                    <span className="h-1 w-1 rounded-full bg-dark/10" />
-                    <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-dark/40">{quickAdd.category}</span>
+              {/* Section Image */}
+              <div className="relative w-full sm:w-1/2 h-[50vh] sm:h-auto bg-[#F9F9F9] flex-shrink-0 flex items-center justify-center p-4 sm:p-8">
+                {activeImage || quickAdd.imageUrl ? (
+                  <img 
+                    src={activeImage || getProductImages(quickAdd)[0]} 
+                    alt={quickAdd.name} 
+                    className="max-h-full max-w-full w-auto h-auto object-contain drop-shadow-2xl" 
+                  />
+                ) : (
+                  <div className="h-full w-full flex items-center justify-center">
+                    <AppleEmoji emoji={emojiForCategory(quickAdd.category)} size={100} />
                   </div>
-                  
-                  <h2 className="font-display text-3xl sm:text-4xl font-800 text-dark leading-tight">{quickAdd.name}</h2>
+                )}
+                
+                {/* Fermer Mobile */}
+                <button 
+                  onClick={() => setQuickAdd(null)} 
+                  className="absolute top-4 left-4 z-50 h-10 w-10 rounded-full bg-white/90 backdrop-blur-md flex sm:hidden items-center justify-center text-dark/60 shadow-sm"
+                >
+                  <X size={20} />
+                </button>
 
-                  <div className="flex items-baseline gap-3 mt-4">
-                    <span className="text-3xl font-800 text-dark">{formatPrice(quickAdd.salePrice)}</span>
-                    <span className="text-sm text-dark/30 font-medium">TVA incluse</span>
-                  </div>
+                {(() => {
+                  const badge = getBadge(quickAdd);
+                  return badge ? (
+                    <span className={`absolute top-4 right-4 ${badge.color} text-white text-[11px] font-bold px-3 py-1.5 rounded-full shadow-lg`}>
+                      {badge.text}
+                    </span>
+                  ) : null;
+                })()}
+              </div>
 
-                  {/* Avantages */}
-                  <div className="grid grid-cols-1 gap-2 mt-8">
-                    {[
-                      { icon: '📦', text: 'Livraison suivie & Express', sub: 'Arrivée estimée : 7-15 jours' },
-                      { icon: '💎', text: 'Qualité Premium Garantie', sub: 'Contrôle qualité rigoureux avant envoi' },
-                      { icon: '🛡️', text: 'Paiement Sécurisé', sub: 'Finalisation via WhatsApp' }
-                    ].map((item, idx) => (
-                      <div key={idx} className="flex gap-4 p-3 rounded-2xl bg-bg/50 border border-dark/[0.03]">
-                        <span className="text-xl shrink-0">{item.icon}</span>
-                        <div>
-                          <p className="text-xs font-bold text-dark/80">{item.text}</p>
-                          <p className="text-[10px] text-dark/40 font-medium">{item.sub}</p>
+              {/* Section Infos */}
+              <div className="flex-1 flex flex-col min-h-0 bg-white sm:overflow-y-auto custom-scrollbar">
+                <div className="p-6 sm:p-8 md:p-10">
+                  <div className="max-w-lg mx-auto sm:mx-0">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-accent/80">{quickAdd.brand}</span>
+                      <span className="h-1 w-1 rounded-full bg-dark/10" />
+                      <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-dark/40">{quickAdd.category}</span>
+                    </div>
+                    
+                    <h2 className="font-display text-3xl sm:text-4xl font-800 text-dark leading-tight">{quickAdd.name}</h2>
+
+                    <div className="flex items-baseline gap-3 mt-4">
+                      <span className="text-3xl font-800 text-dark">{formatPrice(quickAdd.salePrice)}</span>
+                      <span className="text-sm text-dark/30 font-medium">TVA incluse</span>
+                    </div>
+
+                    {/* Avantages */}
+                    <div className="grid grid-cols-1 gap-2 mt-8">
+                      {[
+                        { icon: '📦', text: 'Livraison suivie & Express', sub: 'Arrivée estimée : 7-15 jours' },
+                        { icon: '💎', text: 'Qualité Premium Garantie', sub: 'Contrôle qualité rigoureux avant envoi' },
+                        { icon: '🛡️', text: 'Paiement Sécurisé', sub: 'Finalisation via WhatsApp' }
+                      ].map((item, idx) => (
+                        <div key={idx} className="flex gap-4 p-3 rounded-2xl bg-bg/50 border border-dark/[0.03]">
+                          <span className="text-xl shrink-0">{item.icon}</span>
+                          <div>
+                            <p className="text-xs font-bold text-dark/80">{item.text}</p>
+                            <p className="text-[10px] text-dark/40 font-medium">{item.sub}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Tailles */}
+                    {quickSizes.length > 0 && (
+                      <div className="mt-8">
+                        <div className="flex justify-between items-center mb-3">
+                          <label className="text-xs font-bold uppercase tracking-wider text-dark/60">Sélectionner la Taille</label>
+                          <button 
+                            onClick={() => setShowSizeGuide(!showSizeGuide)}
+                            className="text-[10px] font-bold text-accent underline underline-offset-4"
+                          >
+                            Guide des tailles
+                          </button>
+                        </div>
+
+                        {showSizeGuide && (
+                          <div className="mb-4 p-4 bg-bg rounded-2xl border border-dark/5 anim-fade-in">
+                            <h4 className="text-[11px] font-bold mb-2 uppercase text-dark/40">Correspondances approximatives</h4>
+                            <div className="grid grid-cols-2 gap-4 text-[10px]">
+                              <div>
+                                <p className="font-bold text-dark/60">S / M / L</p>
+                                <p>Prenez votre taille habituelle.</p>
+                              </div>
+                              <div>
+                                <p className="font-bold text-dark/60">Sneakers</p>
+                                <p>TTS (True To Size) recommandé.</p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
+                          {quickSizes.map((s) => (
+                            <button
+                              key={s}
+                              onClick={() => setSelectedSize(s)}
+                              className={`h-12 rounded-xl text-sm font-bold border-2 transition-all duration-200 ${
+                                selectedSize === s 
+                                  ? 'bg-dark text-white border-dark' 
+                                  : 'bg-white text-dark/80 border-dark/10 hover:border-dark/30 hover:bg-bg'
+                              }`}
+                            >
+                              {s}
+                            </button>
+                          ))}
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    )}
 
-                  {/* Tailles */}
-                  {quickSizes.length > 0 && (
-                    <div className="mt-8">
-                      <div className="flex justify-between items-center mb-3">
-                        <label className="text-xs font-bold uppercase tracking-wider text-dark/60">Sélectionner la Taille</label>
-                        <button className="text-[10px] font-bold text-accent underline underline-offset-4">Guide des tailles</button>
+                    {/* Couleurs */}
+                    {quickColors.length > 0 && (
+                      <div className="mt-8">
+                        <label className="text-xs font-bold uppercase tracking-wider text-dark/60 block mb-3">Couleur</label>
+                        <div className="flex flex-wrap gap-2">
+                          {quickColors.map((c, idx) => (
+                            <button
+                              key={c}
+                              onClick={() => handleColorSelect(c, idx)}
+                              className={`h-11 rounded-xl px-5 text-sm font-bold border-2 transition-all duration-200 ${
+                                selectedColor === c 
+                                  ? 'bg-dark text-white border-dark' 
+                                  : 'bg-white text-dark/80 border-dark/10 hover:border-dark/30 hover:bg-bg'
+                              }`}
+                            >
+                              {c}
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                      <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
-                        {quickSizes.map((s) => (
-                          <button
-                            key={s}
-                            onClick={() => setSelectedSize(s)}
-                            className={`h-12 rounded-xl text-sm font-bold border-2 transition-all duration-200 ${
-                              selectedSize === s 
-                                ? 'bg-dark text-white border-dark scale-[0.98]' 
-                                : 'bg-white text-dark/80 border-dark/10 hover:border-dark/30 hover:bg-bg'
-                            }`}
-                          >
-                            {s}
-                          </button>
-                        ))}
+                    )}
+
+                    {!canAdd() && (quickSizes.length > 0 || quickColors.length > 0) && (
+                      <div className="mt-6 p-3 rounded-xl bg-accent/5 border border-accent/10">
+                        <p className="text-[11px] text-accent font-bold text-center">
+                          {quickSizes.length > 0 && !selectedSize ? 'Veuillez choisir une taille' : ''}
+                          {quickSizes.length > 0 && !selectedSize && quickColors.length > 0 && !selectedColor ? ' et ' : ''}
+                          {quickColors.length > 0 && !selectedColor ? 'une couleur' : ''}
+                        </p>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Couleurs */}
-                  {quickColors.length > 0 && (
-                    <div className="mt-8">
-                      <label className="text-xs font-bold uppercase tracking-wider text-dark/60 block mb-3">Couleur</label>
-                      <div className="flex flex-wrap gap-2">
-                        {quickColors.map((c) => (
-                          <button
-                            key={c}
-                            onClick={() => setSelectedColor(c)}
-                            className={`h-11 rounded-xl px-5 text-sm font-bold border-2 transition-all duration-200 ${
-                              selectedColor === c 
-                                ? 'bg-dark text-white border-dark' 
-                                : 'bg-white text-dark/80 border-dark/10 hover:border-dark/30 hover:bg-bg'
-                            }`}
-                          >
-                            {c}
-                          </button>
-                        ))}
+                    {/* Détails supplémentaires */}
+                    <div className="mt-10 pt-8 border-t border-dark/5 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-dark/40">Livraison</span>
+                        <span className="text-xs font-bold text-green-600">
+                          {settings.freeShipping ? 'Gratuite ✨' : settings.freeShippingThreshold > 0 ? `Offerte dès ${formatPrice(settings.freeShippingThreshold)}` : formatPrice(settings.standardShippingFee || 7.9)}
+                        </span>
                       </div>
-                    </div>
-                  )}
-
-                  {!canAdd() && (quickSizes.length > 0 || quickColors.length > 0) && (
-                    <div className="mt-6 p-3 rounded-xl bg-accent/5 border border-accent/10">
-                      <p className="text-[11px] text-accent font-bold text-center">
-                        {quickSizes.length > 0 && !selectedSize ? 'Veuillez choisir une taille' : ''}
-                        {quickSizes.length > 0 && !selectedSize && quickColors.length > 0 && !selectedColor ? ' et ' : ''}
-                        {quickColors.length > 0 && !selectedColor ? 'une couleur' : ''}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Détails supplémentaires */}
-                  <div className="mt-10 pt-8 border-t border-dark/5 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-dark/40">Livraison</span>
-                      <span className="text-xs font-bold text-green-600">
-                        {settings.freeShipping ? 'Gratuite ✨' : settings.freeShippingThreshold > 0 ? `Offerte dès ${formatPrice(settings.freeShippingThreshold)}` : formatPrice(settings.standardShippingFee || 7.9)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-dark/40">Retours & Échanges</span>
-                      <span className="text-xs font-bold text-dark/70">Sous 14 jours</span>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-dark/40">Retours & Échanges</span>
+                        <span className="text-xs font-bold text-dark/70">Sous 14 jours</span>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
+            </div>
 
-              {/* Panier Sticky */}
-              <div className="p-6 sm:p-8 border-t border-dark/5 bg-white/80 backdrop-blur-md pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]">
-                <button
-                  onClick={handleAddToCart}
-                  disabled={!canAdd()}
-                  className={`w-full h-16 rounded-2xl text-[15px] font-900 text-white transition-all duration-300 flex items-center justify-center gap-3 shadow-xl ${
-                    addedId 
-                      ? 'bg-green-500 shadow-green-200' 
-                      : !canAdd() 
-                        ? 'bg-dark/10 text-dark/20 cursor-not-allowed shadow-none' 
-                        : 'bg-dark hover:bg-accent hover:scale-[1.02] active:scale-[0.98] shadow-dark/20'
-                  }`}
-                >
-                  {addedId ? (
-                    <>
-                      <span className="text-xl">✓</span>
-                      <span>AJOUTÉ AU PANIER !</span>
-                    </>
-                  ) : (
-                    <>
-                      <ShoppingBag size={20} strokeWidth={2.5} />
-                      <span>AJOUTER AU PANIER — {formatPrice(quickAdd.salePrice)}</span>
-                    </>
-                  )}
-                </button>
-                <p className="text-[10px] text-center text-dark/30 mt-4 font-bold tracking-widest uppercase">
-                  Satisfait ou remboursé sous 14 jours
-                </p>
-              </div>
+            {/* Panier Sticky */}
+            <div className="p-6 sm:p-8 border-t border-dark/5 bg-white/80 backdrop-blur-md pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)] sticky bottom-0 z-20">
+              <button
+                onClick={handleAddToCart}
+                disabled={!canAdd()}
+                className={`w-full h-16 rounded-2xl text-[15px] font-900 text-white transition-all duration-300 flex items-center justify-center gap-3 shadow-xl ${
+                  addedId 
+                    ? 'bg-green-500 shadow-green-200' 
+                    : !canAdd() 
+                      ? 'bg-dark/10 text-dark/20 cursor-not-allowed shadow-none' 
+                      : 'bg-dark hover:bg-accent hover:scale-[1.02] active:scale-[0.98] shadow-dark/20'
+                }`}
+              >
+                {addedId ? (
+                  <>
+                    <span className="text-xl">✓</span>
+                    <span>AJOUTÉ AU PANIER !</span>
+                  </>
+                ) : (
+                  <>
+                    <ShoppingBag size={20} strokeWidth={2.5} />
+                    <span>AJOUTER AU PANIER — {formatPrice(quickAdd.salePrice)}</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
       )}
+    </section>
+  );
+}
     </section>
   );
 }
