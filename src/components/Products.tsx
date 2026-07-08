@@ -527,7 +527,7 @@ export default function Products() {
                     )}
 
                     {/* Détails bas */}
-                    <div className="mt-10 pt-8 border-t border-dark/5 space-y-3">
+                    <div className="mt-10 pt-8 border-t border-dark/5 space-y-3 pb-24 sm:pb-0">
                       <div className="flex items-center justify-between text-[11px] font-medium">
                         <span className="text-dark/30">Livraison</span>
                         <span className="text-green-600 font-bold">
@@ -543,7 +543,7 @@ export default function Products() {
                 </div>
 
                 {/* Panier Sticky */}
-                <div className="p-6 sm:p-8 border-t border-dark/5 bg-white/80 backdrop-blur-md">
+                <div className="p-6 sm:p-8 border-t border-dark/5 bg-white/80 backdrop-blur-md sticky bottom-0 z-20 mt-auto hidden sm:block">
                   <button
                     onClick={handleAddToCart}
                     disabled={!canAdd()}
@@ -570,6 +570,26 @@ export default function Products() {
                 </div>
               </div>
             </div>
+
+            {/* Panier Mobile Sticky - Uniquement visible sur mobile */}
+            <div className="sm:hidden p-4 border-t border-dark/5 bg-white/90 backdrop-blur-xl sticky bottom-0 z-[100] safe-bottom">
+              <button
+                onClick={handleAddToCart}
+                disabled={!canAdd()}
+                className={`w-full h-14 rounded-2xl text-[13px] font-900 text-white transition-all duration-300 flex items-center justify-center gap-2 shadow-lg ${
+                  addedId 
+                    ? 'bg-green-500 shadow-green-200' 
+                    : !canAdd() 
+                      ? 'bg-dark/10 text-dark/20 cursor-not-allowed shadow-none' 
+                      : 'bg-dark active:scale-[0.96] shadow-dark/20'
+                }`}
+              >
+                {addedId ? 'AJOUTÉ !' : `AJOUTER — ${formatPrice(quickAdd.salePrice)}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
             {/* Panier Sticky */}
             <div className="p-6 sm:p-8 border-t border-dark/5 bg-white/80 backdrop-blur-md pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)] sticky bottom-0 z-20">

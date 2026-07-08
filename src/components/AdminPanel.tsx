@@ -1408,12 +1408,12 @@ export default function AdminPanel() {
                         </div>
                         <div className="flex items-center gap-3">
                           <div className="flex-1">
-                            <label className="text-xs text-dark/35">Images (Séparez les URLs par une virgule pour les coloris)
+                            <label className="text-xs text-dark/35">Images (Séparez les URLs par un pipe | pour les coloris)
                               <textarea 
                                 disabled={!isEditing} 
                                 value={current.imageUrl || ''} 
                                 onChange={(e) => setDraftProduct({ ...current, imageUrl: e.target.value })} 
-                                placeholder="URL1, URL2, URL3..." 
+                                placeholder="URL1 | URL2 | URL3..." 
                                 className="mt-1 w-full rounded-xl bg-bg px-3 py-2 text-sm text-dark outline-none min-h-[80px]" 
                               />
                             </label>
@@ -1442,6 +1442,7 @@ export default function AdminPanel() {
                                 }} />
                               </label>
                               <button 
+                                type="button"
                                 onClick={() => setDraftProduct({ ...current, imageUrl: '' })}
                                 className="rounded-xl bg-red-500/10 px-4 py-2 text-[10px] font-bold text-red-500 hover:bg-red-500/20 transition-colors"
                               >
@@ -1452,29 +1453,38 @@ export default function AdminPanel() {
                         </div>
                         
                         {current.imageUrl && (
-                          <div className="flex flex-wrap gap-2 mt-2">
-                            {current.imageUrl.split('|').map((url, idx) => {
-                              const trimmedUrl = url.trim();
-                              if (!trimmedUrl) return null;
-                              return (
-                                <div key={idx} className="relative group/img">
-                                  <img src={trimmedUrl} alt="" className="h-14 w-14 rounded-lg object-contain bg-subtle border border-dark/10" />
-                                  {isEditing && (
-                                    <button 
-                                      type="button"
-                                      onClick={() => {
-                                        const urls = current.imageUrl.split('|').map(s => s.trim()).filter(Boolean);
-                                        urls.splice(idx, 1);
-                                        setDraftProduct({ ...current, imageUrl: urls.join('|') });
-                                      }}
-                                      className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 text-white rounded-full text-[8px] flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity z-10"
-                                    >
-                                      ✕
-                                    </button>
-                                  )}
-                                </div>
-                              );
-                            })}
+                          <div className="mt-3">
+                            <p className="text-[10px] font-bold text-dark/30 uppercase mb-2">Correspondance photos / coloris</p>
+                            <div className="flex flex-wrap gap-3">
+                              {current.imageUrl.split('|').map((url, idx) => {
+                                const trimmedUrl = url.trim();
+                                if (!trimmedUrl) return null;
+                                const colorNames = current.colors ? current.colors.split(',').map(s => s.trim()) : [];
+                                const colorName = colorNames[idx] || `Photo ${idx + 1}`;
+                                
+                                return (
+                                  <div key={idx} className="relative group/img flex flex-col items-center gap-1">
+                                    <div className="relative">
+                                      <img src={trimmedUrl} alt="" className="h-16 w-16 rounded-xl object-contain bg-subtle border border-dark/10" />
+                                      {isEditing && (
+                                        <button 
+                                          type="button"
+                                          onClick={() => {
+                                            const urls = current.imageUrl.split('|').map(s => s.trim()).filter(Boolean);
+                                            urls.splice(idx, 1);
+                                            setDraftProduct({ ...current, imageUrl: urls.join('|') });
+                                          }}
+                                          className="absolute -top-1.5 -right-1.5 h-5 w-5 bg-red-500 text-white rounded-full text-[10px] flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity z-10 shadow-sm"
+                                        >
+                                          ✕
+                                        </button>
+                                      )}
+                                    </div>
+                                    <span className="text-[9px] font-bold text-dark/40 uppercase truncate max-w-[64px]">{colorName}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
                         )}
                         <div className="flex flex-wrap gap-2 text-xs">
