@@ -13,13 +13,14 @@ type Product = {
   salePrice: number;
   sizes?: string;
   colors?: string;
+  imageUrl?: string;
   status: string;
 };
 
 const filters = ['Tout', 'Sneakers', 'Vetements', 'Accessoires'];
 
 function dbToShopProduct(d: DbProduct): Product {
-  return { id: d.id, brand: d.brand, name: d.name, category: d.category, salePrice: d.sale_price, sizes: d.sizes, colors: d.colors, status: d.status };
+  return { id: d.id, brand: d.brand, name: d.name, category: d.category, salePrice: d.sale_price, sizes: d.sizes, colors: d.colors, imageUrl: d.image_url || '', status: d.status };
 }
 
 async function loadProducts(): Promise<Product[]> {
@@ -160,8 +161,12 @@ export default function Products() {
               style={{ animationDelay: `${i * 0.07}s` }}
             >
               <div className="relative aspect-square rounded-2xl bg-subtle overflow-hidden border border-dark/5 shadow-sm shadow-dark/5 group-hover:shadow-lg group-hover:shadow-dark/10 transition-shadow duration-300">
-                <div className="absolute inset-0 flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
-                  <AppleEmoji emoji={emojiForCategory(p.category)} size={52} />
+                <div className="absolute inset-0 flex items-center justify-center group-hover:scale-105 transition-transform duration-500">
+                  {p.imageUrl ? (
+                    <img src={p.imageUrl} alt={p.name} className="h-full w-full object-cover" />
+                  ) : (
+                    <AppleEmoji emoji={emojiForCategory(p.category)} size={52} />
+                  )}
                 </div>
                 <span className="absolute top-3 left-3 bg-accent text-white text-[10px] font-bold px-2.5 py-1 rounded-full">
                   {i < 2 ? 'Stock limite' : 'New'}

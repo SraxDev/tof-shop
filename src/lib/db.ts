@@ -13,6 +13,7 @@ export type DbProduct = {
   packaging: string;
   sizes: string;
   colors: string;
+  image_url: string;
   source_url: string;
   status: string;
   created_at?: string;

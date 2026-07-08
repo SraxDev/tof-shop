@@ -17,6 +17,7 @@ type Product = {
   packaging: 'none' | 'without_box' | 'with_box';
   sizes: string;
   colors: string;
+  imageUrl: string;
   sourceUrl: string;
   status: 'active' | 'link_dead' | 'paused';
 };
@@ -90,6 +91,7 @@ const initialProducts: Product[] = [
     packaging: 'without_box',
     sizes: '39, 40, 41, 42, 43, 44, 45',
     colors: 'Black, White',
+    imageUrl: '',
     sourceUrl: 'https://detail.1688.com/offer/EXEMPLE-AF1.html',
     status: 'active',
   },
@@ -104,6 +106,7 @@ const initialProducts: Product[] = [
     packaging: 'none',
     sizes: 'S, M, L, XL',
     colors: 'Black, White, Beige',
+    imageUrl: '',
     sourceUrl: 'https://detail.1688.com/offer/EXEMPLE-GUCCI-TEE.html',
     status: 'active',
   },
@@ -118,6 +121,7 @@ const initialProducts: Product[] = [
     packaging: 'none',
     sizes: 'S, M, L, XL, XXL',
     colors: 'Black, Brown',
+    imageUrl: '',
     sourceUrl: 'https://detail.1688.com/offer/EXEMPLE-LV-HOODIE.html',
     status: 'active',
   },
@@ -156,7 +160,7 @@ function productToDb(p: Product): DbProduct {
     id: p.id, brand: p.brand, name: p.name, category: p.category,
     sale_price: p.salePrice, source_price_cny: p.sourcePriceCny,
     weight_grams: p.weightGrams, packaging: p.packaging,
-    sizes: p.sizes, colors: p.colors,
+    sizes: p.sizes, colors: p.colors, image_url: p.imageUrl || '',
     source_url: p.sourceUrl, status: p.status,
   };
 }
@@ -166,7 +170,7 @@ function dbToProduct(d: DbProduct): Product {
     id: d.id, brand: d.brand, name: d.name, category: d.category,
     salePrice: d.sale_price, sourcePriceCny: d.source_price_cny,
     weightGrams: d.weight_grams, packaging: d.packaging as Product['packaging'],
-    sizes: d.sizes, colors: d.colors,
+    sizes: d.sizes, colors: d.colors, imageUrl: d.image_url || '',
     sourceUrl: d.source_url, status: d.status as Product['status'],
   };
 }
@@ -244,6 +248,7 @@ function normalizedProduct(product: Product): Product {
     packaging: product.packaging || 'none',
     sizes: product.sizes || '39, 40, 41, 42, 43, 44, 45',
     colors: product.colors || 'Black, White',
+    imageUrl: product.imageUrl || '',
   };
 }
 
@@ -269,6 +274,7 @@ function suggestedSalePrice(sourcePriceCny: number, weightGrams: number, packagi
     packaging,
     sizes: '',
     colors: '',
+    imageUrl: '',
     sourceUrl: '',
     status: 'active',
   };
@@ -358,6 +364,7 @@ export default function AdminPanel() {
     packaging: defaultPreset.packaging,
     sizes: '39, 40, 41, 42, 43, 44, 45',
     colors: 'Black, White',
+    imageUrl: '',
     sourceUrl: '',
   });
   const [dropDraft, setDropDraft] = useState<FeaturedDropConfig>(defaultDrop);
@@ -574,6 +581,7 @@ export default function AdminPanel() {
       packaging: 'without_box',
       sizes: '39, 40, 41, 42, 43, 44, 45',
       colors: 'Black, White',
+      imageUrl: '',
       sourceUrl: 'https://detail.1688.com/offer/...',
       status: 'active',
     };
@@ -636,7 +644,7 @@ export default function AdminPanel() {
     showToast('Commande créée ✓');
   };
 
-  const fallbackProduct: Product = { id: '', brand: '-', name: '-', category: 'T-shirt', salePrice: 0, sourcePriceCny: 0, weightGrams: 300, packaging: 'none', sizes: '', colors: '', sourceUrl: '', status: 'active' };
+  const fallbackProduct: Product = { id: '', brand: '-', name: '-', category: 'T-shirt', salePrice: 0, sourcePriceCny: 0, weightGrams: 300, packaging: 'none', sizes: '', colors: '', imageUrl: '', sourceUrl: '', status: 'active' };
   const getProduct = (id: string) => products.find((product) => product.id === id) || products[0] || fallbackProduct;
 
   const dashboard = useMemo(() => {
@@ -1313,6 +1321,28 @@ export default function AdminPanel() {
                 />
               </div>
 
+              <div className="grid lg:grid-cols-[1fr_auto_auto] gap-3 mt-3">
+                <input
+                  value={quickProduct.imageUrl}
+                  onChange={(e) => setQuickProduct({ ...quickProduct, imageUrl: e.target.value })}
+                  placeholder="URL image produit (optionnel)"
+                  className="rounded-xl bg-white px-4 py-3 text-sm outline-none border border-dark/5"
+                />
+                <label className="cursor-pointer rounded-xl bg-dark px-5 py-3 text-sm font-bold text-white text-center hover:bg-accent transition-colors flex items-center gap-2">
+                  Upload
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = () => setQuickProduct({ ...quickProduct, imageUrl: String(reader.result) });
+                    reader.readAsDataURL(file);
+                  }} />
+                </label>
+                {quickProduct.imageUrl && (
+                  <img src={quickProduct.imageUrl} alt="" className="h-11 w-11 rounded-xl object-cover border border-dark/5" />
+                )}
+              </div>
+
               <div className="grid lg:grid-cols-[1fr_auto] gap-3 mt-3">
                 <input
                   value={quickProduct.sourceUrl}
@@ -1381,6 +1411,28 @@ export default function AdminPanel() {
                           <label className="text-xs text-dark/35">Couleurs disponibles
                             <input disabled={!isEditing} value={current.colors || ''} onChange={(e) => setDraftProduct({ ...current, colors: e.target.value })} placeholder="Black, White, Red" className="mt-1 w-full rounded-xl bg-bg px-3 py-2 text-sm text-dark outline-none" />
                           </label>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1">
+                            <label className="text-xs text-dark/35">Image produit
+                              <input disabled={!isEditing} value={current.imageUrl || ''} onChange={(e) => setDraftProduct({ ...current, imageUrl: e.target.value })} placeholder="URL image ou upload →" className="mt-1 w-full rounded-xl bg-bg px-3 py-2 text-sm text-dark outline-none" />
+                            </label>
+                          </div>
+                          {isEditing && (
+                            <label className="mt-4 cursor-pointer rounded-xl bg-dark px-4 py-2 text-xs font-bold text-white hover:bg-accent transition-colors">
+                              Upload
+                              <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                const reader = new FileReader();
+                                reader.onload = () => setDraftProduct({ ...current, imageUrl: String(reader.result) });
+                                reader.readAsDataURL(file);
+                              }} />
+                            </label>
+                          )}
+                          {current.imageUrl && (
+                            <img src={current.imageUrl} alt="" className="mt-4 h-10 w-10 rounded-lg object-cover border border-dark/10" />
+                          )}
                         </div>
                         <div className="flex flex-wrap gap-2 text-xs">
                           <span className="rounded-full bg-dark/5 px-3 py-1 text-dark/45">Poids retenu {margin.effectiveWeight}g</span>
