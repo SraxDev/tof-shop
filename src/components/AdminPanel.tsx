@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Copy, ExternalLink, Package, Pencil, Plus, Save, Send, Trash2, Truck } from 'lucide-react';
 import { defaultDrop, type FeaturedDropConfig } from './FeaturedDrop';
 import { defaultSettings, readSiteSettings, saveSiteSettings, hydrateSiteSettings, type SiteSettings } from '../lib/siteSettings';
-import { fetchProducts, upsertProduct, deleteProduct as dbDeleteProduct, fetchOrders, updateOrder, insertOrder as dbInsertOrder, fetchDrop, saveDrop as dbSaveDrop, fetchNotes, upsertNote, deleteNote as dbDeleteNote, subscribeToOrders, subscribeToProducts, onOnlineCountChange, getPresenceState, trackVisitor, fetchConversations, sendChatMessage, subscribeToChatMessages, type DbProduct, type DbOrder, type DbDrop, type DbNote, type DbChatMessage } from '../lib/db';
+import { fetchProducts, upsertProduct, deleteProduct as dbDeleteProduct, fetchOrders, updateOrder, insertOrder as dbInsertOrder, fetchDrop, saveDrop as dbSaveDrop, fetchNotes, upsertNote, deleteNote as dbDeleteNote, subscribeToOrders, subscribeToProducts, onOnlineCountChange, getPresenceState, trackVisitor, fetchConversations, sendChatMessage, subscribeToChatMessages, deleteConversation, deleteChatMessage, type DbProduct, type DbOrder, type DbDrop, type DbNote, type DbChatMessage } from '../lib/db';
 import { showToast } from './Toast';
 import { playNewOrder, playCopy, playDelete } from '../lib/sounds';
 
@@ -1778,26 +1778,45 @@ export default function AdminPanel() {
                   </div>
                 ) : (
                   <>
-                    <div className="p-4 border-b border-dark/5 flex items-center justify-between">
+                    <div className="p-4 border-b border-dark/5 flex items-center justify-between gap-2">
                       <div className="font-bold">{convos.get(activeConvo)?.name}</div>
-                      <button onClick={() => setActiveConvo(null)} className="text-xs text-dark/30 hover:text-dark lg:hidden">Retour</button>
+                      <div className="flex items-center gap-2">
+                        <button onClick={async () => {
+                          if (confirm('Supprimer cette conversation ?')) {
+                            await deleteConversation(activeConvo);
+                            setChatMessages((prev) => prev.filter((m) => m.conversation_id !== activeConvo));
+                            setActiveConvo(null);
+                            showToast('Conversation supprimée ✓');
+                          }
+                        }} className="text-xs text-red-400 hover:text-red-500 font-bold">Supprimer</button>
+                        <button onClick={() => setActiveConvo(null)} className="text-xs text-dark/30 hover:text-dark lg:hidden">Retour</button>
+                      </div>
                     </div>
                     <div className="flex-1 overflow-y-auto p-4 space-y-3">
                       {activeMessages.map((msg) => (
-                        <div key={msg.id} className={`flex ${msg.sender === 'client' ? 'justify-start' : 'justify-end'}`}>
-                          <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                            msg.sender === 'client' ? 'bg-bg text-dark rounded-bl-md' :
-                            msg.sender === 'admin' ? 'bg-accent text-white rounded-br-md' :
-                            'bg-dark/5 text-dark/60 rounded-bl-md'
-                          }`}>
-                            {msg.sender === 'bot' && <div className="text-[10px] font-bold text-dark/30 mb-1">Bot</div>}
-                            {msg.sender === 'admin' && <div className="text-[10px] font-bold text-white/60 mb-1">Toi</div>}
-                            <p className="whitespace-pre-wrap">{msg.message}</p>
-                            {msg.created_at && (
-                              <div className={`text-[10px] mt-1 ${msg.sender === 'client' ? 'text-dark/20' : msg.sender === 'admin' ? 'text-white/40' : 'text-dark/20'}`}>
-                                {new Date(msg.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                              </div>
-                            )}
+                        <div key={msg.id} className={`group/msg flex ${msg.sender === 'client' ? 'justify-start' : 'justify-end'}`}>
+                          <div className="relative">
+                            <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                              msg.sender === 'client' ? 'bg-bg text-dark rounded-bl-sm' :
+                              msg.sender === 'admin' ? 'bg-accent text-white rounded-br-sm' :
+                              'bg-dark/5 text-dark/60 rounded-bl-sm'
+                            }`}>
+                              {msg.sender === 'bot' && <div className="text-[10px] font-bold text-dark/30 mb-1">Bot</div>}
+                              {msg.sender === 'admin' && <div className="text-[10px] font-bold text-white/60 mb-1">Toi</div>}
+                              <p className="whitespace-pre-wrap">{msg.message}</p>
+                              {msg.created_at && (
+                                <div className={`text-[10px] mt-1 ${msg.sender === 'client' ? 'text-dark/20' : msg.sender === 'admin' ? 'text-white/40' : 'text-dark/20'}`}>
+                                  {new Date(msg.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                                </div>
+                              )}
+                            </div>
+                            <button
+                              onClick={async () => {
+                                await deleteChatMessage(msg.id);
+                                setChatMessages((prev) => prev.filter((m) => m.id !== msg.id));
+                              }}
+                              className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-red-500 text-white text-[10px] items-center justify-center hidden group-hover/msg:flex"
+                            >✕</button>
                           </div>
                         </div>
                       ))}

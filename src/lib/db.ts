@@ -142,6 +142,14 @@ export async function sendChatMessage(msg: DbChatMessage) {
   await supabase.from('chat_messages').insert(msg);
 }
 
+export async function deleteConversation(conversationId: string) {
+  await supabase.from('chat_messages').delete().eq('conversation_id', conversationId);
+}
+
+export async function deleteChatMessage(id: string) {
+  await supabase.from('chat_messages').delete().eq('id', id);
+}
+
 export function subscribeToChatMessages(callback: () => void) {
   const channel = supabase
     .channel('chat-realtime')
