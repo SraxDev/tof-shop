@@ -103,6 +103,19 @@ export default function ChatWidget() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const conversationId = getConversationId();
 
+  useEffect(() => {
+    // Bloquer le scroll uniquement sur mobile quand le chat est ouvert
+    const isMobile = window.innerWidth < 640;
+    if (open && isMobile) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [open]);
+
   const scrollToBottom = useCallback(() => {
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
   }, []);

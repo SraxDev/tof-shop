@@ -32,6 +32,17 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
   });
 
   useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [open]);
+
+  useEffect(() => {
     const syncCart = () => setCart(readCart());
     const syncSettings = () => setSettings(readSiteSettings());
     window.addEventListener('tof-cart-updated', syncCart);

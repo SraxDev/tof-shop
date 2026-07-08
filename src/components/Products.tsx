@@ -142,6 +142,17 @@ export default function Products() {
   const [settings, setSettings] = useState(readSiteSettings);
 
   useEffect(() => {
+    if (quickAdd) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [quickAdd]);
+
+  useEffect(() => {
     const syncS = () => setSettings(readSiteSettings());
     window.addEventListener('tof-settings-updated', syncS);
     return () => window.removeEventListener('tof-settings-updated', syncS);
