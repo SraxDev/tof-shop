@@ -47,6 +47,9 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
     if (open) {
       setCart(readCart());
       setStep('cart');
+      setSavedCart([]);
+      setSavedTotal(0);
+      setCreatedOrderId('');
     }
   }, [open]);
 

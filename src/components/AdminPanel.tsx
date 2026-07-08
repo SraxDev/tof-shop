@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Copy, ExternalLink, Package, Pencil, Plus, Save, Trash2, Truck } from 'lucide-react';
 import { defaultDrop, type FeaturedDropConfig } from './FeaturedDrop';
 import { defaultSettings, readSiteSettings, saveSiteSettings, hydrateSiteSettings, type SiteSettings } from '../lib/siteSettings';
-import { fetchProducts, upsertProduct, deleteProduct as dbDeleteProduct, fetchOrders, updateOrder, insertOrder as dbInsertOrder, fetchDrop, saveDrop as dbSaveDrop, fetchNotes, upsertNote, deleteNote as dbDeleteNote, subscribeToOrders, subscribeToProducts, type DbProduct, type DbOrder, type DbDrop, type DbNote } from '../lib/db';
+import { fetchProducts, upsertProduct, deleteProduct as dbDeleteProduct, fetchOrders, updateOrder, insertOrder as dbInsertOrder, fetchDrop, saveDrop as dbSaveDrop, fetchNotes, upsertNote, deleteNote as dbDeleteNote, subscribeToOrders, subscribeToProducts, onOnlineCountChange, getPresenceState, trackVisitor, type DbProduct, type DbOrder, type DbDrop, type DbNote } from '../lib/db';
 import { showToast } from './Toast';
 
 type Product = {
@@ -328,6 +328,7 @@ export default function AdminPanel() {
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editingNoteText, setEditingNoteText] = useState('');
   const [noteSort, setNoteSort] = useState<'priority' | 'date'>('priority');
+  const [onlineCount, setOnlineCount] = useState(0);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftProduct, setDraftProduct] = useState<Product | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -388,17 +389,26 @@ export default function AdminPanel() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { loadAll(); }, [loadAll]);
+  useEffect(() => {
+    loadAll();
+    trackVisitor('admin');
+    onOnlineCountChange(setOnlineCount);
+  }, [loadAll]);
 
   useEffect(() => {
     const refresh = () => { loadAll(); };
     window.addEventListener('tof-orders-updated', refresh);
     window.addEventListener('tof-products-updated', refresh);
 
-    const unsubOrders = subscribeToOrders(() => {
-      fetchOrders().then((data) => setOrders(data.map(dbToOrder)));
-      showToast('Nouvelle commande reçue !');
-    });
+    const unsubOrders = subscribeToOrders(
+      () => {
+        fetchOrders().then((data) => setOrders(data.map(dbToOrder)));
+        showToast('Nouvelle commande reçue !');
+      },
+      () => {
+        fetchOrders().then((data) => setOrders(data.map(dbToOrder)));
+      }
+    );
     const unsubProducts = subscribeToProducts(() => {
       fetchProducts().then((data) => setProducts(data.map(dbToProduct).map(normalizedProduct)));
     });
@@ -661,6 +671,11 @@ export default function AdminPanel() {
     });
 
     const topProducts = Array.from(productStats.values()).sort((a, b) => b.units - a.units).slice(0, 5);
+
+    const lastOrderTime = orders.length > 0 && orders[0].id ? (() => {
+      const match = orders.find((o) => o.status === 'to_order' || o.status === 'new');
+      return match ? 'en attente' : 'toutes traitées';
+    })() : 'aucune';
     const riskyProducts = products
       .map((product) => ({ product, margin: estimateNetMargin(product).net }))
       .filter((item) => item.product.status === 'link_dead' || item.margin < 20)
@@ -675,6 +690,7 @@ export default function AdminPanel() {
       statusCounts,
       paymentCounts,
       topProducts,
+      lastOrderTime,
       riskyProducts,
       activeProducts: products.filter((product) => product.status === 'active').length,
       toProcess: statusCounts.new + statusCounts.to_order,
@@ -804,7 +820,15 @@ export default function AdminPanel() {
 
         {activeTab === 'dashboard' && (
           <div className="space-y-5">
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+              <div className="rounded-3xl bg-gradient-to-br from-green-500 to-emerald-600 text-white p-5">
+                <div className="text-xs font-bold uppercase tracking-wider text-white/60">En ligne</div>
+                <div className="mt-3 text-3xl font-display font-800 tracking-tight flex items-center gap-2">
+                  <span className="h-3 w-3 bg-white rounded-full animate-pulse" />
+                  {onlineCount}
+                </div>
+                <div className="mt-1 text-xs text-white/50">visiteurs maintenant</div>
+              </div>
               {[
                 { label: 'CA potentiel', value: euro(dashboard.revenue), hint: `${orders.length} commandes` },
                 { label: 'Marge estimée', value: euro(dashboard.netMargin), hint: 'après livraison + frais' },
@@ -819,8 +843,48 @@ export default function AdminPanel() {
               ))}
             </div>
 
-            <div className="grid lg:grid-cols-3 gap-5">
-              <div className="lg:col-span-2 rounded-3xl bg-white text-dark p-6">
+            <div className="grid lg:grid-cols-4 gap-5">
+              {/* Activité live */}
+              <div className="rounded-3xl bg-white text-dark p-6">
+                <h3 className="font-bold text-xl mb-4">Activité en direct</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between rounded-2xl bg-bg p-4">
+                    <div className="flex items-center gap-3">
+                      <span className="h-3 w-3 bg-green-500 rounded-full animate-pulse" />
+                      <span className="text-sm font-semibold">{onlineCount} visiteur{onlineCount > 1 ? 's' : ''} en ligne</span>
+                    </div>
+                    <span className="text-xs text-dark/30">temps réel</span>
+                  </div>
+                  <div className="flex items-center justify-between rounded-2xl bg-bg p-4">
+                    <span className="text-sm font-semibold">Commandes non traitées</span>
+                    <span className={`text-sm font-800 ${dashboard.toProcess > 0 ? 'text-accent' : 'text-green-600'}`}>{dashboard.toProcess}</span>
+                  </div>
+                  <div className="flex items-center justify-between rounded-2xl bg-bg p-4">
+                    <span className="text-sm font-semibold">Statut commandes</span>
+                    <span className="text-xs text-dark/40">{dashboard.lastOrderTime}</span>
+                  </div>
+                  {(() => {
+                    const state = getPresenceState();
+                    const visitors = Object.values(state).flat();
+                    const shopCount = visitors.filter((v) => v.page === 'shop').length;
+                    const adminCount = visitors.filter((v) => v.page === 'admin').length;
+                    return (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="rounded-2xl bg-bg p-3 text-center">
+                          <div className="text-lg font-800">{shopCount}</div>
+                          <div className="text-[10px] text-dark/30">sur le shop</div>
+                        </div>
+                        <div className="rounded-2xl bg-bg p-3 text-center">
+                          <div className="text-lg font-800">{adminCount}</div>
+                          <div className="text-[10px] text-dark/30">sur l'admin</div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              <div className="lg:col-span-3 rounded-3xl bg-white text-dark p-6">
                 <div className="flex items-center justify-between gap-4 mb-5">
                   <div>
                     <h3 className="font-bold text-xl">Ce qui marche le mieux</h3>

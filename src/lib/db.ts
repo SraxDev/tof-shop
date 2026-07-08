@@ -151,13 +151,52 @@ export async function saveDrop(drop: DbDrop) {
   window.dispatchEvent(new CustomEvent('tof-drop-updated'));
 }
 
+// ─── Presence (visiteurs en ligne) ───────────────────────
+
+let presenceChannel: ReturnType<typeof supabase.channel> | null = null;
+let onlineCountCallback: ((count: number) => void) | null = null;
+
+export function trackVisitor(page: string) {
+  if (presenceChannel) return;
+  const userId = localStorage.getItem('tof-visitor-id') || `v-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  localStorage.setItem('tof-visitor-id', userId);
+
+  presenceChannel = supabase.channel('online-visitors', {
+    config: { presence: { key: userId } },
+  });
+
+  presenceChannel
+    .on('presence', { event: 'sync' }, () => {
+      const state = presenceChannel?.presenceState() || {};
+      const count = Object.keys(state).length;
+      if (onlineCountCallback) onlineCountCallback(count);
+    })
+    .subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await presenceChannel?.track({ page, joined_at: new Date().toISOString() });
+      }
+    });
+}
+
+export function onOnlineCountChange(callback: (count: number) => void) {
+  onlineCountCallback = callback;
+}
+
+export function getPresenceState(): Record<string, { page?: string; joined_at?: string }[]> {
+  if (!presenceChannel) return {};
+  return presenceChannel.presenceState() as Record<string, { page?: string; joined_at?: string }[]>;
+}
+
 // ─── Realtime ────────────────────────────────────────────
 
-export function subscribeToOrders(callback: () => void) {
+export function subscribeToOrders(onInsert: () => void, onUpdate: () => void) {
   const channel = supabase
     .channel('orders-realtime')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
-      callback();
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => {
+      onInsert();
+    })
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => {
+      onUpdate();
     })
     .subscribe();
 

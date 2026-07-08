@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTwemoji } from './hooks/useTwemoji';
 import { hydrateSiteSettings } from './lib/siteSettings';
+import { trackVisitor } from './lib/db';
 import AnnouncementBar from './components/AnnouncementBar';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
@@ -101,6 +102,7 @@ export default function App() {
 
   useEffect(() => {
     hydrateSiteSettings();
+    trackVisitor('shop');
   }, []);
 
   useEffect(() => {
