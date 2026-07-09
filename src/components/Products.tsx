@@ -177,7 +177,7 @@ function ProductCard({
       style={{ animationDelay: `${Math.min(index * 0.04, 0.4)}s` }}
     >
       <div
-        className="relative aspect-[3/4] rounded-2xl bg-subtle overflow-hidden border border-dark/5 shadow-sm shadow-dark/5 group-hover:shadow-lg group-hover:shadow-dark/10 transition-shadow duration-300 flex items-center justify-center p-4"
+        className="relative aspect-[3/4] rounded-2xl bg-white overflow-hidden border border-dark/5 shadow-sm shadow-dark/5 group-hover:shadow-lg group-hover:shadow-dark/10 transition-shadow duration-300 flex items-center justify-center p-4"
         onMouseEnter={() => setHover(true)}
         onMouseLeave={() => setHover(false)}
       >
@@ -186,7 +186,7 @@ function ProductCard({
           className="absolute inset-0 z-0 cursor-pointer"
           aria-label={`Voir ${product.name}`}
         />
-        <div className="h-full w-full flex items-center justify-center transition-transform duration-500 group-hover:scale-105">
+        <div className="h-full w-full flex items-center justify-center transition-transform duration-500 group-hover:scale-105 relative z-[1]">
           {img ? (
             <img
               src={img}
