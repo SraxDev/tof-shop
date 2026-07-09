@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Copy, ExternalLink, Package, Pencil, Plus, Save, Search, Send, Trash2, Truck, X } from 'lucide-react';
 import { defaultDrop, type FeaturedDropConfig } from './FeaturedDrop';
@@ -457,6 +458,125 @@ const ProductListItem = memo(function ProductListItem({ product, onEdit, onRemov
 });
 
 // ────────────────────────────────────────────────────────────────────────────
+// DrawerSelect : select custom (évite le bug du <select> natif dans un
+// conteneur position:fixed + overflow-y:auto : popup blanche coupée / mal
+// positionnée). On rend la liste dans un portail pour qu'elle s'affiche
+// toujours par-dessus tout, peu importe le z-index/overflow du parent.
+// ────────────────────────────────────────────────────────────────────────────
+type DrawerSelectOption = { value: string; label: string };
+type DrawerSelectProps = {
+  value: string;
+  options: DrawerSelectOption[];
+  onChange: (value: string) => void;
+  label?: string;
+  className?: string;
+};
+
+const DrawerSelect = memo(function DrawerSelect({
+  value,
+  options,
+  onChange,
+  label,
+  className = '',
+}: DrawerSelectProps) {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [coords, setCoords] = useState<{ top: number; left: number; width: number; above: boolean }>({
+    top: 0, left: 0, width: 0, above: false,
+  });
+
+  const selected = options.find((o) => o.value === value) || options[0];
+
+  const openMenu = useCallback(() => {
+    if (!btnRef.current) return;
+    const r = btnRef.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - r.bottom;
+    const spaceAbove = r.top;
+    const needAbove = spaceBelow < 260 && spaceAbove > spaceBelow;
+    setCoords({
+      top: needAbove ? r.top - 8 : r.bottom + 4,
+      left: r.left,
+      width: r.width,
+      above: needAbove,
+    });
+    setOpen(true);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => {
+      if (btnRef.current?.contains(e.target as Node)) return;
+      const pop = document.getElementById('drawer-select-portal');
+      if (pop && pop.contains(e.target as Node)) return;
+      setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    const onScrollResize = () => setOpen(false);
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', onKey);
+    window.addEventListener('resize', onScrollResize);
+    window.addEventListener('scroll', onScrollResize, true);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', onScrollResize);
+      window.removeEventListener('scroll', onScrollResize, true);
+    };
+  }, [open]);
+
+  return (
+    <div className={`relative ${className}`}>
+      {label && <div className="text-xs text-white/50 mb-1">{label}</div>}
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={() => (open ? setOpen(false) : openMenu())}
+        className="w-full flex items-center justify-between gap-2 rounded-xl bg-white/10 border border-white/10 hover:border-accent/40 px-3 py-2.5 text-sm text-white text-left transition-colors"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <span className="truncate">{selected?.label}</span>
+        <svg
+          width="12" height="12" viewBox="0 0 12 12"
+          className={`flex-shrink-0 text-white/50 transition-transform ${open ? 'rotate-180' : ''}`}
+          aria-hidden
+        >
+          <path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
+
+      {open && createPortal(
+        <div
+          id="drawer-select-portal"
+          role="listbox"
+          className="fixed z-[60] max-h-64 overflow-y-auto rounded-xl bg-neutral-800 border border-white/10 shadow-2xl shadow-black/60 py-1"
+          style={{ top: coords.top, left: coords.left, width: coords.width }}
+        >
+          {options.map((opt) => {
+            const active = opt.value === value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                role="option"
+                aria-selected={active}
+                onClick={() => { onChange(opt.value); setOpen(false); }}
+                className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+                  active ? 'bg-accent text-white' : 'text-white/80 hover:bg-white/10'
+                }`}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>,
+        document.body,
+      )}
+    </div>
+  );
+});
+
+// ────────────────────────────────────────────────────────────────────────────
 // ProductEditDrawer : panneau latéral d'édition / création
 // ────────────────────────────────────────────────────────────────────────────
 type ProductEditDrawerProps = {
@@ -556,65 +676,54 @@ const ProductEditDrawer = memo(function ProductEditDrawer({
           <div className="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-3">
             <h4 className="text-xs font-bold uppercase tracking-wider text-white/50">Catégorisation</h4>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <label className="text-xs text-white/50 block">
-                Genre
-                <select
-                  value={draft.gender}
-                  onChange={(e) => onChange({ ...draft, gender: e.target.value as Product['gender'] })}
-                  className="mt-1 w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2.5 text-sm text-white outline-none"
-                >
-                  <option value="homme">Homme</option>
-                  <option value="femme">Femme</option>
-                  <option value="mixte">Mixte</option>
-                </select>
-              </label>
-              <label className="text-xs text-white/50 block sm:col-span-2">
-                Catégorie
-                <select
-                  value={draft.category}
-                  onChange={(e) => {
-                    const preset = categoryPresets.find((item) => item.label === e.target.value);
-                    onChange({
-                      ...draft,
-                      category: e.target.value,
-                      weightGrams: preset?.weight || draft.weightGrams,
-                      packaging: preset?.packaging || draft.packaging,
-                      sizes: preset?.defaultSizes ?? draft.sizes,
-                      colors: preset?.defaultColors ?? draft.colors,
-                    });
-                  }}
-                  className="mt-1 w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2.5 text-sm text-white outline-none"
-                >
-                  {categoryPresets.map((preset) => (
-                    <option key={preset.label} value={preset.label}>{preset.label}</option>
-                  ))}
-                </select>
-              </label>
+              <DrawerSelect
+                label="Genre"
+                value={draft.gender}
+                onChange={(v) => onChange({ ...draft, gender: v as Product['gender'] })}
+                options={[
+                  { value: 'homme', label: 'Homme' },
+                  { value: 'femme', label: 'Femme' },
+                  { value: 'mixte', label: 'Mixte' },
+                ]}
+              />
+              <DrawerSelect
+                label="Catégorie"
+                value={draft.category}
+                onChange={(v) => {
+                  const preset = categoryPresets.find((item) => item.label === v);
+                  onChange({
+                    ...draft,
+                    category: v,
+                    weightGrams: preset?.weight || draft.weightGrams,
+                    packaging: preset?.packaging || draft.packaging,
+                    sizes: preset?.defaultSizes ?? draft.sizes,
+                    colors: preset?.defaultColors ?? draft.colors,
+                  });
+                }}
+                options={categoryPresets.map((p) => ({ value: p.label, label: p.label }))}
+                className="sm:col-span-2"
+              />
             </div>
-            <label className="text-xs text-white/50 block">
-              Packaging
-              <select
-                value={draft.packaging}
-                onChange={(e) => onChange({ ...draft, packaging: e.target.value as Product['packaging'] })}
-                className="mt-1 w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2.5 text-sm text-white outline-none"
-              >
-                <option value="none">Standard</option>
-                <option value="without_box">Sans boîte</option>
-                <option value="with_box">Avec boîte</option>
-              </select>
-            </label>
-            <label className="text-xs text-white/50 block">
-              Statut
-              <select
-                value={draft.status}
-                onChange={(e) => onChange({ ...draft, status: e.target.value as Product['status'] })}
-                className="mt-1 w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2.5 text-sm text-white outline-none"
-              >
-                <option value="active">Actif</option>
-                <option value="link_dead">Lien sauté</option>
-                <option value="paused">En pause</option>
-              </select>
-            </label>
+            <DrawerSelect
+              label="Packaging"
+              value={draft.packaging}
+              onChange={(v) => onChange({ ...draft, packaging: v as Product['packaging'] })}
+              options={[
+                { value: 'none', label: 'Standard' },
+                { value: 'without_box', label: 'Sans boîte' },
+                { value: 'with_box', label: 'Avec boîte' },
+              ]}
+            />
+            <DrawerSelect
+              label="Statut"
+              value={draft.status}
+              onChange={(v) => onChange({ ...draft, status: v as Product['status'] })}
+              options={[
+                { value: 'active', label: 'Actif' },
+                { value: 'link_dead', label: 'Lien sauté' },
+                { value: 'paused', label: 'En pause' },
+              ]}
+            />
           </div>
 
           {/* Prix & poids */}
