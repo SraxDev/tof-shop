@@ -17,29 +17,65 @@ const FE0F_NEEDED: Record<string, string> = {
 
 export function useTwemoji() {
   useEffect(() => {
-    const parse = () => {
-      if (window.twemoji) {
-        window.twemoji.parse(document.body, {
-          callback: (icon: string) => {
-            const filename = FE0F_NEEDED[icon] || icon;
-            return APPLE_CDN + filename + '.png';
-          },
-          ext: '.png',
-        });
-      }
+    // Only run on public shop (admin doesn't need emoji parsing)
+    if (window.location.hash === '#admin') return;
+
+    let scheduled = false;
+    let parsing = false;
+
+    const scheduleParse = () => {
+      if (scheduled || parsing) return;
+      scheduled = true;
+      requestAnimationFrame(() => {
+        scheduled = false;
+        if (!window.twemoji || !document.body.isConnected) return;
+        parsing = true;
+        try {
+          window.twemoji.parse(document.body, {
+            callback: (icon: string) => {
+              const filename = FE0F_NEEDED[icon] || icon;
+              return APPLE_CDN + filename + '.png';
+            },
+            ext: '.png',
+            className: 'emoji',
+          });
+        } catch {
+          /* ignore detached-node errors from React re-renders */
+        }
+        parsing = false;
+      });
     };
 
-    // Initial parse after a short delay to ensure DOM is rendered
-    const timeout = setTimeout(parse, 100);
+    // Initial parse (twemoji loaded via defer + a little extra wait)
+    const t1 = setTimeout(scheduleParse, 200);
+    const t2 = setTimeout(scheduleParse, 1000);
+    const onLoad = () => scheduleParse();
+    window.addEventListener('load', onLoad);
 
-    // Re-parse on DOM changes (for dynamic content like state changes)
-    const observer = new MutationObserver(() => {
-      requestAnimationFrame(parse);
+    // Observe DOM mutations, but skip those we ourselves caused (emoji img insertions)
+    const observer = new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        for (const node of Array.from(m.addedNodes)) {
+          if (node instanceof HTMLElement) {
+            // Skip already-parsed emoji images and their containers
+            if (node.tagName === 'IMG' && node.classList.contains('emoji')) return;
+            // Skip if this is a newly added node whose subtree already has emojis parsed
+            if (node.querySelector?.('img.emoji')) return;
+          }
+          if (node instanceof Text) {
+            // Text nodes are fine to parse
+            continue;
+          }
+        }
+      }
+      scheduleParse();
     });
     observer.observe(document.body, { childList: true, subtree: true });
 
     return () => {
-      clearTimeout(timeout);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      window.removeEventListener('load', onLoad);
       observer.disconnect();
     };
   }, []);

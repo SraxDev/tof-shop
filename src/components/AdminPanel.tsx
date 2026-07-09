@@ -502,25 +502,25 @@ const ProductListItem = memo(function ProductListItem({ product, ordersCount, on
               <ExternalLink size={14} />
             </a>
           )}
-          <a
-            href={`#shop`}
-            target="_blank"
-            rel="noreferrer"
+          <button
+            type="button"
             title="Aperçu dans le shop"
             onClick={() => {
-              // Store preview ID so Products can highlight/open quickadd for it
-              try { sessionStorage.setItem('tof-preview-product', product.id); } catch {}
+              try { localStorage.setItem('tof-preview-product', product.id); } catch {}
+              // Open the public shop (strip #admin hash) in a new tab
+              const publicUrl = window.location.origin + window.location.pathname;
+              window.open(publicUrl, '_blank', 'noreferrer');
             }}
-            className="hidden sm:inline-flex h-8 w-8 items-center justify-center rounded-lg bg-dark/5 text-dark/50 hover:bg-dark/10 hover:text-dark/80 transition-colors"
+            className="h-9 w-9 sm:h-8 sm:w-8 inline-flex items-center justify-center rounded-full sm:rounded-lg bg-dark/5 text-dark/50 hover:bg-dark/10 hover:text-dark/80 transition-colors"
           >
-            <span className="text-[10px] font-black">👁</span>
-          </a>
+            <span className="text-sm sm:text-[10px]">👁</span>
+          </button>
         <button
           onClick={() => onDuplicate(product)}
           title="Dupliquer"
-          className="hidden sm:inline-flex h-8 w-8 items-center justify-center rounded-lg bg-dark/5 text-dark/50 hover:bg-dark/10 hover:text-dark/80 transition-colors"
+          className="h-9 w-9 sm:h-8 sm:w-8 inline-flex items-center justify-center rounded-full sm:rounded-lg bg-dark/5 text-dark/50 hover:bg-dark/10 hover:text-dark/80 transition-colors"
         >
-          <Copy size={13} />
+          <Copy size={14} />
         </button>
         <button
           onClick={() => onEdit(product)}

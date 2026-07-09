@@ -611,7 +611,12 @@ function QuickAddModal({
                               )}
                             </div>
                             <p className="text-[9px] font-bold text-dark/40 mt-2 truncate uppercase">{p.brand}</p>
-                            <p className="text-[10px] font-bold text-dark truncate">{formatPrice(p.salePrice)}</p>
+                            <p className="text-[10px] font-bold text-dark truncate flex items-baseline gap-1">
+                              {formatPrice(p.salePrice)}
+                              {p.oldPrice && p.oldPrice > p.salePrice && (
+                                <span className="text-[9px] text-dark/25 line-through font-semibold">{formatPrice(p.oldPrice)}</span>
+                              )}
+                            </p>
                           </button>
                         );
                       })}
@@ -750,22 +755,43 @@ export default function Products() {
     };
   }, []);
 
+  const openProductById = useCallback((id: string) => {
+    setQuickAddId(id);
+    requestAnimationFrame(() => {
+      const scroller = document.querySelector('.custom-scrollbar') as HTMLElement | null;
+      if (scroller) scroller.scrollTop = 0;
+    });
+  }, []);
+
   // Listen for related-product clicks in modal
   useEffect(() => {
     const handler = (e: Event) => {
       const id = (e as CustomEvent).detail as string;
-      if (id) {
-        setQuickAddId(id);
-        // scroll modal content to top
-        requestAnimationFrame(() => {
-          const scroller = document.querySelector('.custom-scrollbar') as HTMLElement | null;
-          if (scroller) scroller.scrollTop = 0;
-        });
-      }
+      if (id) openProductById(id);
     };
     window.addEventListener('tof-open-product', handler);
     return () => window.removeEventListener('tof-open-product', handler);
-  }, []);
+  }, [openProductById]);
+
+  // Auto-open product preview from admin "Aperçu" button
+  useEffect(() => {
+    if (loading || products.length === 0) return;
+    try {
+      const previewId = localStorage.getItem('tof-preview-product');
+      if (previewId) {
+        localStorage.removeItem('tof-preview-product');
+        const p = products.find((x) => x.id === previewId);
+        if (p) {
+          // scroll to shop section first
+          const el = document.getElementById('shop');
+          if (el) {
+            window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 90, behavior: 'auto' });
+          }
+          setTimeout(() => openProductById(previewId), 200);
+        }
+      }
+    } catch {}
+  }, [loading, products, openProductById]);
 
   const allFiltered = useMemo(() => {
     const q = search.toLowerCase().trim();
