@@ -1,13 +1,27 @@
 import { createPortal } from 'react-dom';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Copy, ExternalLink, Package, Pencil, Plus, Save, Search, Send, Trash2, Truck, X } from 'lucide-react';
+import {
+  Copy, ExternalLink, Package, Pencil, Plus, RotateCcw, Save, Search, Send,
+  Trash2, Truck, X, ArrowUpDown, Flame, ArrowLeft,
+} from 'lucide-react';
 import { defaultDrop, type FeaturedDropConfig } from './FeaturedDrop';
 import { defaultSettings, readSiteSettings, saveSiteSettings, hydrateSiteSettings, type SiteSettings } from '../lib/siteSettings';
-import { fetchProducts, upsertProduct, deleteProduct as dbDeleteProduct, fetchOrders, updateOrder, insertOrder as dbInsertOrder, fetchDrop, saveDrop as dbSaveDrop, fetchNotes, upsertNote, deleteNote as dbDeleteNote, subscribeToOrders, subscribeToProducts, onOnlineCountChange, getPresenceState, trackVisitor, fetchConversations, sendChatMessage, subscribeToChatMessages, deleteConversation, deleteChatMessage, fetchPromoCodes, upsertPromoCode, deletePromoCode, type DbProduct, type DbOrder, type DbDrop, type DbNote, type DbChatMessage, type DbPromoCode } from '../lib/db';
-import { showToast } from './Toast';
+import {
+  fetchProducts, upsertProduct, deleteProduct as dbDeleteProduct,
+  fetchOrders, updateOrder, insertOrder as dbInsertOrder,
+  fetchDrop, saveDrop as dbSaveDrop, fetchNotes, upsertNote,
+  deleteNote as dbDeleteNote, subscribeToOrders, subscribeToProducts,
+  onOnlineCountChange, getPresenceState, trackVisitor, fetchConversations,
+  sendChatMessage, subscribeToChatMessages, deleteConversation, deleteChatMessage,
+  fetchPromoCodes, upsertPromoCode, deletePromoCode,
+  type DbProduct, type DbOrder, type DbDrop, type DbNote, type DbChatMessage, type DbPromoCode,
+} from '../lib/db';
+import { showToast, showActionToast } from './Toast';
 import { playNewOrder, playCopy, playDelete } from '../lib/sounds';
 import ImageUploader from './ImageUploader';
-import { uploadProductImage, uploadDropImage } from '../lib/storage';
+import { uploadProductImage, uploadDropImage, pathFromStorageUrl, isStorageUrl, deleteProductImages } from '../lib/storage';
+import { useDebounce } from '../hooks/useDebounce';
+import ConfirmDialog from './ui/ConfirmDialog';
 
 type Product = {
   id: string;
@@ -359,25 +373,33 @@ const productImageUploadHandler = (file: File) =>
 // ────────────────────────────────────────────────────────────────────────────
 type ProductListItemProps = {
   product: Product;
+  ordersCount: number;
   onEdit: (product: Product) => void;
+  onDuplicate: (product: Product) => void;
   onRemove: (id: string) => void;
 };
 
-const ProductListItem = memo(function ProductListItem({ product, onEdit, onRemove }: ProductListItemProps) {
+const statusMeta = {
+  active:     { label: 'Actif',     cls: 'bg-green-500/10 text-green-600' },
+  link_dead:  { label: 'Lien sauté', cls: 'bg-red-500/10 text-red-500' },
+  paused:     { label: 'Pause',     cls: 'bg-dark/10 text-dark/40' },
+} as const;
+
+const ProductListItem = memo(function ProductListItem({ product, ordersCount, onEdit, onDuplicate, onRemove }: ProductListItemProps) {
   const margin = estimateNetMargin(product);
   const firstImage = product.imageUrl
     ? product.imageUrl.split('|').map((s) => s.trim()).find(Boolean) || ''
     : '';
-  const statusBadge = {
-    active: { label: 'Actif', cls: 'bg-green-500/10 text-green-600' },
-    link_dead: { label: 'Lien sauté', cls: 'bg-red-500/10 text-red-500' },
-    paused: { label: 'Pause', cls: 'bg-dark/10 text-dark/40' },
-  }[product.status];
+  const sBadge = statusMeta[product.status];
+  const marginColor =
+    margin.net >= 45 ? 'text-green-600' :
+    margin.net >= 20 ? 'text-orange-500' :
+    'text-red-500';
 
   return (
-    <div className="group flex items-center gap-3 sm:gap-4 p-3 sm:p-4 hover:bg-bg/60 transition-colors">
+    <div className="group relative flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-3 hover:bg-bg/80 active:bg-bg transition-colors">
       {/* Miniature */}
-      <div className="h-14 w-14 sm:h-16 sm:w-16 rounded-2xl bg-subtle border border-dark/5 flex-shrink-0 overflow-hidden flex items-center justify-center">
+      <div className="h-14 w-14 sm:h-16 sm:w-16 rounded-2xl bg-subtle border border-dark/5 flex-shrink-0 overflow-hidden flex items-center justify-center relative">
         {firstImage ? (
           <img
             src={firstImage}
@@ -389,66 +411,84 @@ const ProductListItem = memo(function ProductListItem({ product, onEdit, onRemov
         ) : (
           <Package size={20} className="text-dark/20" />
         )}
+        {ordersCount >= 3 && (
+          <span className="absolute -top-1.5 -left-1.5 inline-flex items-center gap-0.5 rounded-full bg-accent text-white h-5 min-w-5 px-1 text-[9px] font-800 shadow">
+            <Flame size={9} />
+            {ordersCount}
+          </span>
+        )}
       </div>
 
       {/* Infos principales */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-accent truncate max-w-[120px]">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-accent truncate max-w-[140px]">
             {product.brand || 'Sans marque'}
           </span>
-          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${statusBadge.cls}`}>
-            {statusBadge.label}
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${sBadge.cls}`}>
+            {sBadge.label}
           </span>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-dark/30">
-            {product.category}
-          </span>
+          {margin.net < 20 && product.status === 'active' && (
+            <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-bold text-red-500">
+              Marge faible
+            </span>
+          )}
+          {!firstImage && (
+            <span className="rounded-full bg-orange-500/10 px-2 py-0.5 text-[10px] font-bold text-orange-500">
+              Sans photo
+            </span>
+          )}
         </div>
         <div className="font-semibold text-sm sm:text-base truncate mt-0.5">
           {product.name || 'Produit sans nom'}
         </div>
-        <div className="flex items-center gap-2 sm:gap-3 mt-1 text-[11px] text-dark/45 flex-wrap">
+        <div className="flex items-center gap-2 sm:gap-2.5 mt-1 text-[11px] text-dark/45 flex-wrap">
           <span className="font-800 text-dark/80">{euro(product.salePrice)}</span>
-          <span>·</span>
-          <span>Source ¥{product.sourcePriceCny}</span>
-          <span>·</span>
-          <span className={`font-bold ${margin.net >= 45 ? 'text-green-600' : margin.net >= 20 ? 'text-orange-500' : 'text-red-500'}`}>
-            {euro(margin.net)}
-          </span>
+          <span className="opacity-40">·</span>
+          <span>¥{product.sourcePriceCny}</span>
+          <span className="opacity-40">·</span>
+          <span className={`font-bold ${marginColor}`}>{euro(margin.net)}</span>
           {product.sizes && (
             <>
-              <span className="hidden sm:inline">·</span>
-              <span className="hidden sm:inline truncate max-w-[160px]">{product.sizes}</span>
+              <span className="hidden sm:inline opacity-40">·</span>
+              <span className="hidden sm:inline truncate max-w-[180px]">{product.sizes}</span>
             </>
           )}
         </div>
       </div>
 
-      {/* Actions */}
-      <div className="flex items-center gap-1.5 flex-shrink-0">
+      {/* Actions : toujours visibles sur mobile, toujours visibles au hover desktop */}
+      <div className="flex items-center gap-1 flex-shrink-0 sm:opacity-100 sm:pointer-events-auto">
         {product.sourceUrl && (
           <a
             href={product.sourceUrl}
             target="_blank"
             rel="noreferrer"
             title="Ouvrir le lien source"
-            className="h-9 w-9 inline-flex items-center justify-center rounded-full bg-dark/5 text-dark/50 hover:bg-dark/10 hover:text-dark/80 transition-colors"
+            className="h-9 w-9 sm:h-8 sm:w-8 inline-flex items-center justify-center rounded-full sm:rounded-lg bg-dark/5 text-dark/50 hover:bg-dark/10 hover:text-dark/80 transition-colors"
           >
             <ExternalLink size={14} />
           </a>
         )}
         <button
+          onClick={() => onDuplicate(product)}
+          title="Dupliquer"
+          className="hidden sm:inline-flex h-8 w-8 items-center justify-center rounded-lg bg-dark/5 text-dark/50 hover:bg-dark/10 hover:text-dark/80 transition-colors"
+        >
+          <Copy size={13} />
+        </button>
+        <button
           onClick={() => onEdit(product)}
-          title="Modifier le produit"
-          className="inline-flex items-center gap-1.5 rounded-full bg-dark px-3 sm:px-4 h-9 text-xs font-semibold text-white hover:bg-accent transition-colors"
+          title="Modifier"
+          className="inline-flex items-center gap-1.5 rounded-full sm:rounded-lg bg-dark text-white h-9 px-3 sm:h-8 sm:px-3 text-xs font-semibold hover:bg-accent hover:brightness-110 transition-colors"
         >
           <Pencil size={13} />
           <span className="hidden sm:inline">Modifier</span>
         </button>
         <button
-          onClick={() => { if (confirm('Supprimer ce produit ?')) onRemove(product.id); }}
-          title="Supprimer le produit"
-          className="h-9 w-9 inline-flex items-center justify-center rounded-full bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors"
+          onClick={() => onRemove(product.id)}
+          title="Supprimer"
+          className="h-9 w-9 sm:h-8 sm:w-8 inline-flex items-center justify-center rounded-full sm:rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors"
         >
           <Trash2 size={14} />
         </button>
@@ -612,96 +652,188 @@ type ProductEditDrawerProps = {
   open: boolean;
   isNew: boolean;
   draft: Product | null;
+  original: Product | null;
   onChange: (next: Product) => void;
   onClose: () => void;
   onSave: () => void;
+  onDuplicate?: (p: Product) => void;
   onAutoPrice: () => void;
 };
 
+// Petit utilitaire de style pour les champs du drawer
+function inputCls(hasError: boolean) {
+  return `mt-1 w-full rounded-xl bg-white/10 border px-4 py-2.5 text-sm text-white outline-none transition-colors ${
+    hasError
+      ? 'border-red-500/50 focus:border-red-400'
+      : 'border-white/10 focus:border-accent/40'
+  }`;
+}
+
+function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
+  return (
+    <label className="text-xs text-white/50 block">
+      <span className="flex items-center justify-between gap-2">
+        <span>{label}</span>
+        {error && <span className="text-[10px] font-bold text-red-400">{error}</span>}
+      </span>
+      <div>{children}</div>
+    </label>
+  );
+}
+
 const ProductEditDrawer = memo(function ProductEditDrawer({
-  open, isNew, draft, onChange, onClose, onSave, onAutoPrice,
+  open, isNew, draft, original, onChange, onClose, onSave, onDuplicate, onAutoPrice,
 }: ProductEditDrawerProps) {
-  // Fermeture par Échap
+  const firstFieldRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      const inField = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable;
+
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        onSave();
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+      if (inField) return;
+    };
     window.addEventListener('keydown', onKey);
-    // Empêche le scroll du fond quand le drawer est ouvert
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+    setTimeout(() => firstFieldRef.current?.focus(), 150);
     return () => {
       window.removeEventListener('keydown', onKey);
       document.body.style.overflow = prev;
     };
-  }, [open, onClose]);
+  }, [open, onSave, onClose]);
+
+  const isDirty = useMemo(() => {
+    if (!draft) return false;
+    if (isNew) {
+      return Boolean(draft.brand || draft.name || draft.sourceUrl || draft.imageUrl);
+    }
+    if (!original) return false;
+    return (
+      draft.brand !== original.brand ||
+      draft.name !== original.name ||
+      draft.sourceUrl !== original.sourceUrl ||
+      draft.category !== original.category ||
+      draft.gender !== original.gender ||
+      draft.packaging !== original.packaging ||
+      draft.status !== original.status ||
+      draft.salePrice !== original.salePrice ||
+      draft.sourcePriceCny !== original.sourcePriceCny ||
+      draft.weightGrams !== original.weightGrams ||
+      draft.sizes !== original.sizes ||
+      draft.colors !== original.colors ||
+      draft.imageUrl !== original.imageUrl
+    );
+  }, [draft, original, isNew]);
+
+  useEffect(() => {
+    if (!open || !isDirty) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [open, isDirty]);
+
+  const handleClose = useCallback(() => {
+    if (isDirty) {
+      if (!window.confirm('Modifications non enregistrées. Fermer sans sauvegarder ?')) return;
+    }
+    onClose();
+  }, [isDirty, onClose]);
 
   if (!open || !draft) return null;
 
   const margin = estimateNetMargin(draft);
 
+  const validation = {
+    brand: !draft.brand.trim(),
+    name: !draft.name.trim(),
+    price: draft.salePrice <= 0,
+  };
+  const canSave = !validation.brand && !validation.name && !validation.price;
+
   return (
     <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
-      {/* Overlay */}
-      <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
-        onClick={onClose}
-      />
-      {/* Panneau */}
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity" onClick={handleClose} />
       <div className="absolute right-0 top-0 h-full w-full sm:w-[640px] lg:w-[760px] bg-dark text-white shadow-2xl shadow-black/40 flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between gap-4 p-5 border-b border-white/10">
-          <div>
-            <div className="text-[10px] font-bold uppercase tracking-widest text-accent">
-              {isNew ? 'Nouveau produit' : 'Édition produit'}
+        <div className="flex items-center justify-between gap-4 p-4 sm:p-5 border-b border-white/10 flex-shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              onClick={handleClose}
+              aria-label="Retour"
+              className="lg:hidden h-9 w-9 rounded-full bg-white/5 hover:bg-white/10 inline-flex items-center justify-center flex-shrink-0"
+            >
+              <ArrowLeft size={16} />
+            </button>
+            <div className="min-w-0">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-accent">
+                {isNew ? 'Nouveau produit' : 'Édition produit'}
+              </div>
+              <h3 className="font-display text-lg sm:text-xl font-800 mt-0.5 truncate flex items-center gap-2">
+                {(draft.brand || draft.name) ? `${draft.brand || ''} ${draft.name ? `- ${draft.name}` : ''}` : 'Nouveau produit'}
+                {isDirty && <span className="inline-block h-2 w-2 rounded-full bg-amber-400" title="Modifications non sauvegardées" />}
+              </h3>
             </div>
-            <h3 className="font-display text-xl font-800 mt-0.5 truncate">
-              {draft.brand || '—'} {draft.name ? `- ${draft.name}` : ''}
-            </h3>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             aria-label="Fermer"
-            className="h-9 w-9 rounded-full bg-white/5 hover:bg-white/10 inline-flex items-center justify-center flex-shrink-0 transition-colors"
+            className="hidden lg:inline-flex h-9 w-9 rounded-full bg-white/5 hover:bg-white/10 items-center justify-center flex-shrink-0"
           >
             <X size={16} />
           </button>
         </div>
 
-        {/* Body scrollable */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-5">
-          {/* Identité */}
+        {margin.net < 20 && draft.status === 'active' && (
+          <div className="mx-4 sm:mx-5 mt-4 rounded-xl bg-red-500/10 border border-red-500/20 px-4 py-2.5 text-xs text-red-200 flex items-start gap-2 flex-shrink-0">
+            <span className="font-bold text-red-300">⚠ Marge faible</span>
+            <span className="opacity-90">Marge estimée {euro(margin.net)}. Augmente le prix ou vérifie le poids.</span>
+          </div>
+        )}
+
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
           <div className="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-3">
             <h4 className="text-xs font-bold uppercase tracking-wider text-white/50">Identité</h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <label className="text-xs text-white/50 block">
-                Marque
+              <Field label="Marque" error={validation.brand ? 'Requis' : undefined}>
                 <input
+                  ref={firstFieldRef}
                   value={draft.brand}
                   onChange={(e) => onChange({ ...draft, brand: e.target.value })}
-                  className="mt-1 w-full rounded-xl bg-white/10 border border-white/10 px-4 py-2.5 text-sm text-white outline-none focus:border-accent/40"
+                  className={inputCls(validation.brand)}
                 />
-              </label>
-              <label className="text-xs text-white/50 block">
-                Nom du produit
+              </Field>
+              <Field label="Nom du produit" error={validation.name ? 'Requis' : undefined}>
                 <input
                   value={draft.name}
                   onChange={(e) => onChange({ ...draft, name: e.target.value })}
-                  className="mt-1 w-full rounded-xl bg-white/10 border border-white/10 px-4 py-2.5 text-sm text-white outline-none focus:border-accent/40"
+                  className={inputCls(validation.name)}
                 />
-              </label>
+              </Field>
             </div>
-            <label className="text-xs text-white/50 block">
-              Lien source (1688 / Taobao / Weidian…)
+            <Field label="Lien source (1688 / Taobao / Weidian…)">
               <input
                 value={draft.sourceUrl}
                 onChange={(e) => onChange({ ...draft, sourceUrl: e.target.value })}
                 placeholder="https://detail.1688.com/offer/..."
-                className="mt-1 w-full rounded-xl bg-white/10 border border-white/10 px-4 py-2.5 text-xs text-white/80 outline-none focus:border-accent/40"
+                className={inputCls(false) + ' text-xs'}
               />
-            </label>
+            </Field>
           </div>
 
-          {/* Catégorisation */}
           <div className="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-3">
             <h4 className="text-xs font-bold uppercase tracking-wider text-white/50">Catégorisation</h4>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -733,94 +865,88 @@ const ProductEditDrawer = memo(function ProductEditDrawer({
                 className="sm:col-span-2"
               />
             </div>
-            <DrawerSelect
-              label="Packaging"
-              value={draft.packaging}
-              onChange={(v) => onChange({ ...draft, packaging: v as Product['packaging'] })}
-              options={[
-                { value: 'none', label: 'Standard' },
-                { value: 'without_box', label: 'Sans boîte' },
-                { value: 'with_box', label: 'Avec boîte' },
-              ]}
-            />
-            <DrawerSelect
-              label="Statut"
-              value={draft.status}
-              onChange={(v) => onChange({ ...draft, status: v as Product['status'] })}
-              options={[
-                { value: 'active', label: 'Actif' },
-                { value: 'link_dead', label: 'Lien sauté' },
-                { value: 'paused', label: 'En pause' },
-              ]}
-            />
+            <div className="grid grid-cols-2 gap-3">
+              <DrawerSelect
+                label="Packaging"
+                value={draft.packaging}
+                onChange={(v) => onChange({ ...draft, packaging: v as Product['packaging'] })}
+                options={[
+                  { value: 'none', label: 'Standard' },
+                  { value: 'without_box', label: 'Sans boîte' },
+                  { value: 'with_box', label: 'Avec boîte' },
+                ]}
+              />
+              <DrawerSelect
+                label="Statut"
+                value={draft.status}
+                onChange={(v) => onChange({ ...draft, status: v as Product['status'] })}
+                options={[
+                  { value: 'active', label: 'Actif' },
+                  { value: 'link_dead', label: 'Lien sauté' },
+                  { value: 'paused', label: 'En pause' },
+                ]}
+              />
+            </div>
           </div>
 
-          {/* Prix & poids */}
           <div className="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-white/50">Prix & poids</h4>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-white/50">Prix &amp; poids</h4>
             <div className="grid grid-cols-3 gap-3">
-              <label className="text-xs text-white/50 block">
-                Prix vente €
+              <Field label="Prix vente €" error={validation.price ? '>0' : undefined}>
                 <input
                   type="number"
                   value={draft.salePrice}
                   onChange={(e) => onChange({ ...draft, salePrice: Number(e.target.value) })}
-                  className="mt-1 w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2.5 text-sm text-white outline-none"
+                  className={inputCls(validation.price)}
                 />
-              </label>
-              <label className="text-xs text-white/50 block">
-                Prix source ¥
+              </Field>
+              <Field label="Prix source ¥">
                 <input
                   type="number"
                   value={draft.sourcePriceCny}
                   onChange={(e) => onChange({ ...draft, sourcePriceCny: Number(e.target.value) })}
-                  className="mt-1 w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2.5 text-sm text-white outline-none"
+                  className={inputCls(false)}
                 />
-              </label>
-              <label className="text-xs text-white/50 block">
-                Poids g
+              </Field>
+              <Field label="Poids g">
                 <input
                   type="number"
                   value={draft.weightGrams}
                   onChange={(e) => onChange({ ...draft, weightGrams: Number(e.target.value) })}
-                  className="mt-1 w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2.5 text-sm text-white outline-none"
+                  className={inputCls(false)}
                 />
-              </label>
+              </Field>
             </div>
             <div className="flex flex-wrap gap-2 text-[11px] pt-1">
-              <span className="rounded-full bg-white/10 px-3 py-1 text-white/60">Poids retenu {margin.effectiveWeight}g</span>
-              <span className="rounded-full bg-white/10 px-3 py-1 text-white/60">Livraison {euro(margin.shipping.low)} – {euro(margin.shipping.high)}</span>
-              <span className="rounded-full bg-white/10 px-3 py-1 text-white/60">Sécurité +20% {euro(margin.shippingWithSafety)}</span>
+              <span className="rounded-full bg-white/10 px-3 py-1 text-white/60">Poids {margin.effectiveWeight}g</span>
+              <span className="rounded-full bg-white/10 px-3 py-1 text-white/60">Livr. {euro(margin.shipping.low)}–{euro(margin.shipping.high)}</span>
+              <span className="rounded-full bg-white/10 px-3 py-1 text-white/60">+20% {euro(margin.shippingWithSafety)}</span>
               <span className={`rounded-full px-3 py-1 font-bold ${marginTone(margin.net).replace('bg-green-500/10', 'bg-green-500/20').replace('bg-orange-500/10', 'bg-orange-500/20').replace('bg-red-500/10', 'bg-red-500/20').replace('text-green-600', 'text-green-300').replace('text-orange-600', 'text-orange-300').replace('text-red-600', 'text-red-300')}`}>
-                Marge {marginLabel(margin.net)} : {euro(margin.net)}
+                {marginLabel(margin.net)} · {euro(margin.net)}
               </span>
             </div>
           </div>
 
-          {/* Variants */}
           <div className="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-white/50">Tailles & couleurs</h4>
-            <label className="text-xs text-white/50 block">
-              Tailles (séparées par des virgules)
+            <h4 className="text-xs font-bold uppercase tracking-wider text-white/50">Tailles &amp; couleurs</h4>
+            <Field label="Tailles (virgules)">
               <input
                 value={draft.sizes}
                 onChange={(e) => onChange({ ...draft, sizes: e.target.value })}
                 placeholder="39, 40, 41, 42, 43, 44, 45"
-                className="mt-1 w-full rounded-xl bg-white/10 border border-white/10 px-4 py-2.5 text-sm text-white outline-none"
+                className={inputCls(false)}
               />
-            </label>
-            <label className="text-xs text-white/50 block">
-              Couleurs (ordre 1:1 avec les photos)
+            </Field>
+            <Field label="Couleurs (ordre 1:1 avec les photos)">
               <input
                 value={draft.colors}
                 onChange={(e) => onChange({ ...draft, colors: e.target.value })}
                 placeholder="Black, White, Red"
-                className="mt-1 w-full rounded-xl bg-white/10 border border-white/10 px-4 py-2.5 text-sm text-white outline-none"
+                className={inputCls(false)}
               />
-            </label>
+            </Field>
           </div>
 
-          {/* Photos */}
           <div className="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-3">
             <h4 className="text-xs font-bold uppercase tracking-wider text-white/50">Photos produit</h4>
             <ImageUploader
@@ -830,32 +956,43 @@ const ProductEditDrawer = memo(function ProductEditDrawer({
               maxSize={800}
               quality={0.75}
               label="Images"
-              hint="Glisse-dépose, colle (Ctrl+V), clique ou ajoute une URL. Les fichiers sont compressés puis uploadés sur Supabase Storage. L'ordre des photos correspond 1:1 à l'ordre des couleurs ci-dessus."
+              hint="Glisse-dépose, colle (Ctrl+V), clique ou ajoute une URL. Ordre 1:1 avec les couleurs."
             />
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between gap-3 p-5 border-t border-white/10 bg-black/20">
-          <button
-            onClick={onAutoPrice}
-            className="rounded-full bg-white/5 hover:bg-white/10 px-4 py-2.5 text-xs font-semibold text-white/70 transition-colors"
-          >
-            Prix automatique
-          </button>
+        <div className="flex items-center justify-between gap-2 p-4 sm:p-5 border-t border-white/10 bg-black/20 flex-shrink-0">
           <div className="flex items-center gap-2">
             <button
-              onClick={onClose}
+              onClick={onAutoPrice}
+              className="rounded-full bg-white/5 hover:bg-white/10 px-4 py-2.5 text-xs font-semibold text-white/70 transition-colors inline-flex items-center gap-1.5"
+            >
+              <RotateCcw size={12} /> Prix auto
+            </button>
+            {onDuplicate && !isNew && (
+              <button
+                onClick={() => onDuplicate(draft)}
+                className="rounded-full bg-white/5 hover:bg-white/10 px-4 py-2.5 text-xs font-semibold text-white/70 transition-colors hidden sm:inline-flex items-center gap-1.5"
+              >
+                <Copy size={12} /> Dupliquer
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleClose}
               className="rounded-full bg-white/5 hover:bg-white/10 px-4 py-2.5 text-sm font-semibold text-white/60 transition-colors"
             >
               Annuler
             </button>
             <button
               onClick={onSave}
-              className="inline-flex items-center gap-2 rounded-full bg-accent hover:bg-accent/90 px-5 py-2.5 text-sm font-bold text-white transition-colors"
+              disabled={!canSave}
+              className="inline-flex items-center gap-2 rounded-full bg-accent hover:bg-accent hover:brightness-110/90 disabled:bg-white/10 disabled:text-white/30 px-5 py-2.5 text-sm font-bold text-white transition-colors"
             >
               <Save size={14} />
-              {isNew ? 'Créer le produit' : 'Enregistrer'}
+              {isNew ? 'Créer' : 'Enregistrer'}
+              <span className="hidden sm:inline text-xs opacity-60 font-normal ml-1">⌘S</span>
             </button>
           </div>
         </div>
@@ -863,6 +1000,7 @@ const ProductEditDrawer = memo(function ProductEditDrawer({
     </div>
   );
 });
+
 
 // ────────────────────────────────────────────────────────────────────────────
 // OrderCard (mémoïsé)
@@ -993,7 +1131,7 @@ const OrderCard = memo(function OrderCard({ order, product, margin, copied, copi
       <div className="flex flex-wrap gap-2 mt-5">
         <button
           onClick={() => onCopyOrder(order)}
-          className="inline-flex items-center gap-2 rounded-full bg-dark px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-white hover:bg-accent transition-colors"
+          className="inline-flex items-center gap-2 rounded-full bg-dark px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-white hover:bg-accent hover:brightness-110 transition-colors"
         >
           <Copy size={14} /> {copied ? 'Copie !' : 'Mulebuy'}
         </button>
@@ -1049,9 +1187,25 @@ export default function AdminPanel() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerIsNew, setDrawerIsNew] = useState(false);
   const [drawerDraft, setDrawerDraft] = useState<Product | null>(null);
+  const [drawerOriginal, setDrawerOriginal] = useState<Product | null>(null);
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [productSearch, setProductSearch] = useState('');
+  const debouncedProductSearch = useDebounce(productSearch, 180);
+  type ProductFilter = 'all' | 'active' | 'low_margin' | 'link_dead' | 'paused' | 'no_photo';
+  type ProductSort = 'name' | 'price_desc' | 'margin_desc' | 'margin_asc' | 'orders_desc' | 'recent';
+  const [productFilter, setProductFilter] = useState<ProductFilter>('all');
+  const [productSort, setProductSort] = useState<ProductSort>('name');
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  const [filterMenuOpen, setFilterMenuOpen] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    title: string;
+    message?: string;
+    confirmLabel?: string;
+    tone?: 'danger' | 'accent';
+    onConfirm?: () => void;
+  }>({ open: false, title: '' });
   const [selectedEstimateProduct, setSelectedEstimateProduct] = useState<string>('');
   const [newOrder, setNewOrder] = useState<Omit<Order, 'id' | 'status'>>({
     productId: products[0]?.id || '',
@@ -1096,17 +1250,73 @@ export default function AdminPanel() {
     );
   }, [products]);
 
-  // Recherche / filtre produits
+  // Compte de commandes par produit (pour le badge 🔥)
+  const ordersCountByProduct = useMemo(() => {
+    const map = new Map<string, number>();
+    orders.forEach((o) => {
+      if (o.items && o.items.length > 1) {
+        o.items.forEach((it) => map.set(it.productId, (map.get(it.productId) || 0) + it.quantity));
+      } else {
+        map.set(o.productId, (map.get(o.productId) || 0) + o.quantity);
+      }
+    });
+    return map;
+  }, [orders]);
+
+  // Filtre + tri + recherche produits (debounced pour la recherche)
   const filteredProducts = useMemo(() => {
-    const q = productSearch.trim().toLowerCase();
-    if (!q) return products;
-    return products.filter((p) =>
-      p.brand.toLowerCase().includes(q) ||
-      p.name.toLowerCase().includes(q) ||
-      p.category.toLowerCase().includes(q) ||
-      p.sourceUrl.toLowerCase().includes(q),
-    );
-  }, [products, productSearch]);
+    const q = debouncedProductSearch.trim().toLowerCase();
+    let list = products;
+    if (q) {
+      list = list.filter((p) =>
+        p.brand.toLowerCase().includes(q) ||
+        p.name.toLowerCase().includes(q) ||
+        p.category.toLowerCase().includes(q) ||
+        p.sourceUrl.toLowerCase().includes(q),
+      );
+    }
+    if (productFilter !== 'all') {
+      list = list.filter((p) => {
+        const m = estimateNetMargin(p).net;
+        const firstImg = p.imageUrl.split('|').map((s) => s.trim()).find(Boolean);
+        if (productFilter === 'active') return p.status === 'active';
+        if (productFilter === 'link_dead') return p.status === 'link_dead';
+        if (productFilter === 'paused') return p.status === 'paused';
+        if (productFilter === 'low_margin') return p.status === 'active' && m < 20;
+        if (productFilter === 'no_photo') return !firstImg;
+        return true;
+      });
+    }
+    const sorted = [...list];
+    switch (productSort) {
+      case 'price_desc': sorted.sort((a, b) => b.salePrice - a.salePrice); break;
+      case 'margin_desc': sorted.sort((a, b) => estimateNetMargin(b).net - estimateNetMargin(a).net); break;
+      case 'margin_asc': sorted.sort((a, b) => estimateNetMargin(a).net - estimateNetMargin(b).net); break;
+      case 'orders_desc': sorted.sort((a, b) => (ordersCountByProduct.get(b.id) || 0) - (ordersCountByProduct.get(a.id) || 0)); break;
+      case 'recent': sorted.sort((a, b) => (b.id > a.id ? 1 : -1)); break;
+      case 'name':
+      default: sorted.sort((a, b) => {
+        const an = `${a.brand} ${a.name}`.toLowerCase();
+        const bn = `${b.brand} ${b.name}`.toLowerCase();
+        return an.localeCompare(bn, 'fr');
+      });
+    }
+    return sorted;
+  }, [products, debouncedProductSearch, productFilter, productSort, ordersCountByProduct]);
+
+  // Compteurs pour les filtres
+  const productCounts = useMemo(() => {
+    const c = { all: products.length, active: 0, low_margin: 0, link_dead: 0, paused: 0, no_photo: 0 };
+    products.forEach((p) => {
+      const firstImg = p.imageUrl.split('|').map((s) => s.trim()).find(Boolean);
+      if (p.status === 'active') c.active++;
+      if (p.status === 'link_dead') c.link_dead++;
+      if (p.status === 'paused') c.paused++;
+      if (p.status === 'active' && estimateNetMargin(p).net < 20) c.low_margin++;
+      if (!firstImg) c.no_photo++;
+    });
+    return c;
+  }, [products]);
 
   // ── Supabase load ──
   const loadAll = useCallback(async () => {
@@ -1186,24 +1396,89 @@ export default function AdminPanel() {
     showToast('Mise à jour réussie ✓');
   };
 
+  // Supprime un produit AVEC confirmation (via dialog custom) + undo (6s) + nettoyage
+  // des fichiers orphelins dans Supabase Storage.
   const removeProduct = useCallback(async (id: string) => {
-    await dbDeleteProduct(id);
-    setProducts((prev) => prev.filter((p) => p.id !== id));
-    // Ferme le drawer si on supprime le produit en cours d'édition
-    if (drawerDraft?.id === id) {
-      setDrawerOpen(false);
-      setDrawerDraft(null);
-    }
-    window.dispatchEvent(new CustomEvent('tof-products-updated'));
-    showToast('Produit supprimé ✓');
-    playDelete();
+    setConfirmDialog({
+      open: true,
+      title: 'Supprimer ce produit ?',
+      message: 'Cette action est irréversible. Tu peux annuler dans les 6 secondes qui suivent.',
+      confirmLabel: 'Supprimer',
+      tone: 'danger',
+      onConfirm: async () => {
+        setConfirmDialog((c) => ({ ...c, open: false }));
+        // Copie avant suppression pour permettre l'undo
+        const deleted = productsRef.current.find((p) => p.id === id);
+        const snapshot = productsRef.current;
+        await dbDeleteProduct(id);
+        setProducts((prev) => prev.filter((p) => p.id !== id));
+        if (drawerDraft?.id === id) {
+          setDrawerOpen(false);
+          setDrawerDraft(null);
+          setDrawerOriginal(null);
+        }
+        window.dispatchEvent(new CustomEvent('tof-products-updated'));
+        playDelete();
+        // Nettoyage des images orphelines dans Storage (meilleur effort, pas de throw si erreur)
+        if (deleted?.imageUrl) {
+          try {
+            const paths = deleted.imageUrl
+              .split('|')
+              .map((u) => u.trim())
+              .filter(Boolean)
+              .filter(isStorageUrl)
+              .map(pathFromStorageUrl)
+              .filter((p): p is string => Boolean(p));
+            if (paths.length > 0) deleteProductImages(paths).catch(() => { /* silent */ });
+          } catch { /* ignore */ }
+        }
+        // Toast avec undo
+        showActionToast(
+          `"${deleted?.brand ?? ''} ${deleted?.name ?? ''}" supprimé`,
+          'Annuler',
+          async () => {
+            if (!deleted) return;
+            try {
+              await upsertProduct(productToDb(deleted));
+              setProducts(snapshot.includes(deleted) ? snapshot : [deleted, ...snapshot]);
+              showToast('Produit restauré ✓');
+            } catch {
+              showToast('Impossible de restaurer', 'error');
+            }
+          },
+          6500,
+        );
+      },
+    });
   }, [drawerDraft]);
+
+  const duplicateProduct = useCallback((source: Product) => {
+    const copy: Product = {
+      ...source,
+      id: `p${Date.now()}`,
+      name: source.name ? `${source.name} (copie)` : 'Copie',
+      imageUrl: '', // on repart sans les photos pour éviter les collisions/confusion
+    };
+    void saveProducts((prev) => [copy, ...prev], copy);
+    setSelectedEstimateProduct(copy.id);
+    setNewOrder((prev) => ({ ...prev, productId: copy.id }));
+    // Ouvre directement le drawer sur la copie
+    setDrawerIsNew(false);
+    setDrawerOriginal(null);
+    setDrawerDraft({ ...copy });
+    setDrawerOpen(true);
+    showToast('Produit dupliqué ✓');
+  }, []);
 
   // ── Drawer handlers ──
   const openEditDrawer = useCallback((product: Product) => {
     setDrawerIsNew(false);
+    setDrawerOriginal({ ...product });
     setDrawerDraft({ ...product });
     setDrawerOpen(true);
+    // Ferme les menus filtres/tri si ouverts
+    setFilterMenuOpen(false);
+    setSortMenuOpen(false);
   }, []);
 
   const openCreateDrawer = useCallback(() => {
@@ -1226,41 +1501,73 @@ export default function AdminPanel() {
       status: 'active',
     };
     setDrawerIsNew(true);
+    setDrawerOriginal(null);
     setDrawerDraft(blank);
     setDrawerOpen(true);
+    setFilterMenuOpen(false);
+    setSortMenuOpen(false);
   }, []);
 
   const closeDrawer = useCallback(() => {
     setDrawerOpen(false);
-    // On ne nettoie pas le draft immédiatement pour éviter un flash à la fermeture
-    setTimeout(() => setDrawerDraft(null), 200);
+    setTimeout(() => {
+      setDrawerDraft(null);
+      setDrawerOriginal(null);
+    }, 220);
   }, []);
 
-  // Refs pour lire les valeurs à jour dans saveDrawerSave sans casser le callback
+  // Refs pour lire les valeurs à jour dans les callbacks sans casser la stabilité
   const drawerDraftRef = useRef(drawerDraft);
   drawerDraftRef.current = drawerDraft;
   const drawerIsNewRef = useRef(drawerIsNew);
   drawerIsNewRef.current = drawerIsNew;
+  const drawerOriginalRef = useRef(drawerOriginal);
+  drawerOriginalRef.current = drawerOriginal;
   const productsRef = useRef(products);
   productsRef.current = products;
   const siteSettingsRef = useRef(siteSettings);
   siteSettingsRef.current = siteSettings;
 
+  // Quand on sauvegarde un produit, si imageUrl a changé, on supprime les anciennes
+  // images Storage qui ne sont plus référencées (nettoyage orphelins).
   const saveDrawer = useCallback(() => {
     const draft = drawerDraftRef.current;
+    const original = drawerOriginalRef.current;
     if (!draft) return;
+    // Validation
+    if (!draft.brand.trim() || !draft.name.trim() || draft.salePrice <= 0) return;
+
+    // Nettoyage des orphelins Storage si on a remplacé/supprimé des images
+    if (original && original.imageUrl !== draft.imageUrl) {
+      try {
+        const newUrls = new Set(
+          draft.imageUrl.split('|').map((u) => u.trim()).filter(Boolean),
+        );
+        const toDelete = original.imageUrl
+          .split('|')
+          .map((u) => u.trim())
+          .filter(Boolean)
+          .filter((u) => isStorageUrl(u) && !newUrls.has(u))
+          .map(pathFromStorageUrl)
+          .filter((p): p is string => Boolean(p));
+        if (toDelete.length > 0) deleteProductImages(toDelete).catch(() => { /* silent */ });
+      } catch { /* ignore */ }
+    }
+
     if (drawerIsNewRef.current) {
-      // Création
       setSelectedEstimateProduct(draft.id);
       setNewOrder((prev) => ({ ...prev, productId: draft.id }));
       void saveProducts((prev) => [draft, ...prev], draft);
+      showToast('Produit créé ✓');
     } else {
-      // Mise à jour
       const next = productsRef.current.map((p) => (p.id === draft.id ? draft : p));
       void saveProducts(next, draft);
     }
     setDrawerOpen(false);
-    setTimeout(() => setDrawerDraft(null), 200);
+    setTimeout(() => {
+      setDrawerDraft(null);
+      setDrawerOriginal(null);
+    }, 220);
   }, []);
 
   const autoPriceDrawer = useCallback(() => {
@@ -1615,6 +1922,50 @@ export default function AdminPanel() {
     return `https://wa.me/${phone}?text=${text}`;
   }, [clientMessage]);
 
+  // Refs pour les raccourcis clavier
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Raccourcis clavier globaux (hors drawer qui a ses propres handlers)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      const inField = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable;
+      if (inField) return;
+      // "/" focus la recherche produit si on est sur l'onglet produits
+      if (e.key === '/' && activeTab === 'products' && !drawerOpen) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+      // "n" nouveau produit
+      if ((e.key === 'n' || e.key === 'N') && activeTab === 'products' && !drawerOpen) {
+        e.preventDefault();
+        openCreateDrawer();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [activeTab, drawerOpen, openCreateDrawer]);
+
+  // Fermeture des menus déroulants filtre/tri au clic extérieur
+  useEffect(() => {
+    if (!filterMenuOpen && !sortMenuOpen) return;
+    const close = (e: MouseEvent) => {
+      const t = e.target as HTMLElement;
+      if (t.closest('[data-filter-menu]') || t.closest('[data-sort-menu]')) return;
+      setFilterMenuOpen(false);
+      setSortMenuOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [filterMenuOpen, sortMenuOpen]);
+
+  // Nombre de commandes nécessitant une action (pour le badge sur l'onglet)
+  const ordersNeedingAction = useMemo(
+    () => orders.filter((o) => o.status === 'new' || o.status === 'to_order').length,
+    [orders],
+  );
+
   if (!isAdminAuthed) {
     return (
       <div className="p-10 text-center bg-dark min-h-screen">
@@ -1652,10 +2003,10 @@ export default function AdminPanel() {
           </div>
         </div>
 
-        <div className="flex gap-2 mb-6 overflow-x-auto pb-2 -mx-1 px-1">
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-thin">
           {[
             { id: 'dashboard', label: 'Dashboard' },
-            { id: 'orders', label: 'Commandes' },
+            { id: 'orders', label: 'Commandes', badge: ordersNeedingAction },
             { id: 'products', label: 'Produits & liens' },
             { id: 'drop', label: 'Drop semaine' },
             { id: 'promos', label: 'Promos' },
@@ -1663,17 +2014,27 @@ export default function AdminPanel() {
             { id: 'chat', label: 'Chat' },
             { id: 'notes', label: 'Notes & idées' },
             { id: 'estimate', label: 'Estimation livraison' },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as typeof activeTab)}
-              className={`rounded-full px-4 py-2.5 text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap flex-shrink-0 ${
-                activeTab === tab.id ? 'bg-accent text-white' : 'bg-white/5 text-white/45 hover:bg-white/10'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+          ].map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                className={`relative rounded-full px-4 py-2.5 text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap flex-shrink-0 inline-flex items-center gap-2 ${
+                  isActive ? 'bg-accent text-white' : 'bg-white/5 text-white/45 hover:bg-white/10'
+                }`}
+              >
+                <span>{tab.label}</span>
+                {tab.badge && tab.badge > 0 && (
+                  <span className={`h-5 min-w-5 px-1.5 rounded-full text-[10px] font-800 inline-flex items-center justify-center ${
+                    isActive ? 'bg-white/20 text-white' : 'bg-accent text-white'
+                  }`}>
+                    {tab.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {activeTab === 'dashboard' && (
@@ -1896,7 +2257,7 @@ export default function AdminPanel() {
                   <input className="rounded-xl bg-white/10 border border-white/10 px-4 py-3 text-sm outline-none" placeholder="Code postal" value={newOrder.zip} onChange={(e) => setNewOrder({ ...newOrder, zip: e.target.value })} />
                 </div>
                 <input className="w-full rounded-xl bg-white/10 border border-white/10 px-4 py-3 text-sm outline-none" placeholder="Snap ou WhatsApp" value={newOrder.snapOrWhatsapp} onChange={(e) => setNewOrder({ ...newOrder, snapOrWhatsapp: e.target.value })} />
-                <button onClick={addOrder} className="w-full rounded-full bg-accent px-5 py-3 text-sm font-bold text-white hover:bg-accent-light transition-colors">
+                <button onClick={addOrder} className="w-full rounded-full bg-accent px-5 py-3 text-sm font-bold text-white hue-rotate-0 hover:brightness-110 transition-colors">
                     Créer la commande
                 </button>
               </div>
@@ -1905,143 +2266,245 @@ export default function AdminPanel() {
         )}
 
         {activeTab === 'products' && (
-          <div className="rounded-3xl bg-white text-dark overflow-hidden">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 border-b border-dark/5">
+          <div className="rounded-3xl bg-white text-dark overflow-hidden flex flex-col">
+            {/* Sticky header : titre + bouton nouveau */}
+            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 sm:p-5 border-b border-dark/5">
               <div>
-                <h3 className="font-bold">Produits source</h3>
-                <p className="text-sm text-dark/40">Clique sur <b>Modifier</b> pour éditer un produit en détail. Ajout rapide ci-dessous.</p>
+                <h3 className="font-bold">Catalogue produits</h3>
+                <p className="text-xs sm:text-sm text-dark/40">
+                  {productCounts.active} actifs · {productCounts.low_margin} marges faibles · {productCounts.link_dead} liens sautés
+                  <span className="hidden sm:inline"> ·</span>
+                  <kbd className="ml-0.5 sm:ml-1.5 hidden sm:inline text-[10px] px-1.5 py-0.5 rounded bg-dark/5 text-dark/50 font-mono">/</kbd>
+                  <span className="hidden sm:inline text-dark/35 text-xs"> rechercher ·</span>
+                  <kbd className="ml-0.5 sm:ml-1.5 hidden sm:inline text-[10px] px-1.5 py-0.5 rounded bg-dark/5 text-dark/50 font-mono">N</kbd>
+                  <span className="hidden sm:inline text-dark/35 text-xs"> nouveau</span>
+                </p>
               </div>
-              <button onClick={openCreateDrawer} className="inline-flex items-center gap-2 rounded-full bg-dark px-5 py-3 text-sm font-semibold text-white hover:bg-accent transition-colors self-start sm:self-auto">
+              <button onClick={openCreateDrawer} className="inline-flex items-center gap-2 rounded-full bg-dark px-5 py-2.5 sm:py-3 text-sm font-semibold text-white hover:bg-accent hover:brightness-110 transition-colors self-start sm:self-auto flex-shrink-0">
                 <Plus size={15} /> Nouveau produit
               </button>
             </div>
 
-            {/* Barre de recherche */}
-            <div className="p-4 sm:p-5 border-b border-dark/5 bg-bg/40">
+            {/* Barre recherche + filtres + tri */}
+            <div className="sticky top-[72px] sm:top-[76px] z-10 bg-white/95 backdrop-blur border-b border-dark/5 p-3 sm:p-4 flex flex-col gap-2">
               <div className="relative">
                 <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-dark/25" />
                 <input
+                  ref={searchInputRef}
                   type="search"
                   value={productSearch}
                   onChange={(e) => setProductSearch(e.target.value)}
                   placeholder={`Rechercher parmi ${products.length} produits (marque, nom, catégorie, lien)…`}
-                  className="w-full rounded-xl bg-white pl-11 pr-4 py-3 text-sm outline-none border border-dark/5 focus:border-accent/40 transition-colors"
+                  className="w-full rounded-xl bg-bg pl-11 pr-20 py-2.5 text-sm outline-none border border-dark/5 focus:border-accent/40 transition-colors"
                 />
                 {productSearch && (
                   <button
                     type="button"
                     onClick={() => setProductSearch('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 h-7 w-7 rounded-full text-dark/30 hover:text-dark/60 hover:bg-dark/5 text-xs font-bold flex items-center justify-center"
-                    aria-label="Effacer la recherche"
-                  >
-                    ✕
-                  </button>
+                    className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 rounded-full text-dark/30 hover:text-dark/60 hover:bg-dark/5 text-xs font-bold flex items-center justify-center"
+                    aria-label="Effacer"
+                  >✕</button>
+                )}
+                {!productSearch && (
+                  <span className="hidden sm:inline absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-dark/25 border border-dark/10 rounded px-1.5 py-0.5">/</span>
                 )}
               </div>
-              {productSearch && (
-                <p className="mt-2 text-[11px] text-dark/40">
+
+              <div className="flex items-center justify-between gap-2">
+                {/* Chips filtres (scrollable horizontalement sur mobile) */}
+                <div className="flex gap-1.5 overflow-x-auto pb-0.5 -mx-1 px-1 flex-1 min-w-0">
+                  {([
+                    { id: 'all',        label: 'Tous',       count: productCounts.all },
+                    { id: 'active',     label: 'Actifs',     count: productCounts.active },
+                    { id: 'low_margin', label: 'À surveiller', count: productCounts.low_margin },
+                    { id: 'link_dead',  label: 'Lien sauté', count: productCounts.link_dead },
+                    { id: 'no_photo',   label: 'Sans photo', count: productCounts.no_photo },
+                    { id: 'paused',     label: 'Pause',      count: productCounts.paused },
+                  ] as { id: ProductFilter; label: string; count: number }[]).map((f) => {
+                    const active = productFilter === f.id;
+                    return (
+                      <button
+                        key={f.id}
+                        onClick={() => setProductFilter(f.id)}
+                        className={`flex-shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors inline-flex items-center gap-1.5 ${
+                          active ? 'bg-dark text-white' : 'bg-dark/5 text-dark/55 hover:bg-dark/10'
+                        }`}
+                      >
+                        {f.label}
+                        <span className={`text-[10px] font-800 rounded-full px-1.5 py-0.5 ${active ? 'bg-white/20' : 'bg-dark/10 text-dark/40'}`}>
+                          {f.count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Menu tri */}
+                <div className="relative flex-shrink-0" data-sort-menu>
+                  <button
+                    onClick={() => { setSortMenuOpen((v) => !v); setFilterMenuOpen(false); }}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-dark/5 hover:bg-dark/10 px-3 py-1.5 text-xs font-semibold text-dark/60 transition-colors"
+                  >
+                    <ArrowUpDown size={13} />
+                    <span className="hidden sm:inline">
+                      {({
+                        name: 'Nom',
+                        price_desc: 'Prix ↓',
+                        margin_desc: 'Marge ↓',
+                        margin_asc: 'Marge ↑',
+                        orders_desc: 'Populaires',
+                        recent: 'Récents',
+                      } as Record<ProductSort, string>)[productSort]}
+                    </span>
+                  </button>
+                  {sortMenuOpen && (
+                    <div className="absolute right-0 top-full mt-1 w-44 rounded-xl bg-neutral-800 border border-white/10 shadow-2xl shadow-black/40 py-1 z-30">
+                      {([
+                        { id: 'name',        label: 'Nom (A→Z)' },
+                        { id: 'orders_desc', label: 'Les plus vendus' },
+                        { id: 'margin_desc', label: 'Meilleure marge' },
+                        { id: 'margin_asc',  label: 'Marge faible' },
+                        { id: 'price_desc',  label: 'Prix élevé' },
+                        { id: 'recent',      label: 'Plus récents' },
+                      ] as { id: ProductSort; label: string }[]).map((o) => (
+                        <button
+                          key={o.id}
+                          onClick={() => { setProductSort(o.id); setSortMenuOpen(false); }}
+                          className={`w-full text-left px-3 py-2 text-xs font-semibold transition-colors ${
+                            productSort === o.id ? 'bg-accent text-white' : 'text-white/80 hover:bg-white/10'
+                          }`}
+                        >
+                          {o.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {(productSearch || productFilter !== 'all') && (
+                <p className="text-[11px] text-dark/40">
                   {filteredProducts.length} résultat{filteredProducts.length > 1 ? 's' : ''} sur {products.length}
+                  {productSearch && <> · recherche "<span className="font-semibold text-dark/60">{productSearch}</span>"</>}
+                  {productFilter !== 'all' && <> · filtre <span className="font-semibold text-dark/60">
+                    {({ all: 'tous', active: 'actifs', low_margin: 'à surveiller', link_dead: 'lien sauté', paused: 'pause', no_photo: 'sans photo' } as Record<ProductFilter, string>)[productFilter]}
+                  </span></>}
+                  <button
+                    onClick={() => { setProductSearch(''); setProductFilter('all'); }}
+                    className="ml-2 text-accent font-bold underline-offset-2 hover:underline"
+                  >
+                    Réinitialiser
+                  </button>
                 </p>
               )}
             </div>
 
-            {/* Ajout rapide */}
-            <div className="p-4 sm:p-5 border-b border-dark/5 bg-bg/60">
-              <h4 className="font-bold mb-1">Ajout rapide</h4>
-              <p className="text-xs text-dark/40 mb-4">Remplis le minimum, le reste se calcule tout seul. Pour plus de détails, ouvre la fiche produit via Modifier.</p>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
-                <input value={quickProduct.brand} onChange={(e) => setQuickProduct({ ...quickProduct, brand: e.target.value })} placeholder="Marque *" className="rounded-xl bg-white px-4 py-3 text-sm outline-none border border-dark/5" />
-                <input value={quickProduct.name} onChange={(e) => setQuickProduct({ ...quickProduct, name: e.target.value })} placeholder="Nom produit *" className="rounded-xl bg-white px-4 py-3 text-sm outline-none border border-dark/5 sm:col-span-2" />
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mt-2">
-                <select value={quickProduct.gender} onChange={(e) => setQuickProduct({ ...quickProduct, gender: e.target.value as Product['gender'] })} className="rounded-xl bg-white px-3 py-3 text-sm outline-none border border-dark/5">
-                  <option value="homme">Homme</option>
-                  <option value="femme">Femme</option>
-                  <option value="mixte">Mixte</option>
-                </select>
-                <select value={quickProduct.category} onChange={(e) => updateQuickPreset(e.target.value)} className="rounded-xl bg-white px-3 py-3 text-sm outline-none border border-dark/5">
-                  {categoryPresets.map((p) => <option key={p.label} value={p.label}>{p.label}</option>)}
-                </select>
-                <input type="number" value={quickProduct.sourcePriceCny} onChange={(e) => {
-                  const v = Number(e.target.value);
-                  setQuickProduct({ ...quickProduct, sourcePriceCny: v, salePrice: suggestedSalePrice(v, quickProduct.weightGrams, quickProduct.packaging) });
-                }} placeholder="Prix ¥ *" className="rounded-xl bg-white px-4 py-3 text-sm outline-none border border-dark/5" />
-                <div className="flex gap-1.5">
-                  <input type="number" value={quickProduct.salePrice} onChange={(e) => setQuickProduct({ ...quickProduct, salePrice: Number(e.target.value) })} placeholder="Prix €" className="rounded-xl bg-white px-4 py-3 text-sm outline-none border border-dark/5 flex-1 min-w-0" />
-                  <button onClick={autoPriceQuickProduct} className="rounded-xl bg-accent text-white px-3 py-3 text-xs font-bold hover:bg-accent-light transition-colors flex-shrink-0">
-                    Auto
+            {/* Bloc ajout rapide */}
+            <details className="group border-b border-dark/5 bg-bg/30 open:bg-bg/60">
+              <summary className="cursor-pointer list-none p-4 sm:p-5 flex items-center justify-between gap-3 select-none">
+                <div>
+                  <h4 className="font-bold text-sm">Ajout rapide</h4>
+                  <p className="text-xs text-dark/40 mt-0.5">Remplis le minimum. Pour plus de détails, ouvre la fiche via Modifier.</p>
+                </div>
+                <span className="text-xs font-bold text-dark/40 group-open:rotate-180 transition-transform">▾</span>
+              </summary>
+              <div className="p-4 sm:p-5 pt-0 space-y-2 sm:space-y-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
+                  <input value={quickProduct.brand} onChange={(e) => setQuickProduct({ ...quickProduct, brand: e.target.value })} placeholder="Marque *" className="rounded-xl bg-white px-3 sm:px-4 py-2.5 sm:py-3 text-sm outline-none border border-dark/5" />
+                  <input value={quickProduct.name} onChange={(e) => setQuickProduct({ ...quickProduct, name: e.target.value })} placeholder="Nom produit *" className="rounded-xl bg-white px-3 sm:px-4 py-2.5 sm:py-3 text-sm outline-none border border-dark/5 sm:col-span-2" />
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+                  <select value={quickProduct.gender} onChange={(e) => setQuickProduct({ ...quickProduct, gender: e.target.value as Product['gender'] })} className="rounded-xl bg-white px-3 py-2.5 sm:py-3 text-sm outline-none border border-dark/5">
+                    <option value="homme">Homme</option>
+                    <option value="femme">Femme</option>
+                    <option value="mixte">Mixte</option>
+                  </select>
+                  <select value={quickProduct.category} onChange={(e) => updateQuickPreset(e.target.value)} className="rounded-xl bg-white px-3 py-2.5 sm:py-3 text-sm outline-none border border-dark/5">
+                    {categoryPresets.map((p) => <option key={p.label} value={p.label}>{p.label}</option>)}
+                  </select>
+                  <input type="number" value={quickProduct.sourcePriceCny} onChange={(e) => {
+                    const v = Number(e.target.value);
+                    setQuickProduct({ ...quickProduct, sourcePriceCny: v, salePrice: suggestedSalePrice(v, quickProduct.weightGrams, quickProduct.packaging) });
+                  }} placeholder="Prix ¥ *" className="rounded-xl bg-white px-3 sm:px-4 py-2.5 sm:py-3 text-sm outline-none border border-dark/5" />
+                  <div className="flex gap-1.5">
+                    <input type="number" value={quickProduct.salePrice} onChange={(e) => setQuickProduct({ ...quickProduct, salePrice: Number(e.target.value) })} placeholder="Prix €" className="rounded-xl bg-white px-3 sm:px-4 py-2.5 sm:py-3 text-sm outline-none border border-dark/5 flex-1 min-w-0" />
+                    <button onClick={autoPriceQuickProduct} className="rounded-xl bg-accent text-white px-3 py-2.5 sm:py-3 text-xs font-bold hue-rotate-0 hover:brightness-110 transition-colors flex-shrink-0">Auto</button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                  <input value={quickProduct.sizes} onChange={(e) => setQuickProduct({ ...quickProduct, sizes: e.target.value })} placeholder="Tailles" className="rounded-xl bg-white px-3 sm:px-4 py-2.5 sm:py-3 text-sm outline-none border border-dark/5" />
+                  <input value={quickProduct.colors} onChange={(e) => setQuickProduct({ ...quickProduct, colors: e.target.value })} placeholder="Couleurs" className="rounded-xl bg-white px-3 sm:px-4 py-2.5 sm:py-3 text-sm outline-none border border-dark/5" />
+                </div>
+                <input
+                  value={quickProduct.sourceUrl}
+                  onChange={(e) => setQuickProduct({ ...quickProduct, sourceUrl: e.target.value })}
+                  placeholder="Lien 1688 / Taobao / Weidian *"
+                  className="rounded-xl bg-white px-3 sm:px-4 py-2.5 sm:py-3 text-sm outline-none border border-dark/5 w-full"
+                />
+                <div>
+                  <ImageUploader
+                    value={quickProduct.imageUrl}
+                    onChange={(next) => setQuickProduct((prev) => ({ ...prev, imageUrl: next }))}
+                    uploadHandler={productImageUploadHandler}
+                    multiple={false}
+                    maxSize={800}
+                    quality={0.75}
+                    label="Photo"
+                    hint="Glisse, colle ou clique. Stockée sur Supabase Storage."
+                    dropHeightClass="min-h-[80px]"
+                  />
+                </div>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-1">
+                  {(() => {
+                    const preview: Product = { ...quickProduct, id: 'preview', status: 'active' };
+                    const margin = estimateNetMargin(preview);
+                    return (
+                      <div className="flex flex-wrap gap-2 text-[11px]">
+                        <span className="rounded-full bg-white px-2.5 py-1 text-dark/40">{margin.effectiveWeight}g</span>
+                        <span className="rounded-full bg-white px-2.5 py-1 text-dark/40">Livr. {euro(margin.shippingWithSafety)}</span>
+                        <span className={`rounded-full px-2.5 py-1 font-bold ${marginTone(margin.net)}`}>Marge {euro(margin.net)}</span>
+                      </div>
+                    );
+                  })()}
+                  <button onClick={addQuickProduct} className="rounded-xl bg-accent px-6 py-2.5 sm:py-3 text-sm font-bold text-white hue-rotate-0 hover:brightness-110 transition-colors w-full sm:w-auto">
+                    Ajouter au shop
                   </button>
                 </div>
               </div>
+            </details>
 
-              <div className="grid grid-cols-2 gap-2 sm:gap-3 mt-2">
-                <input value={quickProduct.sizes} onChange={(e) => setQuickProduct({ ...quickProduct, sizes: e.target.value })} placeholder="Tailles (auto selon catégorie)" className="rounded-xl bg-white px-4 py-3 text-sm outline-none border border-dark/5" />
-                <input value={quickProduct.colors} onChange={(e) => setQuickProduct({ ...quickProduct, colors: e.target.value })} placeholder="Couleurs" className="rounded-xl bg-white px-4 py-3 text-sm outline-none border border-dark/5" />
-              </div>
-
-              <input
-                value={quickProduct.sourceUrl}
-                onChange={(e) => setQuickProduct({ ...quickProduct, sourceUrl: e.target.value })}
-                placeholder="Lien 1688 / Taobao / Weidian *"
-                className="rounded-xl bg-white px-4 py-3 text-sm outline-none border border-dark/5 mt-2 w-full"
-              />
-
-              <div className="mt-2">
-                <ImageUploader
-                  value={quickProduct.imageUrl}
-                  onChange={(next) => setQuickProduct((prev) => ({ ...prev, imageUrl: next }))}
-                  uploadHandler={productImageUploadHandler}
-                  multiple={false}
-                  maxSize={800}
-                  quality={0.75}
-                  label="Photo produit"
-                  hint="Glisse-dépose, colle (Ctrl+V) ou clique pour uploader. Une seule photo pour l'ajout rapide. Stockée sur Supabase Storage."
-                  dropHeightClass="min-h-[80px]"
-                />
-              </div>
-
-              <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                {(() => {
-                  const preview: Product = { ...quickProduct, id: 'preview', status: 'active' };
-                  const margin = estimateNetMargin(preview);
-                  return (
-                    <div className="flex flex-wrap gap-2 text-[11px]">
-                      <span className="rounded-full bg-white px-2.5 py-1 text-dark/40">{margin.effectiveWeight}g</span>
-                      <span className="rounded-full bg-white px-2.5 py-1 text-dark/40">Livr. {euro(margin.shippingWithSafety)}</span>
-                      <span className={`rounded-full px-2.5 py-1 font-bold ${marginTone(margin.net)}`}>Marge {euro(margin.net)}</span>
-                    </div>
-                  );
-                })()}
-                <button onClick={addQuickProduct} className="rounded-xl bg-accent px-6 py-3 text-sm font-bold text-white hover:bg-accent-light transition-colors w-full sm:w-auto">
-                  Ajouter au shop
+            {/* Liste */}
+            {filteredProducts.length === 0 ? (
+              <div className="p-10 sm:p-14 text-center">
+                <div className="h-16 w-16 mx-auto rounded-3xl bg-bg flex items-center justify-center mb-4">
+                  <Package size={24} className="text-dark/20" />
+                </div>
+                <p className="text-sm text-dark/50 font-semibold">
+                  {productSearch || productFilter !== 'all' ? 'Aucun produit ne correspond.' : 'Aucun produit pour le moment.'}
+                </p>
+                <p className="text-xs text-dark/35 mt-1 mb-4">
+                  {productSearch || productFilter !== 'all' ? "Essayez un autre terme ou réinitialisez les filtres." : "Ajoute ton premier produit via le bouton ci-dessus ou l'ajout rapide."}
+                </p>
+                <button onClick={openCreateDrawer} className="inline-flex items-center gap-2 rounded-full bg-dark px-5 py-2.5 text-sm font-semibold text-white hover:bg-accent hover:brightness-110 transition-colors">
+                  <Plus size={14} /> Créer un produit
                 </button>
               </div>
-            </div>
-
-            {/* Liste compacte des produits */}
-            <div className="divide-y divide-dark/5">
-              {filteredProducts.length === 0 ? (
-                <div className="p-8 text-center text-sm text-dark/40">
-                  {productSearch
-                    ? 'Aucun produit ne correspond à ta recherche.'
-                    : 'Aucun produit pour le moment. Ajoute ton premier produit ci-dessus.'}
-                </div>
-              ) : (
-                filteredProducts.map((product) => (
+            ) : (
+              <div className="divide-y divide-dark/5">
+                {filteredProducts.map((product) => (
                   <ProductListItem
                     key={product.id}
                     product={product}
+                    ordersCount={ordersCountByProduct.get(product.id) || 0}
                     onEdit={openEditDrawer}
+                    onDuplicate={duplicateProduct}
                     onRemove={removeProduct}
                   />
-                ))
-              )}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
-
         {activeTab === 'drop' && (
           <div className="grid lg:grid-cols-5 gap-5">
             <div className="lg:col-span-3 rounded-3xl bg-white text-dark p-6">
@@ -2054,7 +2517,7 @@ export default function AdminPanel() {
                 </div>
                 <button
                   onClick={saveDrop}
-                  className="inline-flex items-center gap-2 rounded-full bg-accent px-5 py-3 text-sm font-bold text-white hover:bg-accent-light transition-colors"
+                  className="inline-flex items-center gap-2 rounded-full bg-accent px-5 py-3 text-sm font-bold text-white hue-rotate-0 hover:brightness-110 transition-colors"
                 >
                   <Save size={15} /> Sauvegarder
                 </button>
@@ -2222,7 +2685,7 @@ export default function AdminPanel() {
                 setPromoCodes((prev) => [promo, ...prev]);
                 setNewPromo({ code: '', discount: 15, maxUses: 0, expiresIn: '' });
                 showToast('Code promo créé ✓');
-              }} className="w-full rounded-full bg-accent px-5 py-3 text-sm font-bold text-white hover:bg-accent-light transition-colors">
+              }} className="w-full rounded-full bg-accent px-5 py-3 text-sm font-bold text-white hue-rotate-0 hover:brightness-110 transition-colors">
                 Créer le code
               </button>
 
@@ -2261,7 +2724,7 @@ export default function AdminPanel() {
                 </div>
                 <button
                   onClick={saveSettings}
-                  className="inline-flex items-center gap-2 rounded-full bg-accent px-5 py-3 text-sm font-bold text-white hover:bg-accent-light transition-colors"
+                  className="inline-flex items-center gap-2 rounded-full bg-accent px-5 py-3 text-sm font-bold text-white hue-rotate-0 hover:brightness-110 transition-colors"
                 >
                   <Save size={15} /> {settingsSaved ? 'Sauvegarde' : 'Sauvegarder'}
                 </button>
@@ -2543,7 +3006,7 @@ export default function AdminPanel() {
                         placeholder="Répondre..."
                         className="flex-1 rounded-xl bg-bg px-4 py-3 text-sm outline-none"
                       />
-                      <button onClick={sendAdminReply} disabled={!chatReply.trim()} className="h-11 w-11 rounded-xl bg-accent text-white flex items-center justify-center hover:bg-accent-light transition-colors disabled:opacity-30">
+                      <button onClick={sendAdminReply} disabled={!chatReply.trim()} className="h-11 w-11 rounded-xl bg-accent text-white flex items-center justify-center hue-rotate-0 hover:brightness-110 transition-colors disabled:opacity-30">
                         <Send size={16} />
                       </button>
                     </div>
@@ -2712,7 +3175,7 @@ export default function AdminPanel() {
                 </div>
                 <button
                   onClick={addNote}
-                  className="w-full rounded-full bg-accent px-5 py-3 text-sm font-bold text-white hover:bg-accent-light transition-colors"
+                  className="w-full rounded-full bg-accent px-5 py-3 text-sm font-bold text-white hue-rotate-0 hover:brightness-110 transition-colors"
                 >
                   Ajouter
                 </button>
@@ -2822,11 +3285,26 @@ export default function AdminPanel() {
         open={drawerOpen}
         isNew={drawerIsNew}
         draft={drawerDraft}
+        original={drawerOriginal}
         onChange={setDrawerDraft}
         onClose={closeDrawer}
         onSave={saveDrawer}
+        onDuplicate={duplicateProduct}
         onAutoPrice={autoPriceDrawer}
       />
+
+      {/* Dialog de confirmation */}
+      {confirmDialog.open && (
+        <ConfirmDialog
+          open={confirmDialog.open}
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          confirmLabel={confirmDialog.confirmLabel}
+          tone={confirmDialog.tone}
+          onConfirm={() => confirmDialog.onConfirm?.()}
+          onCancel={() => setConfirmDialog((c) => ({ ...c, open: false }))}
+        />
+      )}
     </section>
   );
 }
