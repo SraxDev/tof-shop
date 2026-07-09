@@ -21,10 +21,10 @@ export default function AnnouncementBar() {
   if (!visible || !settings.announcementEnabled || !settings.announcementText.trim()) return null;
 
   return (
-    <div className="relative z-30 px-4 pt-20 sm:pt-24 safe-top">
+    <div className="relative z-30 px-4 pt-3">
       <div className="mx-auto max-w-4xl">
-        <div className="relative rounded-2xl border border-dark/5 bg-white/90 backdrop-blur-xl shadow-sm shadow-dark/5 px-5 py-3 text-center anim-fade-down">
-          <p className="pr-9 text-xs sm:text-sm font-semibold text-dark/75 leading-relaxed">
+        <div className="relative rounded-2xl border border-dark/5 bg-white shadow-sm shadow-dark/5 px-4 py-2.5 text-center">
+          <p className="pr-8 text-xs sm:text-sm font-semibold text-dark/80 leading-snug">
             {settings.announcementText}
           </p>
           <button
@@ -32,10 +32,10 @@ export default function AnnouncementBar() {
               setVisible(false);
               try { sessionStorage.setItem('tof-announcement-closed', '1'); } catch {}
             }}
-            className="absolute right-2 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-dark/5 text-dark/35 hover:text-dark/60 hover:bg-dark/10 transition-colors flex items-center justify-center"
+            className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-dark/5 text-dark/35 hover:text-dark/60 hover:bg-dark/10 transition-colors flex items-center justify-center"
             aria-label="Fermer l'annonce"
           >
-            <X size={14} />
+            <X size={14} strokeWidth={2.5} />
           </button>
         </div>
       </div>

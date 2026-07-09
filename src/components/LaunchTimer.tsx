@@ -30,19 +30,19 @@ function getTimeLeft(): TimeLeft | null {
 
 function TimerCells({ timeLeft, compact = false }: { timeLeft: TimeLeft; compact?: boolean }) {
   return (
-    <div className={`flex items-center justify-center gap-1.5 sm:gap-2 ${compact ? '' : ''}`}>
+    <div className={`flex items-center justify-center gap-1.5 sm:gap-2`}>
       {[
         { label: 'h', value: timeLeft.hours },
         { label: 'm', value: timeLeft.minutes },
         { label: 's', value: timeLeft.seconds },
       ].map((item, i) => (
         <div key={item.label} className="flex items-center gap-1.5">
-          <div className={`${compact ? 'min-w-[42px] px-2 py-1 rounded-xl' : 'min-w-[74px] px-3 py-2 rounded-2xl'} bg-white/8 border border-white/10 text-center`}>
+          <div className={`${compact ? 'min-w-[38px] px-2 py-1 rounded-lg' : 'min-w-[64px] sm:min-w-[74px] px-3 py-2 rounded-2xl'} bg-white/10 border border-white/10 text-center`}>
             <div className={`${compact ? 'text-sm sm:text-base' : 'text-xl sm:text-2xl'} font-800 tracking-tight tabular-nums text-white`}>
               {item.value}
             </div>
             {!compact && (
-              <div className="text-[10px] uppercase tracking-wider text-white/35 mt-0.5">
+              <div className="text-[10px] uppercase tracking-wider text-white/40 mt-0.5">
                 {item.label === 'h' ? 'heures' : item.label === 'm' ? 'minutes' : 'secondes'}
               </div>
             )}
@@ -66,7 +66,7 @@ export default function LaunchTimer() {
   }, []);
 
   useEffect(() => {
-    const onScroll = () => setCompactVisible(window.scrollY > 260);
+    const onScroll = () => setCompactVisible(window.scrollY > 200);
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
@@ -76,16 +76,16 @@ export default function LaunchTimer() {
 
   return (
     <>
-      {/* Grand bloc visible en haut de page */}
-      <section className="px-4 pt-3">
+      {/* Grand bloc visible sous la nav */}
+      <section className="px-4 pt-2">
         <div className="mx-auto max-w-4xl">
-          <div className="rounded-3xl bg-dark text-white px-5 py-4 shadow-xl shadow-dark/10">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="rounded-2xl sm:rounded-3xl bg-dark text-white px-4 sm:px-6 py-3 sm:py-4 shadow-xl shadow-dark/10">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div className="text-center sm:text-left">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-white/45 font-bold">
+                <p className="text-[10px] sm:text-[11px] uppercase tracking-[0.18em] text-white/45 font-bold">
                   Offre d'ouverture
                 </p>
-                <h3 className="mt-1 font-display text-xl sm:text-2xl font-800 tracking-tight leading-tight">
+                <h3 className="mt-0.5 font-display text-lg sm:text-2xl font-800 tracking-tight leading-tight">
                   Livraison offerte + <span className="text-accent">-15%</span> avec <span className="text-accent">TOFLAUNCH</span>
                 </h3>
               </div>
@@ -96,9 +96,9 @@ export default function LaunchTimer() {
         </div>
       </section>
 
-      {/* Version compacte sticky au scroll */}
+      {/* Version compacte sticky au scroll (fixée sous la navbar sticky) */}
       <div
-        className={`fixed left-1/2 -translate-x-1/2 top-[82px] sm:top-[96px] z-40 transition-all duration-300 ${
+        className={`fixed left-1/2 -translate-x-1/2 top-[78px] sm:top-[82px] z-40 transition-all duration-300 ${
           compactVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-3 pointer-events-none'
         }`}
       >

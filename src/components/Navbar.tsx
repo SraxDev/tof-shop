@@ -41,11 +41,10 @@ export default function Navbar() {
       rafRef.current = requestAnimationFrame(() => {
         rafRef.current = null;
         const y = window.scrollY;
-        setScrolled(y > 20);
+        setScrolled(y > 10);
         const docH = document.documentElement.scrollHeight - window.innerHeight;
         setProgress(docH > 0 ? Math.min(1, y / docH) : 0);
 
-        // Active section detection
         const ids = getSectionIds();
         let current = ids[0];
         const offset = 120;
@@ -80,8 +79,8 @@ export default function Navbar() {
   return (
     <>
       <nav
-        className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 safe-top ${
-          scrolled ? 'bg-bg/85 backdrop-blur-xl shadow-sm' : 'bg-transparent'
+        className={`fixed top-0 inset-x-0 z-50 transition-shadow duration-300 safe-top bg-bg/95 backdrop-blur-xl ${
+          scrolled ? 'shadow-sm border-b border-dark/5' : 'border-b border-transparent'
         }`}
       >
         {/* Scroll progress */}
@@ -122,7 +121,7 @@ export default function Navbar() {
               aria-label="Ouvrir le panier"
               className="relative h-11 w-11 rounded-full flex items-center justify-center text-dark/70 hover:text-accent hover:bg-dark/5 transition-all"
             >
-              <ShoppingBag size={20} />
+              <ShoppingBag size={20} strokeWidth={2.5} />
               {count > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 min-h-[18px] min-w-[18px] px-1 bg-accent rounded-full text-[9px] font-bold text-white flex items-center justify-center shadow-sm">
                   {count > 99 ? '99+' : count}
@@ -141,7 +140,10 @@ export default function Navbar() {
         </div>
       </nav>
 
-      {/* Mobile menu — slide from right */}
+      {/* Spacer to push content below the fixed nav (accounts for nav height + safe area) */}
+      <div className="h-[72px] sm:h-[76px] safe-top" aria-hidden />
+
+      {/* Mobile menu */}
       <div
         className={`fixed inset-0 z-[200] md:hidden transition-opacity duration-300 ${
           open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
@@ -150,12 +152,10 @@ export default function Navbar() {
       >
         <div className="absolute inset-0 bg-dark/40 backdrop-blur-sm" onClick={closeMenu} />
         <div
-          className={`absolute top-0 right-0 h-full w-[85%] max-w-[340px] bg-white shadow-2xl flex flex-col ${
-            open ? 'anim-slide-in-right' : ''
-          }`}
+          className={`absolute top-0 right-0 h-full w-[85%] max-w-[340px] bg-white shadow-2xl flex flex-col`}
           style={{ transform: open ? 'translateX(0)' : 'translateX(100%)', transition: 'transform 0.3s cubic-bezier(0.22,1,0.36,1)' }}
         >
-          <div className="flex items-center justify-between p-5 border-b border-dark/5">
+          <div className="flex items-center justify-between p-5 border-b border-dark/5 safe-top">
             <span className="font-display text-2xl font-800 tracking-tight text-dark">
               menu<span className="text-accent">.</span>
             </span>
@@ -174,8 +174,10 @@ export default function Navbar() {
                 key={l.label}
                 href={l.href}
                 onClick={closeMenu}
-                className="flex items-center justify-between text-4xl font-display font-800 text-dark hover:text-accent transition-colors py-2 anim-slide-up opacity-0"
-                style={{ animationDelay: open ? `${i * 0.05 + 0.08}s` : '0s' }}
+                className="flex items-center justify-between text-4xl font-display font-800 text-dark hover:text-accent transition-colors py-2"
+                style={{
+                  animation: open ? `slide-up 0.4s cubic-bezier(0.22,1,0.36,1) ${i * 0.05 + 0.08}s both` : 'none',
+                }}
               >
                 <span>{l.label}</span>
                 <span className="text-accent text-2xl">→</span>
