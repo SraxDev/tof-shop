@@ -480,6 +480,7 @@ const DrawerSelect = memo(function DrawerSelect({
   className = '',
 }: DrawerSelectProps) {
   const [open, setOpen] = useState(false);
+  const [maxHeight, setMaxHeight] = useState(260);
   const btnRef = useRef<HTMLButtonElement>(null);
   const [coords, setCoords] = useState<{ top: number; left: number; width: number; above: boolean }>({
     top: 0, left: 0, width: 0, above: false,
@@ -490,15 +491,18 @@ const DrawerSelect = memo(function DrawerSelect({
   const openMenu = useCallback(() => {
     if (!btnRef.current) return;
     const r = btnRef.current.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - r.bottom;
-    const spaceAbove = r.top;
-    const needAbove = spaceBelow < 260 && spaceAbove > spaceBelow;
+    const spaceBelow = window.innerHeight - r.bottom - 12;
+    const spaceAbove = r.top - 12;
+    const needAbove = spaceBelow < 220 && spaceAbove > spaceBelow;
+    // Hauteur max dynamique : utilise la place disponible sans dépasser 360px
+    const maxHeight = Math.max(160, Math.min(360, needAbove ? spaceAbove : spaceBelow));
     setCoords({
-      top: needAbove ? r.top - 8 : r.bottom + 4,
+      top: needAbove ? r.top - 4 : r.bottom + 4,
       left: r.left,
       width: r.width,
       above: needAbove,
     });
+    setMaxHeight(maxHeight);
     setOpen(true);
   }, []);
 
@@ -510,17 +514,36 @@ const DrawerSelect = memo(function DrawerSelect({
       if (pop && pop.contains(e.target as Node)) return;
       setOpen(false);
     };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
-    const onScrollResize = () => setOpen(false);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+      // Navigation clavier (haut/bas/entrée)
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter') {
+        e.preventDefault();
+        const pop = document.getElementById('drawer-select-portal');
+        if (!pop) return;
+        const buttons = Array.from(pop.querySelectorAll<HTMLButtonElement>('[role="option"]'));
+        const currentIdx = buttons.findIndex((b) => b.getAttribute('aria-selected') === 'true');
+        let nextIdx = currentIdx;
+        if (e.key === 'ArrowDown') nextIdx = (currentIdx + 1) % buttons.length;
+        if (e.key === 'ArrowUp') nextIdx = (currentIdx - 1 + buttons.length) % buttons.length;
+        if (e.key === 'Enter' && currentIdx >= 0) {
+          buttons[currentIdx].click();
+          return;
+        }
+        buttons[nextIdx]?.focus();
+      }
+    };
+    // On retire le listener sur scroll de window qui fermait le menu
+    // (il empêchait de scroller dans la liste avec la molette).
+    // On repositionne juste à la resize, ce qui est suffisant.
+    const onResize = () => setOpen(false);
     document.addEventListener('mousedown', close);
     document.addEventListener('keydown', onKey);
-    window.addEventListener('resize', onScrollResize);
-    window.addEventListener('scroll', onScrollResize, true);
+    window.addEventListener('resize', onResize);
     return () => {
       document.removeEventListener('mousedown', close);
       document.removeEventListener('keydown', onKey);
-      window.removeEventListener('resize', onScrollResize);
-      window.removeEventListener('scroll', onScrollResize, true);
+      window.removeEventListener('resize', onResize);
     };
   }, [open]);
 
@@ -549,8 +572,14 @@ const DrawerSelect = memo(function DrawerSelect({
         <div
           id="drawer-select-portal"
           role="listbox"
-          className="fixed z-[60] max-h-64 overflow-y-auto rounded-xl bg-neutral-800 border border-white/10 shadow-2xl shadow-black/60 py-1"
-          style={{ top: coords.top, left: coords.left, width: coords.width }}
+          className="fixed z-[60] overflow-y-auto rounded-xl bg-neutral-800 border border-white/10 shadow-2xl shadow-black/60 py-1 overscroll-contain"
+          style={{
+            top: coords.top,
+            left: coords.left,
+            width: coords.width,
+            maxHeight,
+            transformOrigin: coords.above ? 'bottom left' : 'top left',
+          }}
         >
           {options.map((opt) => {
             const active = opt.value === value;
