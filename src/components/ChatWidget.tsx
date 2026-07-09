@@ -23,7 +23,7 @@ const botRules: BotRule[] = [
   },
   {
     keywords: ['livraison', 'delai', 'délai', 'combien de temps', 'expédition', 'expedition', 'recevoir', 'jours', 'semaine', 'quand', 'arrive', 'envoi', 'reçu'],
-    reply: "🚀 Délais estimés (après paiement) :\n\n• Standard : 10-20 jours ouvrés (offerte dès 150€)\n• Express : 5-10 jours (avec supplément)\n\nDès l'expédition tu reçois ton numéro de suivi par message. 💌",
+    reply: "🚀 Délais estimés (après paiement) :\n\n• Standard : 10-20 jours ouvrés\n• Express : 5-10 jours (avec supplément)\n\nDès l'expédition tu reçois ton numéro de suivi par message. 💌\n\nLe seuil de livraison offerte et les frais exacts sont calculés en direct dans le panier.",
     followUp: ["C'est suivi ?", 'Livraison gratuite ?', 'Express ?'],
   },
   {
@@ -32,7 +32,7 @@ const botRules: BotRule[] = [
   },
   {
     keywords: ['gratuit', 'offert', 'livraison gratuite', 'frais', 'port', 'free'],
-    reply: "Bonne nouvelle ! 🎉 La livraison standard est offerte pour toute commande supérieure à 150€. En dessous, les frais sont calculés au panier selon le mode choisi.",
+    reply: "Bonne nouvelle ! 🎉 La livraison standard est offerte dès le seuil affiché dans ton panier (sinon les frais sont calculés automatiquement au panier selon le mode choisi : Standard ou Express).",
   },
   {
     keywords: ['paiement', 'payer', 'paypal', 'virement', 'carte', 'cb', 'apple pay', 'revolut', 'moyen', 'régler', 'regler'],

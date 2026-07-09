@@ -272,6 +272,22 @@ function estimateMulebuyShipping(weightGrams: number, line: 'tax_free' | 'econom
   };
 }
 
+function getCategoryDefaults(category: string) {
+  const preset = categoryPresets.find((p) => p.label === category);
+  if (preset) return { sizes: preset.defaultSizes, colors: preset.defaultColors, packaging: preset.packaging, weightGrams: preset.weight };
+  const lower = (category || '').toLowerCase();
+  // Fallback heuristics based on name
+  if (lower.includes('sneaker') || lower.includes('chaussure') || lower.includes('claquette')) {
+    return { sizes: '39, 40, 41, 42, 43, 44, 45', colors: 'Black, White', packaging: 'none' as const, weightGrams: 900 };
+  }
+  if (lower.includes('sac') || lower.includes('portefeuille') || lower.includes('ceinture') || lower.includes('lunettes') ||
+      lower.includes('bijou') || lower.includes('montre') || lower.includes('parfum') || lower.includes('casquette') ||
+      lower.includes('bonnet') || lower.includes('écharpe') || lower.includes('echarpe')) {
+    return { sizes: '', colors: 'Black', packaging: 'none' as const, weightGrams: 250 };
+  }
+  return { sizes: 'S, M, L, XL', colors: 'Black, White', packaging: 'none' as const, weightGrams: 500 };
+}
+
 function normalizedProduct(product: Product): Product {
   const categoryExists = categoryPresets.some((preset) => preset.label === product.category);
   const fallbackCategory = product.category.toLowerCase().includes('sneaker')
@@ -279,12 +295,15 @@ function normalizedProduct(product: Product): Product {
     : product.name.toLowerCase().includes('hoodie') || product.name.toLowerCase().includes('pull')
       ? 'Hoodie / pull'
       : 'T-shirt';
+  const finalCategory = categoryExists ? product.category : fallbackCategory;
+  const defaults = getCategoryDefaults(finalCategory);
   return {
     ...product,
-    category: categoryExists ? product.category : fallbackCategory,
-    packaging: product.packaging || 'none',
-    sizes: product.sizes || '39, 40, 41, 42, 43, 44, 45',
-    colors: product.colors || 'Black, White',
+    category: finalCategory,
+    packaging: product.packaging || defaults.packaging,
+    sizes: product.sizes ?? defaults.sizes,
+    colors: product.colors || defaults.colors,
+    weightGrams: product.weightGrams || defaults.weightGrams,
     imageUrl: product.imageUrl || '',
     gender: product.gender || 'mixte',
   };
@@ -857,8 +876,8 @@ const ProductEditDrawer = memo(function ProductEditDrawer({
                     category: v,
                     weightGrams: preset?.weight || draft.weightGrams,
                     packaging: preset?.packaging || draft.packaging,
-                    sizes: preset?.defaultSizes ?? draft.sizes,
-                    colors: preset?.defaultColors ?? draft.colors,
+                    sizes: preset ? preset.defaultSizes : draft.sizes,
+                    colors: preset ? preset.defaultColors : draft.colors,
                   });
                 }}
                 options={categoryPresets.map((p) => ({ value: p.label, label: p.label }))}
@@ -1220,17 +1239,17 @@ export default function AdminPanel() {
     country: 'France',
     snapOrWhatsapp: '',
   });
-  const defaultPreset = categoryPresets.find((preset) => preset.label === 'Sneakers') || categoryPresets[0];
+  const defaultPreset = categoryPresets.find((preset) => preset.label === 'T-shirt') || categoryPresets[0];
   const [quickProduct, setQuickProduct] = useState<Omit<Product, 'id' | 'status'>>({
     brand: '',
     name: '',
     category: defaultPreset.label,
-    salePrice: suggestedSalePrice(150, defaultPreset.weight, defaultPreset.packaging),
-    sourcePriceCny: 150,
+    salePrice: suggestedSalePrice(100, defaultPreset.weight, defaultPreset.packaging),
+    sourcePriceCny: 100,
     weightGrams: defaultPreset.weight,
     packaging: defaultPreset.packaging,
-    sizes: '39, 40, 41, 42, 43, 44, 45',
-    colors: 'Black, White',
+    sizes: defaultPreset.defaultSizes,
+    colors: defaultPreset.defaultColors,
     imageUrl: '',
     gender: 'mixte',
     sourceUrl: '',
@@ -1482,7 +1501,7 @@ export default function AdminPanel() {
   }, []);
 
   const openCreateDrawer = useCallback(() => {
-    const preset = categoryPresets.find((p) => p.label === 'Sneakers') || categoryPresets[0];
+    const preset = categoryPresets.find((p) => p.label === 'T-shirt') || categoryPresets[0];
     const newId = `p${Date.now()}`;
     const blank: Product = {
       id: newId,
