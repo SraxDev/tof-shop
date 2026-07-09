@@ -168,8 +168,8 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
 
   return (
     <div className="fixed inset-0 z-[90] flex justify-end">
-      <div className="absolute inset-0 bg-dark/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full sm:max-w-md bg-white h-full overflow-y-auto shadow-2xl flex flex-col safe-bottom">
+      <div className="absolute inset-0 bg-dark/50 backdrop-blur-sm anim-fade-in" onClick={onClose} />
+      <div className="relative w-full sm:max-w-md bg-white h-[100dvh] overflow-y-auto shadow-2xl flex flex-col safe-bottom anim-slide-in-right">
         {/* Header */}
         <div className="sticky top-0 bg-white z-10 flex items-center justify-between px-5 py-4 border-b border-dark/5">
           <div className="flex items-center gap-2">
@@ -177,8 +177,8 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
             <span className="font-display text-xl font-800">Panier</span>
             {count > 0 && <span className="bg-accent text-white text-[10px] font-bold h-5 w-5 rounded-full flex items-center justify-center">{count}</span>}
           </div>
-          <button onClick={onClose} className="h-9 w-9 rounded-full bg-dark/5 flex items-center justify-center text-dark/40 hover:text-dark">
-            <X size={18} />
+          <button onClick={onClose} aria-label="Fermer le panier" className="h-11 w-11 rounded-full bg-dark/5 flex items-center justify-center text-dark/40 hover:text-dark hover:bg-dark/10 transition-colors">
+            <X size={18} strokeWidth={2.5} />
           </button>
         </div>
 
@@ -216,16 +216,18 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
                           <div className="flex items-center gap-1.5">
                             <button
                               onClick={() => updateCartQuantity(item.productId, item.size, item.color, item.quantity - 1)}
-                              className="h-8 w-8 rounded-xl bg-white border border-dark/10 flex items-center justify-center text-dark/40 hover:text-dark active:scale-90 transition-all"
+                              aria-label="Diminuer la quantité"
+                              className="h-11 w-11 rounded-xl bg-white border border-dark/10 flex items-center justify-center text-dark/40 hover:text-dark active:scale-90 transition-all"
                             >
-                              <Minus size={14} />
+                              <Minus size={15} strokeWidth={2.5} />
                             </button>
                             <span className="text-sm font-800 w-6 text-center">{item.quantity}</span>
                             <button
                               onClick={() => updateCartQuantity(item.productId, item.size, item.color, item.quantity + 1)}
-                              className="h-8 w-8 rounded-xl bg-white border border-dark/10 flex items-center justify-center text-dark/40 hover:text-dark active:scale-90 transition-all"
+                              aria-label="Augmenter la quantité"
+                              className="h-11 w-11 rounded-xl bg-white border border-dark/10 flex items-center justify-center text-dark/40 hover:text-dark active:scale-90 transition-all"
                             >
-                              <Plus size={14} />
+                              <Plus size={15} strokeWidth={2.5} />
                             </button>
                           </div>
                           <span className="font-900 text-[13px]">{formatPrice(item.salePrice * item.quantity)}</span>
@@ -233,9 +235,10 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
                       </div>
                       <button
                         onClick={() => removeFromCart(item.productId, item.size, item.color)}
-                        className="self-start text-dark/20 hover:text-red-500 transition-colors"
+                        aria-label="Retirer du panier"
+                        className="self-start h-11 w-11 rounded-xl flex items-center justify-center text-dark/20 hover:text-red-500 hover:bg-red-50 transition-colors"
                       >
-                        <Trash2 size={15} />
+                        <Trash2 size={16} />
                       </button>
                     </div>
                   ))}
@@ -269,7 +272,7 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
                           placeholder="Code promo"
                           className="flex-1 rounded-xl bg-bg px-3 py-2.5 text-xs outline-none uppercase tracking-wider"
                         />
-                        <button onClick={applyPromo} className="rounded-xl bg-dark text-white px-4 py-2.5 text-xs font-bold hover:bg-accent transition-colors">
+                        <button onClick={applyPromo} className="h-11 rounded-xl bg-dark text-white px-4 text-xs font-bold hover:bg-accent transition-colors active:scale-95">
                           Appliquer
                         </button>
                       </div>
@@ -320,7 +323,7 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
                   </div>
                   <button
                     onClick={() => setStep('checkout')}
-                    className="w-full rounded-full bg-dark px-7 py-3.5 text-sm font-bold text-white hover:bg-accent transition-colors"
+                    className="w-full h-12 rounded-full bg-dark px-7 text-sm font-bold text-white hover:bg-accent transition-colors active:scale-[0.98]"
                   >
                     Passer la commande
                   </button>
@@ -368,11 +371,11 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
             <div className="sticky bottom-0 bg-white border-t border-dark/5 p-5 space-y-3">
               <button
                 onClick={placeOrder}
-                className="w-full rounded-full bg-dark px-7 py-3.5 text-sm font-bold text-white hover:bg-accent transition-colors"
+                className="w-full h-12 rounded-full bg-dark px-7 text-sm font-bold text-white hover:bg-accent transition-colors active:scale-[0.98]"
               >
                 Confirmer la commande
               </button>
-              <button onClick={() => setStep('cart')} className="w-full text-center text-sm text-dark/40 font-semibold py-2">
+              <button onClick={() => setStep('cart')} className="w-full text-center text-sm text-dark/40 font-semibold py-3 min-h-[44px]">
                 Retour au panier
               </button>
             </div>
@@ -393,13 +396,13 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
                   href={whatsappCheckoutLink()}
                   target="_blank"
                   rel="noreferrer"
-                  className="block rounded-full bg-[#25D366] px-7 py-3.5 text-sm font-bold text-white hover:brightness-110 transition-all text-center"
+                  className="block h-12 rounded-full bg-[#25D366] px-7 text-sm font-bold text-white hover:brightness-110 transition-all text-center flex items-center justify-center"
                 >
                   Finaliser sur WhatsApp
                 </a>
                 <button
                   onClick={onClose}
-                  className="block w-full rounded-full bg-dark/5 px-7 py-3.5 text-sm font-bold text-dark/60 hover:bg-dark/10 transition-colors"
+                  className="block w-full h-12 rounded-full bg-dark/5 px-7 text-sm font-bold text-dark/60 hover:bg-dark/10 transition-colors"
                 >
                   Continuer le shop
                 </button>

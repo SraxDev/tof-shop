@@ -32,6 +32,8 @@ export default function Contact() {
         <div className={`grid sm:grid-cols-2 gap-4 ${isInView ? 'anim-fade-up opacity-0 delay-200' : 'opacity-0'}`}>
           <a
             href={settings.whatsappUrl}
+            target="_blank"
+            rel="noreferrer"
             className="group relative overflow-hidden rounded-3xl bg-[#25D366] p-8 min-h-56 flex flex-col justify-between text-white shadow-xl shadow-[#25D366]/15 hover:-translate-y-1 transition-all duration-300"
           >
             <div className="absolute -top-16 -right-16 h-40 w-40 rounded-full bg-white/15 blur-2xl" />
@@ -49,6 +51,8 @@ export default function Contact() {
 
           <a
             href={settings.snapchatUrl}
+            target="_blank"
+            rel="noreferrer"
             className="group relative overflow-hidden rounded-3xl bg-[#FFFC00] p-8 min-h-56 flex flex-col justify-between text-dark shadow-xl shadow-yellow-300/20 hover:-translate-y-1 transition-all duration-300"
           >
             <div className="absolute -top-16 -right-16 h-40 w-40 rounded-full bg-white/50 blur-2xl" />

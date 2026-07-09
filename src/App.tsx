@@ -1,26 +1,31 @@
-import { useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { useTwemoji } from './hooks/useTwemoji';
 import { hydrateSiteSettings } from './lib/siteSettings';
 import { trackVisitor } from './lib/db';
 import AnnouncementBar from './components/AnnouncementBar';
-import LaunchTimer from './components/LaunchTimer';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
-import BrandMarquee from './components/BrandMarquee';
-import FeaturedDrop from './components/FeaturedDrop';
 import Products from './components/Products';
-import Brands from './components/Brands';
-import WhyUs from './components/WhyUs';
-import Reviews from './components/Reviews';
-import CTA from './components/CTA';
-import Contact from './components/Contact';
-import AdminPanel from './components/AdminPanel';
 import Footer from './components/Footer';
 import BackToTop from './components/BackToTop';
 import MobileStickyBar from './components/MobileStickyBar';
 import ToastContainer from './components/Toast';
-import ChatWidget from './components/ChatWidget';
+import AdminPanel from './components/AdminPanel';
 
+// Lazy-load below-the-fold sections for faster TTI
+const LaunchTimer = lazy(() => import('./components/LaunchTimer'));
+const BrandMarquee = lazy(() => import('./components/BrandMarquee'));
+const FeaturedDrop = lazy(() => import('./components/FeaturedDrop'));
+const Brands = lazy(() => import('./components/Brands'));
+const Reviews = lazy(() => import('./components/Reviews'));
+const WhyUs = lazy(() => import('./components/WhyUs'));
+const CTA = lazy(() => import('./components/CTA'));
+const Contact = lazy(() => import('./components/Contact'));
+const ChatWidget = lazy(() => import('./components/ChatWidget'));
+
+function SectionFallback() {
+  return <div className="min-h-[200px] bg-bg" aria-hidden />;
+}
 
 const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || 'tofadmin';
 
@@ -61,14 +66,14 @@ function AdminAccess() {
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             placeholder="Mot de passe"
-            className="mt-6 w-full rounded-2xl bg-white/10 border border-white/10 px-5 py-4 text-sm text-white placeholder-white/25 outline-none focus:border-accent/60"
+            className="mt-6 w-full rounded-2xl bg-white/10 border border-white/10 px-5 h-12 text-sm text-white placeholder-white/25 outline-none focus:border-accent/60"
           />
           {error && <p className="mt-3 text-sm text-red-300">Mot de passe incorrect.</p>}
 
-          <button className="mt-5 w-full rounded-full bg-accent px-6 py-3.5 text-sm font-bold text-white hover:bg-accent-light transition-colors">
+          <button className="mt-5 w-full h-12 rounded-full bg-accent px-6 text-sm font-bold text-white hover:bg-accent-light transition-colors">
             Entrer
           </button>
-          <a href="#" className="mt-4 block text-center text-xs text-white/25 hover:text-white/50 transition-colors">
+          <a href="#" className="mt-4 block text-center text-xs text-white/25 hover:text-white/50 transition-colors py-2">
             Retour au site
           </a>
         </form>
@@ -78,16 +83,16 @@ function AdminAccess() {
 
   return (
     <div className="bg-dark min-h-screen">
-      <div className="sticky top-0 z-50 bg-dark/90 backdrop-blur-xl border-b border-white/10">
+      <div className="sticky top-0 z-50 bg-dark/90 backdrop-blur-xl border-b border-white/10 safe-top">
         <div className="mx-auto max-w-6xl px-3 sm:px-5 py-3 sm:py-4 flex items-center justify-between gap-2">
           <a href="#" className="font-display text-xl sm:text-2xl font-800 tracking-tight text-white">
             tof<span className="text-accent">.</span> admin
           </a>
           <div className="flex items-center gap-1.5 sm:gap-2">
-            <a href="#" className="rounded-full bg-white/5 px-3 sm:px-4 py-2 text-[11px] sm:text-xs font-semibold text-white/55 hover:text-white hover:bg-white/10 transition-colors">
+            <a href="#" className="rounded-full bg-white/5 px-3 sm:px-4 py-2 h-10 flex items-center text-[11px] sm:text-xs font-semibold text-white/55 hover:text-white hover:bg-white/10 transition-colors">
               Site
             </a>
-            <button onClick={logout} className="rounded-full bg-accent px-3 sm:px-4 py-2 text-[11px] sm:text-xs font-semibold text-white hover:bg-accent-light transition-colors">
+            <button onClick={logout} className="rounded-full bg-accent px-3 sm:px-4 py-2 h-10 flex items-center text-[11px] sm:text-xs font-semibold text-white hover:bg-accent-light transition-colors">
               Deco
             </button>
           </div>
@@ -122,20 +127,28 @@ export default function App() {
     <div className="font-sans antialiased bg-bg text-dark">
       <Navbar />
       <AnnouncementBar />
-      <LaunchTimer />
+      <Suspense fallback={null}>
+        <LaunchTimer />
+      </Suspense>
       <Hero />
-      <BrandMarquee />
+      <Suspense fallback={<SectionFallback />}>
+        <BrandMarquee />
+      </Suspense>
       <Products />
-      <FeaturedDrop />
-      <Brands />
-      <Reviews />
-      <WhyUs />
-      <CTA />
-      <Contact />
+      <Suspense fallback={<SectionFallback />}>
+        <FeaturedDrop />
+        <Brands />
+        <Reviews />
+        <WhyUs />
+        <CTA />
+        <Contact />
+      </Suspense>
       <Footer />
       <BackToTop />
       <MobileStickyBar />
-      <ChatWidget />
+      <Suspense fallback={null}>
+        <ChatWidget />
+      </Suspense>
 
       <ToastContainer />
     </div>

@@ -14,6 +14,7 @@
 
 html {
   scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
@@ -21,6 +22,8 @@ body {
   -webkit-font-smoothing: antialiased;
   background: #f6f5f2;
   color: #111111;
+  min-height: 100dvh;
+  overscroll-behavior-y: contain;
 }
 
 ::selection {
@@ -37,10 +40,14 @@ body {
   padding-top: env(safe-area-inset-top, 0px);
 }
 
-/* Better touch targets */
+/* Prevent iOS double-tap zoom on buttons/links/inputs */
+button, a, input, select, textarea, label, [role="button"] {
+  touch-action: manipulation;
+}
+
+/* Better touch targets — force 16px on iOS inputs to prevent zoom */
 @media (max-width: 640px) {
   input, select, textarea, button {
-    min-height: 44px;
     font-size: 16px !important;
   }
 }
@@ -54,26 +61,41 @@ img.emoji {
   object-fit: contain;
 }
 
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: #f6f5f2; }
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 2px; }
 
 .custom-scrollbar::-webkit-scrollbar {
   width: 5px;
 }
-
 .custom-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
-
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(17, 17, 17, 0.1);
+  background: rgba(17, 17, 17, 0.15);
   border-radius: 10px;
 }
-
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(17, 17, 17, 0.2);
+  background: rgba(17, 17, 17, 0.3);
 }
+
+/* Scrollbar hide utility (for chip rows) */
+.scrollbar-hide,
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar,
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Snap scroll utility */
+.snap-x-mandatory {
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+.snap-start { scroll-snap-align: start; }
 
 @keyframes fade-up {
   from { opacity: 0; transform: translateY(24px); }
@@ -87,6 +109,10 @@ img.emoji {
   from { opacity: 0; transform: translateY(40px); }
   to { opacity: 1; transform: translateY(0); }
 }
+@keyframes slide-in-right {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
 @keyframes marquee {
   0% { transform: translateX(0); }
   100% { transform: translateX(-50%); }
@@ -99,24 +125,58 @@ img.emoji {
   0%, 100% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
   50% { border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%; }
 }
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(232, 77, 26, 0.45); }
+  70% { box-shadow: 0 0 0 14px rgba(232, 77, 26, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(232, 77, 26, 0); }
+}
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes fade-down {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 
 .anim-fade-up {
   animation: fade-up 0.7s ease-out forwards;
 }
 .anim-fade-in {
-  animation: fade-in 0.8s ease-out forwards;
+  animation: fade-in 0.6s ease-out forwards;
 }
 .anim-slide-up {
-  animation: slide-up 0.8s ease-out forwards;
+  animation: slide-up 0.5s cubic-bezier(0.22,1,0.36,1) forwards;
+}
+.anim-slide-in-right {
+  animation: slide-in-right 0.35s cubic-bezier(0.22,1,0.36,1) forwards;
 }
 .anim-marquee {
-  animation: marquee 25s linear infinite;
+  animation: marquee 30s linear infinite;
 }
 .anim-float {
   animation: float 4s ease-in-out infinite;
 }
 .anim-blob {
   animation: blob 8s ease-in-out infinite;
+}
+.anim-shimmer {
+  background: linear-gradient(90deg, rgba(0,0,0,0.03) 0%, rgba(0,0,0,0.08) 50%, rgba(0,0,0,0.03) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+.anim-pulse-ring {
+  animation: pulse-ring 2s ease-out infinite;
+}
+.anim-scale-in {
+  animation: scale-in 0.25s ease-out forwards;
+}
+.anim-fade-down {
+  animation: fade-down 0.5s ease-out forwards;
 }
 
 .delay-100 { animation-delay: 0.1s; }
@@ -127,3 +187,22 @@ img.emoji {
 .delay-600 { animation-delay: 0.6s; }
 .delay-700 { animation-delay: 0.7s; }
 .delay-800 { animation-delay: 0.8s; }
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .anim-marquee { animation: none !important; }
+  .anim-float, .anim-blob { animation: none !important; }
+}
+
+/* Body bottom padding on mobile so sticky bar doesn't cover content */
+@media (max-width: 767px) {
+  body.has-sticky-bar {
+    padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+  }
+}

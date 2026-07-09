@@ -41,13 +41,17 @@ export default function CTA() {
             <div className="flex flex-wrap justify-center gap-3 mt-8">
               <a
                 href={settings.snapchatUrl}
-                className="bg-[#FFFC00] text-dark px-7 py-3.5 rounded-full text-sm font-semibold hover:brightness-95 transition-all flex items-center gap-2"
+                target="_blank"
+                rel="noreferrer"
+                className="bg-[#FFFC00] text-dark px-7 h-12 rounded-full text-sm font-semibold hover:brightness-95 transition-all flex items-center gap-2 active:scale-[0.98]"
               >
                 👻 Snapchat
               </a>
               <a
                 href={settings.whatsappUrl}
-                className="bg-[#25D366] text-white px-7 py-3.5 rounded-full text-sm font-semibold hover:brightness-110 transition-all flex items-center gap-2"
+                target="_blank"
+                rel="noreferrer"
+                className="bg-[#25D366] text-white px-7 h-12 rounded-full text-sm font-semibold hover:brightness-110 transition-all flex items-center gap-2 active:scale-[0.98]"
               >
                 💬 WhatsApp
               </a>

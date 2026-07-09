@@ -77,7 +77,7 @@ export default function FeaturedDrop() {
   const sizes = drop.sizes.split(',').map((size) => size.trim()).filter(Boolean);
 
   return (
-    <section className="py-14 sm:py-20 lg:py-28 bg-dark text-white" ref={ref}>
+    <section id="drop" className="py-14 sm:py-20 lg:py-28 bg-dark text-white" ref={ref}>
       <div className="mx-auto max-w-6xl px-5">
         <div
           className={`grid lg:grid-cols-2 gap-10 lg:gap-16 items-center ${
@@ -87,7 +87,7 @@ export default function FeaturedDrop() {
           <div className="relative">
             <div className="aspect-square rounded-3xl bg-white/5 border border-white/10 overflow-hidden flex items-center justify-center">
               {drop.imageUrl ? (
-                <img src={drop.imageUrl} alt={`${drop.brand} ${drop.name}`} className="h-full w-full object-cover" />
+                <img src={drop.imageUrl} alt={`${drop.brand} ${drop.name}`} loading="eager" decoding="async" fetchPriority="high" width={600} height={600} className="h-full w-full object-cover" />
               ) : (
                 <div className="text-center space-y-3">
                   <AppleEmoji emoji="👟" size={56} className="mx-auto" />
@@ -135,7 +135,7 @@ export default function FeaturedDrop() {
                 {sizes.map((size) => (
                   <button
                     key={size}
-                    className="h-10 min-w-12 rounded-xl bg-white/5 border border-white/10 px-3 text-sm font-semibold text-white/60 hover:bg-accent hover:border-accent hover:text-white transition-all"
+                    className="h-11 min-w-[48px] rounded-xl bg-white/5 border border-white/10 px-3 text-sm font-semibold text-white/60 hover:bg-accent hover:border-accent hover:text-white transition-all active:scale-95"
                   >
                     {size}
                   </button>
@@ -144,10 +144,10 @@ export default function FeaturedDrop() {
             </div>
 
             <div className="flex gap-3 pt-2">
-              <a href="#shop" className="bg-accent hover:bg-accent-light text-white px-8 py-3.5 rounded-full text-sm font-semibold transition-colors flex-1 sm:flex-none text-center">
+              <a href="#shop" className="bg-accent hover:bg-accent-light text-white px-8 h-12 rounded-full text-sm font-semibold transition-colors flex-1 sm:flex-none text-center flex items-center justify-center active:scale-[0.98]">
                 Commander →
               </a>
-              <a href={settings.whatsappUrl} className="bg-white/5 border border-white/10 hover:bg-white/10 text-white px-5 py-3.5 rounded-full text-sm font-semibold transition-colors">
+              <a href={settings.whatsappUrl} target="_blank" rel="noreferrer" className="bg-white/5 border border-white/10 hover:bg-white/10 text-white px-5 h-12 rounded-full text-sm font-semibold transition-colors flex items-center justify-center active:scale-[0.98]">
                 WhatsApp
               </a>
             </div>
