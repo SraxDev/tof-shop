@@ -70,7 +70,17 @@ export type DbDrop = {
 // ─── Products ────────────────────────────────────────────
 
 export async function fetchProducts(): Promise<DbProduct[]> {
-  const { data } = await supabase.from('products').select('*').order('created_at', { ascending: false });
+  const { data, error } = await supabase.from('products').select('*').order('created_at', { ascending: false });
+  if (error) {
+    // Fallback: try without ordering by created_at in case column doesn't exist (legacy DBs)
+    if (/created_at|column/i.test(error.message)) {
+      const { data: fallback, error: err2 } = await supabase.from('products').select('*');
+      if (err2) { console.error('fetchProducts failed:', err2); return []; }
+      return (fallback as DbProduct[]) || [];
+    }
+    console.error('fetchProducts failed:', error);
+    return [];
+  }
   return (data as DbProduct[]) || [];
 }
 
