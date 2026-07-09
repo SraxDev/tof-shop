@@ -21,7 +21,6 @@ import { playNewOrder, playCopy, playDelete } from '../lib/sounds';
 import ImageUploader from './ImageUploader';
 import { uploadProductImage, uploadDropImage, pathFromStorageUrl, isStorageUrl, deleteProductImages } from '../lib/storage';
 import { extractSourceUrl, isShortlink } from '../lib/resolveSourceUrl';
-import { scrapeProduct, guessCategory } from '../lib/scrape1688';
 import { SizePicker, ColorPicker } from './ui/ChipPickers';
 import { useDebounce } from '../hooks/useDebounce';
 import ConfirmDialog from './ui/ConfirmDialog';
@@ -680,8 +679,6 @@ type ProductEditDrawerProps = {
   onSave: () => void;
   onDuplicate?: (p: Product) => void;
   onAutoPrice: () => void;
-  onAutoFill?: () => void;
-  autoFilling?: boolean;
 };
 
 // Petit utilitaire de style pour les champs du drawer
@@ -786,7 +783,7 @@ function SourceUrlInput({
 }
 
 const ProductEditDrawer = memo(function ProductEditDrawer({
-  open, isNew, draft, original, onChange, onClose, onSave, onDuplicate, onAutoPrice, onAutoFill, autoFilling,
+  open, isNew, draft, original, onChange, onClose, onSave, onDuplicate, onAutoPrice,
 }: ProductEditDrawerProps) {
   const firstFieldRef = useRef<HTMLInputElement>(null);
 
@@ -935,23 +932,6 @@ const ProductEditDrawer = memo(function ProductEditDrawer({
                 isNew={isNew}
               />
             </Field>
-            {onAutoFill && (
-              <button
-                type="button"
-                onClick={onAutoFill}
-                disabled={autoFilling || !draft.sourceUrl.trim()}
-                className="w-full rounded-xl bg-accent/15 hover:bg-accent/25 border border-accent/30 text-accent px-4 py-2.5 text-xs font-bold inline-flex items-center justify-center gap-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {autoFilling ? (
-                  <>
-                    <span className="h-3 w-3 rounded-full border-2 border-accent/30 border-t-accent animate-spin" />
-                    Récupération des infos 1688…
-                  </>
-                ) : (
-                  <>✨ Remplir auto. depuis le lien (titre + prix ¥ + images)</>
-                )}
-              </button>
-            )}
           </div>
 
           <div className="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-3">
@@ -1700,42 +1680,7 @@ export default function AdminPanel() {
     });
   }, []);
 
-  const [autoFilling, setAutoFilling] = useState(false);
-  const autoFillDrawer = useCallback(async () => {
-    const d = drawerDraftRef.current;
-    if (!d || !d.sourceUrl.trim()) return;
-    setAutoFilling(true);
-    try {
-      const data = await scrapeProduct(d.sourceUrl);
-      if (!data) {
-        showToast('Impossible de récupérer les infos (site bloqué). Remplis manuellement.');
-        return;
-      }
-      const guessedCat = guessCategory(data.title);
-      const preset = guessedCat ? categoryPresets.find((p) => p.label === guessedCat) : null;
-      const next: Product = {
-        ...d,
-        name: d.name || data.title.split(/[-–—|｜]/)[0].trim(),
-        sourcePriceCny: data.priceCny ?? d.sourcePriceCny,
-        category: preset ? preset.label : d.category,
-        weightGrams: preset ? preset.weight : d.weightGrams,
-        packaging: preset ? preset.packaging : d.packaging,
-        sizes: preset ? preset.defaultSizes : d.sizes,
-        colors: preset ? preset.defaultColors : d.colors,
-        imageUrl: data.images.length > 0 ? data.images.join('|') : d.imageUrl,
-        salePrice: data.priceCny
-          ? suggestedSalePrice(data.priceCny, preset?.weight || d.weightGrams, preset?.packaging || d.packaging)
-          : d.salePrice,
-        sourceUrl: data.source || d.sourceUrl,
-      };
-      setDrawerDraft(next);
-      showToast('Infos récupérées ! Vérifie avant de sauvegarder ✓');
-    } catch {
-      showToast('Erreur lors de la récupération.');
-    } finally {
-      setAutoFilling(false);
-    }
-  }, []);
+
 
   const saveOrderField = useCallback(async (id: string, field: string, value: string) => {
     const dbField: Record<string, string> = { status: 'status', paymentStatus: 'payment_status', tracking: 'tracking' };
@@ -1905,37 +1850,6 @@ export default function AdminPanel() {
     });
   };
 
-  const [autoFillingQuick, setAutoFillingQuick] = useState(false);
-  const autoFillQuick = async () => {
-    if (!quickProduct.sourceUrl.trim()) return;
-    setAutoFillingQuick(true);
-    try {
-      const data = await scrapeProduct(quickProduct.sourceUrl);
-      if (!data) { showToast('Impossible de récupérer les infos.'); return; }
-      const guessedCat = guessCategory(data.title);
-      const preset = guessedCat ? categoryPresets.find((p) => p.label === guessedCat) : null;
-      setQuickProduct({
-        ...quickProduct,
-        name: quickProduct.name || data.title.split(/[-–—|｜]/)[0].trim(),
-        sourcePriceCny: data.priceCny ?? quickProduct.sourcePriceCny,
-        category: preset ? preset.label : quickProduct.category,
-        weightGrams: preset ? preset.weight : quickProduct.weightGrams,
-        packaging: preset ? preset.packaging : quickProduct.packaging,
-        sizes: preset ? preset.defaultSizes : quickProduct.sizes,
-        colors: preset ? preset.defaultColors : quickProduct.colors,
-        imageUrl: data.images.length > 0 ? data.images.join('|') : quickProduct.imageUrl,
-        salePrice: data.priceCny
-          ? suggestedSalePrice(data.priceCny, preset?.weight || quickProduct.weightGrams, preset?.packaging || quickProduct.packaging)
-          : quickProduct.salePrice,
-        sourceUrl: data.source || quickProduct.sourceUrl,
-      });
-      showToast('Auto-rempli ! Vérifie avant d\'ajouter ✓');
-    } catch {
-      showToast('Erreur.');
-    } finally {
-      setAutoFillingQuick(false);
-    }
-  };
 
   const addOrder = async () => {
     if (!newOrder.customerName || !newOrder.phone || !newOrder.address) return;
@@ -2638,24 +2552,11 @@ export default function AdminPanel() {
                     theme="light"
                   />
                 </div>
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <SourceUrlInput
-                      value={quickProduct.sourceUrl}
-                      onChange={(v) => setQuickProduct({ ...quickProduct, sourceUrl: v })}
-                      compact
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={autoFillQuick}
-                    disabled={autoFillingQuick || !quickProduct.sourceUrl.trim()}
-                    className="h-[46px] rounded-xl bg-accent text-white px-3 text-[11px] font-bold hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1 flex-shrink-0"
-                    title="Remplir auto depuis le lien"
-                  >
-                    {autoFillingQuick ? <span className="h-3 w-3 rounded-full border-2 border-white/40 border-t-white animate-spin" /> : '✨ Auto'}
-                  </button>
-                </div>
+                <SourceUrlInput
+                  value={quickProduct.sourceUrl}
+                  onChange={(v) => setQuickProduct({ ...quickProduct, sourceUrl: v })}
+                  compact
+                />
                 <div>
                   <ImageUploader
                     value={quickProduct.imageUrl}
@@ -3506,8 +3407,6 @@ export default function AdminPanel() {
         onSave={saveDrawer}
         onDuplicate={duplicateProduct}
         onAutoPrice={autoPriceDrawer}
-        onAutoFill={autoFillDrawer}
-        autoFilling={autoFilling}
       />
 
       {/* Dialog de confirmation */}
