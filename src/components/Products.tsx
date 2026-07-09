@@ -561,7 +561,7 @@ function QuickAddModal({
                 {/* Colors */}
                 {colors.length > 0 && (
                   <div className="mt-6">
-                    <label className="text-[11px] font-bold uppercase tracking-widest text-dark/40 block mb-3">Couleur</label>
+                    <label className="text-[11px] font-bold uppercase tracking-widest text-dark/40 block mb-3">Variante</label>
                     <div className="flex flex-wrap gap-2">
                       {colors.map((c, idx) => (
                         <button
@@ -585,7 +585,7 @@ function QuickAddModal({
                     <p className="text-[11px] text-accent font-bold text-center">
                       {sizes.length > 0 && !selectedSize ? 'Sélectionnez une taille' : ''}
                       {sizes.length > 0 && !selectedSize && colors.length > 0 && !selectedColor ? ' et ' : ''}
-                      {colors.length > 0 && !selectedColor ? 'une couleur' : ''}
+                      {colors.length > 0 && !selectedColor ? 'une variante' : ''}
                     </p>
                   </div>
                 )}

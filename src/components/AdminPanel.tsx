@@ -82,36 +82,36 @@ const CNY_TO_EUR = 0.13;
 const SHIPPING_SAFETY_MULTIPLIER = 1.2;
 
 const categoryPresets = [
-  { label: 'T-shirt', weight: 320, packaging: 'none' as const, defaultSizes: 'S, M, L, XL, XXL', defaultColors: 'Black, White' },
-  { label: 'Polo', weight: 380, packaging: 'none' as const, defaultSizes: 'S, M, L, XL, XXL', defaultColors: 'Black, White' },
-  { label: 'Chemise', weight: 350, packaging: 'none' as const, defaultSizes: 'S, M, L, XL, XXL', defaultColors: 'Black, White' },
-  { label: 'Hoodie / pull', weight: 900, packaging: 'none' as const, defaultSizes: 'S, M, L, XL, XXL', defaultColors: 'Black, White' },
-  { label: 'Veste légère', weight: 1100, packaging: 'none' as const, defaultSizes: 'S, M, L, XL, XXL', defaultColors: 'Black' },
-  { label: 'Doudoune', weight: 1600, packaging: 'none' as const, defaultSizes: 'S, M, L, XL, XXL', defaultColors: 'Black' },
-  { label: 'Jean / pantalon', weight: 750, packaging: 'none' as const, defaultSizes: 'S, M, L, XL, XXL', defaultColors: 'Black, Blue' },
-  { label: 'Short', weight: 400, packaging: 'none' as const, defaultSizes: 'S, M, L, XL, XXL', defaultColors: 'Black, White' },
-  { label: 'Jogging', weight: 650, packaging: 'none' as const, defaultSizes: 'S, M, L, XL, XXL', defaultColors: 'Black, Grey' },
-  { label: 'Maillot de bain', weight: 200, packaging: 'none' as const, defaultSizes: 'S, M, L, XL', defaultColors: 'Black, Blue' },
-  { label: 'Ensemble', weight: 1200, packaging: 'none' as const, defaultSizes: 'S, M, L, XL, XXL', defaultColors: 'Black, White' },
-  { label: 'Robe', weight: 500, packaging: 'none' as const, defaultSizes: 'XS, S, M, L, XL', defaultColors: 'Black, White' },
-  { label: 'Jupe', weight: 350, packaging: 'none' as const, defaultSizes: 'XS, S, M, L, XL', defaultColors: 'Black' },
-  { label: 'Sous-vêtement', weight: 150, packaging: 'none' as const, defaultSizes: 'S, M, L, XL', defaultColors: 'Black, White' },
-  { label: 'Casquette', weight: 250, packaging: 'none' as const, defaultSizes: '', defaultColors: 'Black, White' },
-  { label: 'Bonnet', weight: 200, packaging: 'none' as const, defaultSizes: '', defaultColors: 'Black' },
-  { label: 'Ceinture', weight: 300, packaging: 'none' as const, defaultSizes: '', defaultColors: 'Black, Brown' },
-  { label: 'Lunettes', weight: 150, packaging: 'none' as const, defaultSizes: '', defaultColors: 'Black' },
-  { label: 'Bijoux', weight: 100, packaging: 'none' as const, defaultSizes: '', defaultColors: '' },
-  { label: 'Sacoche', weight: 500, packaging: 'none' as const, defaultSizes: '', defaultColors: 'Black, Brown' },
-  { label: 'Sac à main', weight: 950, packaging: 'none' as const, defaultSizes: '', defaultColors: 'Black, Brown' },
-  { label: 'Sac à dos', weight: 800, packaging: 'none' as const, defaultSizes: '', defaultColors: 'Black' },
-  { label: 'Sneakers', weight: 1100, packaging: 'without_box' as const, defaultSizes: '39, 40, 41, 42, 43, 44, 45', defaultColors: 'Black, White' },
-  { label: 'Sneakers + boîte', weight: 1600, packaging: 'with_box' as const, defaultSizes: '39, 40, 41, 42, 43, 44, 45', defaultColors: 'Black, White' },
-  { label: 'Claquettes', weight: 500, packaging: 'none' as const, defaultSizes: '39, 40, 41, 42, 43, 44, 45', defaultColors: 'Black' },
-  { label: 'Chaussures', weight: 1000, packaging: 'none' as const, defaultSizes: '39, 40, 41, 42, 43, 44, 45', defaultColors: 'Black' },
-  { label: 'Montre', weight: 200, packaging: 'with_box' as const, defaultSizes: '', defaultColors: '' },
-  { label: 'Portefeuille', weight: 250, packaging: 'none' as const, defaultSizes: '', defaultColors: 'Black, Brown' },
-  { label: 'Écharpe', weight: 300, packaging: 'none' as const, defaultSizes: '', defaultColors: 'Black, Grey' },
-  { label: 'Parfum', weight: 400, packaging: 'with_box' as const, defaultSizes: '', defaultColors: '' },
+  { label: 'T-shirt', weight: 320, packaging: 'none' as const, defaultSizes: 'S, M, L, XL, XXL', defaultColors: '1, 2' },
+  { label: 'Polo', weight: 380, packaging: 'none' as const, defaultSizes: 'S, M, L, XL, XXL', defaultColors: '1, 2' },
+  { label: 'Chemise', weight: 350, packaging: 'none' as const, defaultSizes: 'S, M, L, XL, XXL', defaultColors: '1, 2' },
+  { label: 'Hoodie / pull', weight: 900, packaging: 'none' as const, defaultSizes: 'S, M, L, XL, XXL', defaultColors: '1, 2' },
+  { label: 'Veste légère', weight: 1100, packaging: 'none' as const, defaultSizes: 'S, M, L, XL, XXL', defaultColors: '1' },
+  { label: 'Doudoune', weight: 1600, packaging: 'none' as const, defaultSizes: 'S, M, L, XL, XXL', defaultColors: '1' },
+  { label: 'Jean / pantalon', weight: 750, packaging: 'none' as const, defaultSizes: 'S, M, L, XL, XXL', defaultColors: '1, 2' },
+  { label: 'Short', weight: 400, packaging: 'none' as const, defaultSizes: 'S, M, L, XL, XXL', defaultColors: '1, 2' },
+  { label: 'Jogging', weight: 650, packaging: 'none' as const, defaultSizes: 'S, M, L, XL, XXL', defaultColors: '1, 2' },
+  { label: 'Maillot de bain', weight: 200, packaging: 'none' as const, defaultSizes: 'S, M, L, XL', defaultColors: '1, 2' },
+  { label: 'Ensemble', weight: 1200, packaging: 'none' as const, defaultSizes: 'S, M, L, XL, XXL', defaultColors: '1, 2' },
+  { label: 'Robe', weight: 500, packaging: 'none' as const, defaultSizes: 'XS, S, M, L, XL', defaultColors: '1, 2' },
+  { label: 'Jupe', weight: 350, packaging: 'none' as const, defaultSizes: 'XS, S, M, L, XL', defaultColors: '1' },
+  { label: 'Sous-vêtement', weight: 150, packaging: 'none' as const, defaultSizes: 'S, M, L, XL', defaultColors: '1, 2' },
+  { label: 'Casquette', weight: 250, packaging: 'none' as const, defaultSizes: '', defaultColors: '1, 2' },
+  { label: 'Bonnet', weight: 200, packaging: 'none' as const, defaultSizes: '', defaultColors: '1' },
+  { label: 'Ceinture', weight: 300, packaging: 'none' as const, defaultSizes: '', defaultColors: '1, 2' },
+  { label: 'Lunettes', weight: 150, packaging: 'none' as const, defaultSizes: '', defaultColors: '1' },
+  { label: 'Bijoux', weight: 100, packaging: 'none' as const, defaultSizes: '', defaultColors: '1' },
+  { label: 'Sacoche', weight: 500, packaging: 'none' as const, defaultSizes: '', defaultColors: '1, 2' },
+  { label: 'Sac à main', weight: 950, packaging: 'none' as const, defaultSizes: '', defaultColors: '1, 2' },
+  { label: 'Sac à dos', weight: 800, packaging: 'none' as const, defaultSizes: '', defaultColors: '1' },
+  { label: 'Sneakers', weight: 1100, packaging: 'without_box' as const, defaultSizes: '39, 40, 41, 42, 43, 44, 45', defaultColors: '1, 2' },
+  { label: 'Sneakers + boîte', weight: 1600, packaging: 'with_box' as const, defaultSizes: '39, 40, 41, 42, 43, 44, 45', defaultColors: '1, 2' },
+  { label: 'Claquettes', weight: 500, packaging: 'none' as const, defaultSizes: '39, 40, 41, 42, 43, 44, 45', defaultColors: '1' },
+  { label: 'Chaussures', weight: 1000, packaging: 'none' as const, defaultSizes: '39, 40, 41, 42, 43, 44, 45', defaultColors: '1' },
+  { label: 'Montre', weight: 200, packaging: 'with_box' as const, defaultSizes: '', defaultColors: '1' },
+  { label: 'Portefeuille', weight: 250, packaging: 'none' as const, defaultSizes: '', defaultColors: '1, 2' },
+  { label: 'Écharpe', weight: 300, packaging: 'none' as const, defaultSizes: '', defaultColors: '1, 2' },
+  { label: 'Parfum', weight: 400, packaging: 'with_box' as const, defaultSizes: '', defaultColors: '1' },
 ];
 
 // packagingLabels removed — no longer used in quick form
@@ -1077,7 +1077,7 @@ const ProductEditDrawer = memo(function ProductEditDrawer({
           </div>
 
           <div className="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-white/50">Tailles &amp; couleurs</h4>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-white/50">Tailles &amp; variantes</h4>
             <div>
               <div className="text-[11px] text-white/40 font-semibold mb-2">Tailles</div>
               <SizePicker
@@ -1088,7 +1088,7 @@ const ProductEditDrawer = memo(function ProductEditDrawer({
               />
             </div>
             <div>
-              <div className="text-[11px] text-white/40 font-semibold mb-2">Couleurs (ordre 1:1 avec les photos)</div>
+              <div className="text-[11px] text-white/40 font-semibold mb-2">Variantes photo (1, 2, 3... — correspond à l'ordre des images)</div>
               <ColorPicker
                 value={draft.colors}
                 onChange={(v) => onChange({ ...draft, colors: v })}
@@ -2596,7 +2596,7 @@ export default function AdminPanel() {
                   />
                 </div>
                 <div className="rounded-xl bg-white/80 border border-dark/5 p-3 space-y-2">
-                  <div className="text-[11px] font-bold text-dark/40 uppercase tracking-wider">Couleurs</div>
+                  <div className="text-[11px] font-bold text-dark/40 uppercase tracking-wider">Variantes (1, 2, 3…)</div>
                   <ColorPicker
                     value={quickProduct.colors}
                     onChange={(v) => setQuickProduct({ ...quickProduct, colors: v })}

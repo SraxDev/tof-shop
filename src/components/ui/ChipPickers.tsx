@@ -19,7 +19,9 @@ const SIZE_PRESETS: Record<string, string[]> = {
   kids: ['28', '30', '32', '34', '36'],
 };
 
-const COLOR_QUICK = ['Black', 'White', 'Grey', 'Beige', 'Brown', 'Navy', 'Red', 'Green', 'Blue', 'Pink', 'Cream', 'Khaki'];
+// Par défaut on propose des numéros de variante (correspondent à l'ordre des photos 1:1).
+// Possibilité d'ajouter un nom personnalisé si besoin.
+const COLOR_QUICK = ['1', '2', '3', '4', '5', '6'];
 
 function parseList(value: string): string[] {
   return value.split(',').map((s) => s.trim()).filter(Boolean);
@@ -260,7 +262,7 @@ export function ColorPicker({
             value={custom}
             onChange={(e) => setCustom(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addCustom())}
-            placeholder="Couleur personnalisée (ex: Orange, Camel)"
+            placeholder="Variante personnalisée (ex: 7, 10, Détail)"
             className={cn(
               'flex-1 rounded-xl border px-3 py-2 text-xs outline-none',
               theme === 'dark'
