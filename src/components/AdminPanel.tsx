@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Copy, ExternalLink, Package, Pencil, Plus, Save, Search, Send, Trash2, Truck } from 'lucide-react';
+import { Copy, ExternalLink, Package, Pencil, Plus, Save, Search, Send, Trash2, Truck, X } from 'lucide-react';
 import { defaultDrop, type FeaturedDropConfig } from './FeaturedDrop';
 import { defaultSettings, readSiteSettings, saveSiteSettings, hydrateSiteSettings, type SiteSettings } from '../lib/siteSettings';
 import { fetchProducts, upsertProduct, deleteProduct as dbDeleteProduct, fetchOrders, updateOrder, insertOrder as dbInsertOrder, fetchDrop, saveDrop as dbSaveDrop, fetchNotes, upsertNote, deleteNote as dbDeleteNote, subscribeToOrders, subscribeToProducts, onOnlineCountChange, getPresenceState, trackVisitor, fetchConversations, sendChatMessage, subscribeToChatMessages, deleteConversation, deleteChatMessage, fetchPromoCodes, upsertPromoCode, deletePromoCode, type DbProduct, type DbOrder, type DbDrop, type DbNote, type DbChatMessage, type DbPromoCode } from '../lib/db';
@@ -58,7 +58,7 @@ type Order = {
 
 // Legacy keys kept for reference
 // const STORAGE_PRODUCTS = 'tof-admin-products-v1';
-// const STORAGE_ORDERS = 'tof-admin-orders-v1';
+// const STORAGE_ORDERS = 'tof-orders-v1';
 // const STORAGE_DROP = 'tof-featured-drop-v1';
 const CNY_TO_EUR = 0.13;
 const SHIPPING_SAFETY_MULTIPLIER = 1.2;
@@ -348,142 +348,387 @@ function rootOrderId(id: string) {
   return match ? match[0] : id;
 }
 
-type ProductRowProps = {
-  product: Product;
-  isEditing: boolean;
-  current: Product;
-  onFieldChange: (next: Product) => void;
-  onStartEdit: (product: Product) => void;
-  onSaveEdit: () => void;
-  onRemove: (id: string) => void;
-};
-
-// Handler d'upload stable (référence de module, pas de state) — on évite
-// de devoir le passer en prop à chaque ProductRow, ce qui simplifie le
-// typage et ne casse pas la mémoïsation.
+// Handler d'upload stable (référence de module, pas de state) — évite de
+// recréer la fonction à chaque render et ne casse pas la mémoïsation.
 const productImageUploadHandler = (file: File) =>
   uploadProductImage(file, 800, 0.75).then((r) => r.url);
 
-// Mémoïsé : évite de re-render (et re-décoder les images) de TOUTE la liste
-// de produits quand un seul produit est édité / copié / supprimé.
-const ProductRow = memo(function ProductRow({ product, isEditing, current, onFieldChange, onStartEdit, onSaveEdit, onRemove }: ProductRowProps) {
-  const margin = estimateNetMargin(current);
+// ────────────────────────────────────────────────────────────────────────────
+// ProductListItem : ligne compacte dans la liste (miniature + infos clés)
+// ────────────────────────────────────────────────────────────────────────────
+type ProductListItemProps = {
+  product: Product;
+  onEdit: (product: Product) => void;
+  onRemove: (id: string) => void;
+};
+
+const ProductListItem = memo(function ProductListItem({ product, onEdit, onRemove }: ProductListItemProps) {
+  const margin = estimateNetMargin(product);
+  const firstImage = product.imageUrl
+    ? product.imageUrl.split('|').map((s) => s.trim()).find(Boolean) || ''
+    : '';
+  const statusBadge = {
+    active: { label: 'Actif', cls: 'bg-green-500/10 text-green-600' },
+    link_dead: { label: 'Lien sauté', cls: 'bg-red-500/10 text-red-500' },
+    paused: { label: 'Pause', cls: 'bg-dark/10 text-dark/40' },
+  }[product.status];
+
   return (
-    <div className="p-5">
-      <div className="grid lg:grid-cols-[1fr_1.5fr_auto] gap-4 items-start">
-        <div className="space-y-2">
-          <input disabled={!isEditing} value={current.brand} onChange={(e) => onFieldChange({ ...current, brand: e.target.value })} className="w-full rounded-xl bg-bg px-4 py-3 text-sm font-bold outline-none disabled:bg-transparent disabled:px-0" />
-          <input disabled={!isEditing} value={current.name} onChange={(e) => onFieldChange({ ...current, name: e.target.value })} className="w-full rounded-xl bg-bg px-4 py-3 text-sm outline-none disabled:bg-transparent disabled:px-0 disabled:py-0 text-dark/60" />
-        </div>
-        <div className="space-y-3">
-          <input disabled={!isEditing} value={current.sourceUrl} onChange={(e) => onFieldChange({ ...current, sourceUrl: e.target.value })} className="w-full rounded-xl bg-bg px-4 py-3 text-xs outline-none disabled:bg-bg text-dark/60" />
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
-            <label className="text-xs text-dark/35">Genre<select disabled={!isEditing} value={current.gender || 'mixte'} onChange={(e) => onFieldChange({ ...current, gender: e.target.value as Product['gender'] })} className="mt-1 w-full rounded-xl bg-bg px-3 py-2 text-sm text-dark outline-none"><option value="homme">Homme</option><option value="femme">Femme</option><option value="mixte">Mixte</option></select></label>
-            <label className="text-xs text-dark/35">Catégorie<select disabled={!isEditing} value={current.category} onChange={(e) => {
-              const preset = categoryPresets.find((item) => item.label === e.target.value);
-              onFieldChange({
-                ...current,
-                category: e.target.value,
-                weightGrams: preset?.weight || current.weightGrams,
-                packaging: preset?.packaging || current.packaging,
-                sizes: preset?.defaultSizes ?? current.sizes,
-                colors: preset?.defaultColors ?? current.colors,
-              });
-            }} className="mt-1 w-full rounded-xl bg-bg px-3 py-2 text-sm text-dark outline-none">{categoryPresets.map((preset) => <option key={preset.label} value={preset.label}>{preset.label}</option>)}</select></label>
-            <label className="text-xs text-dark/35">Packaging<select disabled={!isEditing} value={current.packaging || 'none'} onChange={(e) => onFieldChange({ ...current, packaging: e.target.value as Product['packaging'] })} className="mt-1 w-full rounded-xl bg-bg px-3 py-2 text-sm text-dark outline-none"><option value="none">Standard</option><option value="without_box">Sans boite</option><option value="with_box">Avec boite</option></select></label>
-            <label className="text-xs text-dark/35">Vente €<input disabled={!isEditing} type="number" value={current.salePrice} onChange={(e) => onFieldChange({ ...current, salePrice: Number(e.target.value) })} className="mt-1 w-full rounded-xl bg-bg px-3 py-2 text-sm text-dark outline-none" /></label>
-            <label className="text-xs text-dark/35">Source CNY<input disabled={!isEditing} type="number" value={current.sourcePriceCny} onChange={(e) => onFieldChange({ ...current, sourcePriceCny: Number(e.target.value) })} className="mt-1 w-full rounded-xl bg-bg px-3 py-2 text-sm text-dark outline-none" /></label>
-            <label className="text-xs text-dark/35">Poids g<input disabled={!isEditing} type="number" value={current.weightGrams} onChange={(e) => onFieldChange({ ...current, weightGrams: Number(e.target.value) })} className="mt-1 w-full rounded-xl bg-bg px-3 py-2 text-sm text-dark outline-none" /></label>
-            <label className="text-xs text-dark/35">Statut<select disabled={!isEditing} value={current.status} onChange={(e) => onFieldChange({ ...current, status: e.target.value as Product['status'] })} className="mt-1 w-full rounded-xl bg-bg px-3 py-2 text-sm text-dark outline-none"><option value="active">Actif</option><option value="link_dead">Lien saute</option><option value="paused">Pause</option></select></label>
-          </div>
-          <div className="grid sm:grid-cols-2 gap-3">
-            <label className="text-xs text-dark/35">Tailles disponibles
-              <input disabled={!isEditing} value={current.sizes || ''} onChange={(e) => onFieldChange({ ...current, sizes: e.target.value })} placeholder="39, 40, 41, 42, 43, 44, 45" className="mt-1 w-full rounded-xl bg-bg px-3 py-2 text-sm text-dark outline-none" />
-            </label>
-            <label className="text-xs text-dark/35">Couleurs disponibles
-              <input disabled={!isEditing} value={current.colors || ''} onChange={(e) => onFieldChange({ ...current, colors: e.target.value })} placeholder="Black, White, Red" className="mt-1 w-full rounded-xl bg-bg px-3 py-2 text-sm text-dark outline-none" />
-            </label>
-          </div>
-          <ImageUploader
-            value={current.imageUrl}
-            onChange={(next) => onFieldChange({ ...current, imageUrl: next })}
-            disabled={!isEditing}
-            uploadHandler={productImageUploadHandler}
-            maxSize={800}
-            quality={0.75}
-            label="Images produit"
-            hint="Glisse-dépose, colle (Ctrl+V) ou ajoute une URL. Les fichiers sont compressés puis uploadés sur Supabase Storage. Ordre 1:1 avec les coloris."
+    <div className="group flex items-center gap-3 sm:gap-4 p-3 sm:p-4 hover:bg-bg/60 transition-colors">
+      {/* Miniature */}
+      <div className="h-14 w-14 sm:h-16 sm:w-16 rounded-2xl bg-subtle border border-dark/5 flex-shrink-0 overflow-hidden flex items-center justify-center">
+        {firstImage ? (
+          <img
+            src={firstImage}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover"
           />
+        ) : (
+          <Package size={20} className="text-dark/20" />
+        )}
+      </div>
 
-          {current.imageUrl && (
-            <div className="mt-1">
-              <p className="text-[10px] font-bold text-dark/30 uppercase mb-2">
-                Correspondance photos / coloris
-              </p>
-              <div className="flex flex-wrap gap-3">
-                {current.imageUrl.split('|').map((url, idx) => {
-                  const trimmedUrl = url.trim();
-                  if (!trimmedUrl) return null;
-                  const colorNames = current.colors
-                    ? current.colors.split(',').map((s) => s.trim())
-                    : [];
-                  const colorName = colorNames[idx] || `Photo ${idx + 1}`;
-
-                  return (
-                    <div
-                      key={idx}
-                      className="relative group/img flex flex-col items-center gap-1"
-                    >
-                      <div className="relative">
-                        <img
-                          src={trimmedUrl}
-                          alt={colorName}
-                          loading="lazy"
-                          decoding="async"
-                          className="h-16 w-16 rounded-xl object-contain bg-subtle border border-dark/10"
-                        />
-                      </div>
-                      <span className="text-[9px] font-bold text-dark/40 uppercase truncate max-w-[64px]">
-                        {colorName}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+      {/* Infos principales */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-accent truncate max-w-[120px]">
+            {product.brand || 'Sans marque'}
+          </span>
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${statusBadge.cls}`}>
+            {statusBadge.label}
+          </span>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-dark/30">
+            {product.category}
+          </span>
+        </div>
+        <div className="font-semibold text-sm sm:text-base truncate mt-0.5">
+          {product.name || 'Produit sans nom'}
+        </div>
+        <div className="flex items-center gap-2 sm:gap-3 mt-1 text-[11px] text-dark/45 flex-wrap">
+          <span className="font-800 text-dark/80">{euro(product.salePrice)}</span>
+          <span>·</span>
+          <span>Source ¥{product.sourcePriceCny}</span>
+          <span>·</span>
+          <span className={`font-bold ${margin.net >= 45 ? 'text-green-600' : margin.net >= 20 ? 'text-orange-500' : 'text-red-500'}`}>
+            {euro(margin.net)}
+          </span>
+          {product.sizes && (
+            <>
+              <span className="hidden sm:inline">·</span>
+              <span className="hidden sm:inline truncate max-w-[160px]">{product.sizes}</span>
+            </>
           )}
-          <div className="flex flex-wrap gap-2 text-xs">
-            <span className="rounded-full bg-dark/5 px-3 py-1 text-dark/45">Poids retenu {margin.effectiveWeight}g</span>
-            <span className="rounded-full bg-dark/5 px-3 py-1 text-dark/45">Livraison {euro(margin.shipping.low)} - {euro(margin.shipping.high)}</span>
-            <span className="rounded-full bg-dark/5 px-3 py-1 text-dark/45">Securite +20% {euro(margin.shippingWithSafety)}</span>
-            <span className={`rounded-full px-3 py-1 font-bold ${marginTone(margin.net)}`}>Marge nette {marginLabel(margin.net)} : {euro(margin.net)}</span>
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center gap-1.5 flex-shrink-0">
+        {product.sourceUrl && (
+          <a
+            href={product.sourceUrl}
+            target="_blank"
+            rel="noreferrer"
+            title="Ouvrir le lien source"
+            className="h-9 w-9 inline-flex items-center justify-center rounded-full bg-dark/5 text-dark/50 hover:bg-dark/10 hover:text-dark/80 transition-colors"
+          >
+            <ExternalLink size={14} />
+          </a>
+        )}
+        <button
+          onClick={() => onEdit(product)}
+          title="Modifier le produit"
+          className="inline-flex items-center gap-1.5 rounded-full bg-dark px-3 sm:px-4 h-9 text-xs font-semibold text-white hover:bg-accent transition-colors"
+        >
+          <Pencil size={13} />
+          <span className="hidden sm:inline">Modifier</span>
+        </button>
+        <button
+          onClick={() => { if (confirm('Supprimer ce produit ?')) onRemove(product.id); }}
+          title="Supprimer le produit"
+          className="h-9 w-9 inline-flex items-center justify-center rounded-full bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors"
+        >
+          <Trash2 size={14} />
+        </button>
+      </div>
+    </div>
+  );
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// ProductEditDrawer : panneau latéral d'édition / création
+// ────────────────────────────────────────────────────────────────────────────
+type ProductEditDrawerProps = {
+  open: boolean;
+  isNew: boolean;
+  draft: Product | null;
+  onChange: (next: Product) => void;
+  onClose: () => void;
+  onSave: () => void;
+  onAutoPrice: () => void;
+};
+
+const ProductEditDrawer = memo(function ProductEditDrawer({
+  open, isNew, draft, onChange, onClose, onSave, onAutoPrice,
+}: ProductEditDrawerProps) {
+  // Fermeture par Échap
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    // Empêche le scroll du fond quand le drawer est ouvert
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [open, onClose]);
+
+  if (!open || !draft) return null;
+
+  const margin = estimateNetMargin(draft);
+
+  return (
+    <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
+      {/* Overlay */}
+      <div
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
+        onClick={onClose}
+      />
+      {/* Panneau */}
+      <div className="absolute right-0 top-0 h-full w-full sm:w-[640px] lg:w-[760px] bg-dark text-white shadow-2xl shadow-black/40 flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between gap-4 p-5 border-b border-white/10">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-widest text-accent">
+              {isNew ? 'Nouveau produit' : 'Édition produit'}
+            </div>
+            <h3 className="font-display text-xl font-800 mt-0.5 truncate">
+              {draft.brand || '—'} {draft.name ? `- ${draft.name}` : ''}
+            </h3>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Fermer"
+            className="h-9 w-9 rounded-full bg-white/5 hover:bg-white/10 inline-flex items-center justify-center flex-shrink-0 transition-colors"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Body scrollable */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+          {/* Identité */}
+          <div className="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-white/50">Identité</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label className="text-xs text-white/50 block">
+                Marque
+                <input
+                  value={draft.brand}
+                  onChange={(e) => onChange({ ...draft, brand: e.target.value })}
+                  className="mt-1 w-full rounded-xl bg-white/10 border border-white/10 px-4 py-2.5 text-sm text-white outline-none focus:border-accent/40"
+                />
+              </label>
+              <label className="text-xs text-white/50 block">
+                Nom du produit
+                <input
+                  value={draft.name}
+                  onChange={(e) => onChange({ ...draft, name: e.target.value })}
+                  className="mt-1 w-full rounded-xl bg-white/10 border border-white/10 px-4 py-2.5 text-sm text-white outline-none focus:border-accent/40"
+                />
+              </label>
+            </div>
+            <label className="text-xs text-white/50 block">
+              Lien source (1688 / Taobao / Weidian…)
+              <input
+                value={draft.sourceUrl}
+                onChange={(e) => onChange({ ...draft, sourceUrl: e.target.value })}
+                placeholder="https://detail.1688.com/offer/..."
+                className="mt-1 w-full rounded-xl bg-white/10 border border-white/10 px-4 py-2.5 text-xs text-white/80 outline-none focus:border-accent/40"
+              />
+            </label>
+          </div>
+
+          {/* Catégorisation */}
+          <div className="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-white/50">Catégorisation</h4>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <label className="text-xs text-white/50 block">
+                Genre
+                <select
+                  value={draft.gender}
+                  onChange={(e) => onChange({ ...draft, gender: e.target.value as Product['gender'] })}
+                  className="mt-1 w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2.5 text-sm text-white outline-none"
+                >
+                  <option value="homme">Homme</option>
+                  <option value="femme">Femme</option>
+                  <option value="mixte">Mixte</option>
+                </select>
+              </label>
+              <label className="text-xs text-white/50 block sm:col-span-2">
+                Catégorie
+                <select
+                  value={draft.category}
+                  onChange={(e) => {
+                    const preset = categoryPresets.find((item) => item.label === e.target.value);
+                    onChange({
+                      ...draft,
+                      category: e.target.value,
+                      weightGrams: preset?.weight || draft.weightGrams,
+                      packaging: preset?.packaging || draft.packaging,
+                      sizes: preset?.defaultSizes ?? draft.sizes,
+                      colors: preset?.defaultColors ?? draft.colors,
+                    });
+                  }}
+                  className="mt-1 w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2.5 text-sm text-white outline-none"
+                >
+                  {categoryPresets.map((preset) => (
+                    <option key={preset.label} value={preset.label}>{preset.label}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <label className="text-xs text-white/50 block">
+              Packaging
+              <select
+                value={draft.packaging}
+                onChange={(e) => onChange({ ...draft, packaging: e.target.value as Product['packaging'] })}
+                className="mt-1 w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2.5 text-sm text-white outline-none"
+              >
+                <option value="none">Standard</option>
+                <option value="without_box">Sans boîte</option>
+                <option value="with_box">Avec boîte</option>
+              </select>
+            </label>
+            <label className="text-xs text-white/50 block">
+              Statut
+              <select
+                value={draft.status}
+                onChange={(e) => onChange({ ...draft, status: e.target.value as Product['status'] })}
+                className="mt-1 w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2.5 text-sm text-white outline-none"
+              >
+                <option value="active">Actif</option>
+                <option value="link_dead">Lien sauté</option>
+                <option value="paused">En pause</option>
+              </select>
+            </label>
+          </div>
+
+          {/* Prix & poids */}
+          <div className="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-white/50">Prix & poids</h4>
+            <div className="grid grid-cols-3 gap-3">
+              <label className="text-xs text-white/50 block">
+                Prix vente €
+                <input
+                  type="number"
+                  value={draft.salePrice}
+                  onChange={(e) => onChange({ ...draft, salePrice: Number(e.target.value) })}
+                  className="mt-1 w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2.5 text-sm text-white outline-none"
+                />
+              </label>
+              <label className="text-xs text-white/50 block">
+                Prix source ¥
+                <input
+                  type="number"
+                  value={draft.sourcePriceCny}
+                  onChange={(e) => onChange({ ...draft, sourcePriceCny: Number(e.target.value) })}
+                  className="mt-1 w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2.5 text-sm text-white outline-none"
+                />
+              </label>
+              <label className="text-xs text-white/50 block">
+                Poids g
+                <input
+                  type="number"
+                  value={draft.weightGrams}
+                  onChange={(e) => onChange({ ...draft, weightGrams: Number(e.target.value) })}
+                  className="mt-1 w-full rounded-xl bg-white/10 border border-white/10 px-3 py-2.5 text-sm text-white outline-none"
+                />
+              </label>
+            </div>
+            <div className="flex flex-wrap gap-2 text-[11px] pt-1">
+              <span className="rounded-full bg-white/10 px-3 py-1 text-white/60">Poids retenu {margin.effectiveWeight}g</span>
+              <span className="rounded-full bg-white/10 px-3 py-1 text-white/60">Livraison {euro(margin.shipping.low)} – {euro(margin.shipping.high)}</span>
+              <span className="rounded-full bg-white/10 px-3 py-1 text-white/60">Sécurité +20% {euro(margin.shippingWithSafety)}</span>
+              <span className={`rounded-full px-3 py-1 font-bold ${marginTone(margin.net).replace('bg-green-500/10', 'bg-green-500/20').replace('bg-orange-500/10', 'bg-orange-500/20').replace('bg-red-500/10', 'bg-red-500/20').replace('text-green-600', 'text-green-300').replace('text-orange-600', 'text-orange-300').replace('text-red-600', 'text-red-300')}`}>
+                Marge {marginLabel(margin.net)} : {euro(margin.net)}
+              </span>
+            </div>
+          </div>
+
+          {/* Variants */}
+          <div className="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-white/50">Tailles & couleurs</h4>
+            <label className="text-xs text-white/50 block">
+              Tailles (séparées par des virgules)
+              <input
+                value={draft.sizes}
+                onChange={(e) => onChange({ ...draft, sizes: e.target.value })}
+                placeholder="39, 40, 41, 42, 43, 44, 45"
+                className="mt-1 w-full rounded-xl bg-white/10 border border-white/10 px-4 py-2.5 text-sm text-white outline-none"
+              />
+            </label>
+            <label className="text-xs text-white/50 block">
+              Couleurs (ordre 1:1 avec les photos)
+              <input
+                value={draft.colors}
+                onChange={(e) => onChange({ ...draft, colors: e.target.value })}
+                placeholder="Black, White, Red"
+                className="mt-1 w-full rounded-xl bg-white/10 border border-white/10 px-4 py-2.5 text-sm text-white outline-none"
+              />
+            </label>
+          </div>
+
+          {/* Photos */}
+          <div className="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-white/50">Photos produit</h4>
+            <ImageUploader
+              value={draft.imageUrl}
+              onChange={(next) => onChange({ ...draft, imageUrl: next })}
+              uploadHandler={productImageUploadHandler}
+              maxSize={800}
+              quality={0.75}
+              label="Images"
+              hint="Glisse-dépose, colle (Ctrl+V), clique ou ajoute une URL. Les fichiers sont compressés puis uploadés sur Supabase Storage. L'ordre des photos correspond 1:1 à l'ordre des couleurs ci-dessus."
+            />
           </div>
         </div>
-        <div className="flex lg:flex-col gap-2">
-          {isEditing ? (
-            <>
-              <button onClick={onSaveEdit} className="inline-flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-sm font-semibold text-white"><Save size={14} /> Save</button>
-              <button
-                onClick={() => onFieldChange({
-                  ...current,
-                  salePrice: suggestedSalePrice(current.sourcePriceCny, current.weightGrams, current.packaging),
-                })}
-                className="inline-flex items-center gap-2 rounded-full bg-dark/5 px-4 py-2 text-sm font-semibold text-dark/60"
-              >
-                Prix auto
-              </button>
-            </>
-          ) : (
-            <button onClick={() => onStartEdit(product)} className="inline-flex items-center gap-2 rounded-full bg-dark px-4 py-2 text-sm font-semibold text-white"><Pencil size={14} /> Edit</button>
-          )}
-          <a href={current.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full bg-dark/5 px-4 py-2 text-sm font-semibold text-dark/60"><ExternalLink size={14} /> Ouvrir</a>
-          <button onClick={() => { if (confirm('Supprimer ce produit ?')) onRemove(product.id); }} className="inline-flex items-center gap-2 rounded-full bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-500 hover:bg-red-500/20 transition-colors"><Trash2 size={14} /></button>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between gap-3 p-5 border-t border-white/10 bg-black/20">
+          <button
+            onClick={onAutoPrice}
+            className="rounded-full bg-white/5 hover:bg-white/10 px-4 py-2.5 text-xs font-semibold text-white/70 transition-colors"
+          >
+            Prix automatique
+          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onClose}
+              className="rounded-full bg-white/5 hover:bg-white/10 px-4 py-2.5 text-sm font-semibold text-white/60 transition-colors"
+            >
+              Annuler
+            </button>
+            <button
+              onClick={onSave}
+              className="inline-flex items-center gap-2 rounded-full bg-accent hover:bg-accent/90 px-5 py-2.5 text-sm font-bold text-white transition-colors"
+            >
+              <Save size={14} />
+              {isNew ? 'Créer le produit' : 'Enregistrer'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
 });
 
+// ────────────────────────────────────────────────────────────────────────────
+// OrderCard (mémoïsé)
+// ────────────────────────────────────────────────────────────────────────────
 type OrderCardProps = {
   order: Order;
   product: Product;
@@ -496,9 +741,6 @@ type OrderCardProps = {
   whatsappLink: (order: Order, type: 'payment' | 'paid' | 'tracking' | 'delay') => string;
 };
 
-// Mémoïsé : évite de re-render toute la liste de commandes quand une seule
-// commande change de statut ou est copiée (copied/copiedPayment sont des
-// booléens calculés par commande, pas la string copiedId brute).
 const OrderCard = memo(function OrderCard({ order, product, margin, copied, copiedPayment, onFieldChange, onCopyOrder, onCopyClientMessage, whatsappLink }: OrderCardProps) {
   return (
     <div className="rounded-3xl bg-white text-dark p-5 shadow-xl shadow-black/10">
@@ -642,6 +884,9 @@ const OrderCard = memo(function OrderCard({ order, product, margin, copied, copi
   );
 });
 
+// ────────────────────────────────────────────────────────────────────────────
+// AdminPanel
+// ────────────────────────────────────────────────────────────────────────────
 export default function AdminPanel() {
   const [isAdminAuthed] = useState(() => sessionStorage.getItem('tof-admin-auth') === 'true');
 
@@ -661,8 +906,12 @@ export default function AdminPanel() {
   const [chatReply, setChatReply] = useState('');
   const [promoCodes, setPromoCodes] = useState<DbPromoCode[]>([]);
   const [newPromo, setNewPromo] = useState({ code: '', discount: 15, maxUses: 0, expiresIn: '' });
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [draftProduct, setDraftProduct] = useState<Product | null>(null);
+
+  // Drawer produit (remplace l'édition inline editingId/draftProduct)
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerIsNew, setDrawerIsNew] = useState(false);
+  const [drawerDraft, setDrawerDraft] = useState<Product | null>(null);
+
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [productSearch, setProductSearch] = useState('');
   const [selectedEstimateProduct, setSelectedEstimateProduct] = useState<string>('');
@@ -705,12 +954,11 @@ export default function AdminPanel() {
         acc.avgMargin += estimateNetMargin(product).net;
         return acc;
       },
-      { stockValue: 0, avgMargin: 0 }
+      { stockValue: 0, avgMargin: 0 },
     );
   }, [products]);
 
-  // Recherche / filtre produits — calculé une seule fois par changement
-  // de liste ou de terme, pas à chaque render.
+  // Recherche / filtre produits
   const filteredProducts = useMemo(() => {
     const q = productSearch.trim().toLowerCase();
     if (!q) return products;
@@ -743,15 +991,9 @@ export default function AdminPanel() {
     loadAll();
     trackVisitor('admin');
     onOnlineCountChange(setOnlineCount);
-    // Ne pas ajouter de listener tof-*-updated qui appelle loadAll() :
-    // les opérations CRUD font déjà un setState optimiste, et le realtime
-    // Supabase gère les mises à jour ciblées. Évite 6 requêtes parallèles
-    // en rafale à chaque sauvegarde.
   }, [loadAll]);
 
-  // Quand les produits chargent depuis Supabase, si le sélecteur
-  // "estimation" / "nouvelle commande" pointe sur un id vide ou
-  // qui n'existe plus, on retombe sur le premier produit.
+  // Sync sélecteurs quand les produits chargent
   useEffect(() => {
     if (products.length === 0) return;
     const exists = products.some((p) => p.id === selectedEstimateProduct);
@@ -761,9 +1003,6 @@ export default function AdminPanel() {
   }, [products, selectedEstimateProduct, newOrder.productId]);
 
   useEffect(() => {
-    // Realtime Supabase : mises à jour ciblées pour les changements
-    // provenant d'autres onglets / admins / clients (pas nos propres
-    // modifications qui sont déjà reflétées par setState optimiste).
     const unsubOrders = subscribeToOrders(
       () => {
         fetchOrders().then((data) => setOrders(data.map(dbToOrder)));
@@ -772,17 +1011,15 @@ export default function AdminPanel() {
       },
       () => {
         fetchOrders().then((data) => setOrders(data.map(dbToOrder)));
-      }
+      },
     );
     const unsubProducts = subscribeToProducts(() => {
       fetchProducts().then((data) => setProducts(data.map(dbToProduct).map(normalizedProduct)));
     });
-
     const unsubChat = subscribeToChatMessages(() => {
       fetchConversations().then(setChatMessages);
       showToast('Nouveau message chat !');
     });
-
     return () => {
       unsubOrders();
       unsubProducts();
@@ -795,20 +1032,16 @@ export default function AdminPanel() {
     next: Product[] | ((prev: Product[]) => Product[]),
     itemToSave?: Product,
   ) => {
-    // Permet de passer un updater fonctionnel pour éviter les closures
-    // obsolètes quand on enchaîne ajouts/sauvegardes rapidement.
     setProducts((prev) => (typeof next === 'function' ? next(prev) : next));
     if (itemToSave) {
       try {
         await upsertProduct(productToDb(itemToSave));
       } catch (err) {
-        // Rollback optimiste : si l'upsert échoue, on recharge depuis la DB
-        // et on prévient l'utilisateur (pas de silence radio).
         console.error('save product failed', err);
         showToast('Erreur lors de la sauvegarde du produit');
         fetchProducts()
           .then((data) => setProducts(data.map(dbToProduct).map(normalizedProduct)))
-          .catch(() => { /* dernier filet, on ne peut rien faire de plus */ });
+          .catch(() => { /* dernier filet */ });
         return;
       }
     }
@@ -818,9 +1051,87 @@ export default function AdminPanel() {
   const removeProduct = useCallback(async (id: string) => {
     await dbDeleteProduct(id);
     setProducts((prev) => prev.filter((p) => p.id !== id));
+    // Ferme le drawer si on supprime le produit en cours d'édition
+    if (drawerDraft?.id === id) {
+      setDrawerOpen(false);
+      setDrawerDraft(null);
+    }
     window.dispatchEvent(new CustomEvent('tof-products-updated'));
     showToast('Produit supprimé ✓');
     playDelete();
+  }, [drawerDraft]);
+
+  // ── Drawer handlers ──
+  const openEditDrawer = useCallback((product: Product) => {
+    setDrawerIsNew(false);
+    setDrawerDraft({ ...product });
+    setDrawerOpen(true);
+  }, []);
+
+  const openCreateDrawer = useCallback(() => {
+    const preset = categoryPresets.find((p) => p.label === 'Sneakers') || categoryPresets[0];
+    const newId = `p${Date.now()}`;
+    const blank: Product = {
+      id: newId,
+      brand: '',
+      name: '',
+      category: preset.label,
+      gender: 'mixte',
+      salePrice: 99,
+      sourcePriceCny: 100,
+      weightGrams: preset.weight,
+      packaging: preset.packaging,
+      sizes: preset.defaultSizes,
+      colors: preset.defaultColors,
+      imageUrl: '',
+      sourceUrl: '',
+      status: 'active',
+    };
+    setDrawerIsNew(true);
+    setDrawerDraft(blank);
+    setDrawerOpen(true);
+  }, []);
+
+  const closeDrawer = useCallback(() => {
+    setDrawerOpen(false);
+    // On ne nettoie pas le draft immédiatement pour éviter un flash à la fermeture
+    setTimeout(() => setDrawerDraft(null), 200);
+  }, []);
+
+  // Refs pour lire les valeurs à jour dans saveDrawerSave sans casser le callback
+  const drawerDraftRef = useRef(drawerDraft);
+  drawerDraftRef.current = drawerDraft;
+  const drawerIsNewRef = useRef(drawerIsNew);
+  drawerIsNewRef.current = drawerIsNew;
+  const productsRef = useRef(products);
+  productsRef.current = products;
+  const siteSettingsRef = useRef(siteSettings);
+  siteSettingsRef.current = siteSettings;
+
+  const saveDrawer = useCallback(() => {
+    const draft = drawerDraftRef.current;
+    if (!draft) return;
+    if (drawerIsNewRef.current) {
+      // Création
+      setSelectedEstimateProduct(draft.id);
+      setNewOrder((prev) => ({ ...prev, productId: draft.id }));
+      void saveProducts((prev) => [draft, ...prev], draft);
+    } else {
+      // Mise à jour
+      const next = productsRef.current.map((p) => (p.id === draft.id ? draft : p));
+      void saveProducts(next, draft);
+    }
+    setDrawerOpen(false);
+    setTimeout(() => setDrawerDraft(null), 200);
+  }, []);
+
+  const autoPriceDrawer = useCallback(() => {
+    const d = drawerDraftRef.current;
+    if (!d) return;
+    setDrawerDraft({
+      ...d,
+      salePrice: suggestedSalePrice(d.sourcePriceCny, d.weightGrams, d.packaging),
+    });
   }, []);
 
   const saveOrderField = useCallback(async (id: string, field: string, value: string) => {
@@ -926,62 +1237,10 @@ export default function AdminPanel() {
     showToast('Réglages sauvegardés ✓');
   };
 
-  // Handlers d'upload vers Supabase Storage. handleDropImageUpload est une
-  // référence stable (useCallback sans dépendances) pour ne pas casser la
-  // mémoïsation des composants enfants. Les produits utilisent directement
-  // la constante module `productImageUploadHandler`.
   const handleDropImageUpload = useCallback(
     (file: File) => uploadDropImage(file, 1200, 0.8).then((r) => r.url),
     [],
   );
-
-  const startEdit = useCallback((product: Product) => {
-    setEditingId(product.id);
-    setDraftProduct({ ...product });
-  }, []);
-
-  // saveEdit lit draftProduct/products via ref pour garder une identité stable
-  // (sinon chaque frappe pendant l'édition changerait la prop de TOUTES les lignes produit et casserait le memo).
-  const draftProductRef = useRef(draftProduct);
-  draftProductRef.current = draftProduct;
-  const productsRef = useRef(products);
-  productsRef.current = products;
-  const siteSettingsRef = useRef(siteSettings);
-  siteSettingsRef.current = siteSettings;
-
-  const saveEdit = useCallback(() => {
-    const draft = draftProductRef.current;
-    if (!draft) return;
-    const newProducts = productsRef.current.map((product) => (product.id === draft.id ? draft : product));
-    // On passe le draftProduct à saveProducts pour qu'il soit le seul envoyé à la DB
-    saveProducts(newProducts, draft);
-    setEditingId(null);
-    setDraftProduct(null);
-  }, []);
-
-  const addProduct = useCallback(() => {
-    const product: Product = {
-      id: `p${Date.now()}`,
-      brand: 'Nouvelle marque',
-      name: 'Nouveau produit',
-      category: 'Sneakers',
-      gender: 'mixte',
-      salePrice: 99,
-      sourcePriceCny: 100,
-      weightGrams: 800,
-      packaging: 'without_box',
-      sizes: '39, 40, 41, 42, 43, 44, 45',
-      colors: 'Black, White',
-      imageUrl: '',
-      sourceUrl: 'https://detail.1688.com/offer/...',
-      status: 'active',
-    };
-    // Updater fonctionnel → pas de closure obsolète sur `products`.
-    void saveProducts((prev) => [product, ...prev], product);
-    setSelectedEstimateProduct(product.id);
-    setNewOrder((prev) => ({ ...prev, productId: product.id }));
-    startEdit(product);
-  }, [startEdit]);
 
   const addQuickProduct = async () => {
     if (!quickProduct.brand || !quickProduct.name || !quickProduct.sourceUrl) return;
@@ -1002,8 +1261,6 @@ export default function AdminPanel() {
 
     setSelectedEstimateProduct(product.id);
     setNewOrder((prev) => ({ ...prev, productId: product.id }));
-    // Reset du formulaire d'ajout rapide tout en gardant la catégorie
-    // précédemment choisie pour faciliter les ajouts en rafale.
     const resetPreset = categoryPresets.find((p) => p.label === quickProduct.category) || defaultPreset;
     setQuickProduct({
       brand: '',
@@ -1067,13 +1324,10 @@ export default function AdminPanel() {
   };
 
   const fallbackProduct: Product = { id: '', brand: '-', name: '-', category: 'T-shirt', gender: 'mixte', salePrice: 0, sourcePriceCny: 0, weightGrams: 300, packaging: 'none', sizes: '', colors: '', imageUrl: '', sourceUrl: '', status: 'active' };
-  // getProduct lit products via ref pour garder une identité stable entre les
-  // renders (utilisé par des callbacks passés à des composants mémoïsés).
   const getProduct = useCallback(
     (id: string) => productsRef.current.find((product) => product.id === id) || productsRef.current[0] || fallbackProduct,
-    // fallbackProduct ne dépend d'aucun state, sa valeur est constante
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
+    [],
   );
 
   const dashboard = useMemo(() => {
@@ -1215,7 +1469,6 @@ export default function AdminPanel() {
 
   const whatsappLink = useCallback((order: Order, type: 'payment' | 'paid' | 'tracking' | 'delay') => {
     let phone = order.phone.replace(/[^0-9+]/g, '');
-    // Convert French 0X to 33X
     if (phone.startsWith('0') && phone.length === 10) {
       phone = '33' + phone.slice(1);
     }
@@ -1224,9 +1477,6 @@ export default function AdminPanel() {
     return `https://wa.me/${phone}?text=${text}`;
   }, [clientMessage]);
 
-  // Rendu conditionnel de "non autorisé" placé APRÈS tous les hooks
-  // (React interdit les hooks conditionnels : l'ordre des appels doit être
-  // identique à chaque render, même si l'utilisateur n'est pas auth).
   if (!isAdminAuthed) {
     return (
       <div className="p-10 text-center bg-dark min-h-screen">
@@ -1314,7 +1564,6 @@ export default function AdminPanel() {
             </div>
 
             <div className="grid lg:grid-cols-4 gap-5">
-              {/* Activité live */}
               <div className="rounded-3xl bg-white text-dark p-6">
                 <h3 className="font-bold text-xl mb-4">Activité en direct</h3>
                 <div className="space-y-3">
@@ -1522,10 +1771,10 @@ export default function AdminPanel() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 border-b border-dark/5">
               <div>
                 <h3 className="font-bold">Produits source</h3>
-                <p className="text-sm text-dark/40">Ajout rapide : lien + prix source + categorie. Le reste est calcule pour toi.</p>
+                <p className="text-sm text-dark/40">Clique sur <b>Modifier</b> pour éditer un produit en détail. Ajout rapide ci-dessous.</p>
               </div>
-              <button onClick={addProduct} className="inline-flex items-center gap-2 rounded-full bg-dark px-5 py-3 text-sm font-semibold text-white hover:bg-accent transition-colors self-start sm:self-auto">
-                <Plus size={15} /> Produit
+              <button onClick={openCreateDrawer} className="inline-flex items-center gap-2 rounded-full bg-dark px-5 py-3 text-sm font-semibold text-white hover:bg-accent transition-colors self-start sm:self-auto">
+                <Plus size={15} /> Nouveau produit
               </button>
             </div>
 
@@ -1558,17 +1807,16 @@ export default function AdminPanel() {
               )}
             </div>
 
+            {/* Ajout rapide */}
             <div className="p-4 sm:p-5 border-b border-dark/5 bg-bg/60">
               <h4 className="font-bold mb-1">Ajout rapide</h4>
-              <p className="text-xs text-dark/40 mb-4">Remplis le minimum, le reste se calcule tout seul.</p>
+              <p className="text-xs text-dark/40 mb-4">Remplis le minimum, le reste se calcule tout seul. Pour plus de détails, ouvre la fiche produit via Modifier.</p>
 
-              {/* Étape 1 : Essentiel */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
                 <input value={quickProduct.brand} onChange={(e) => setQuickProduct({ ...quickProduct, brand: e.target.value })} placeholder="Marque *" className="rounded-xl bg-white px-4 py-3 text-sm outline-none border border-dark/5" />
                 <input value={quickProduct.name} onChange={(e) => setQuickProduct({ ...quickProduct, name: e.target.value })} placeholder="Nom produit *" className="rounded-xl bg-white px-4 py-3 text-sm outline-none border border-dark/5 sm:col-span-2" />
               </div>
 
-              {/* Étape 2 : Genre + Catégorie + Prix */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mt-2">
                 <select value={quickProduct.gender} onChange={(e) => setQuickProduct({ ...quickProduct, gender: e.target.value as Product['gender'] })} className="rounded-xl bg-white px-3 py-3 text-sm outline-none border border-dark/5">
                   <option value="homme">Homme</option>
@@ -1590,13 +1838,11 @@ export default function AdminPanel() {
                 </div>
               </div>
 
-              {/* Étape 3 : Tailles + Couleurs (pré-remplis par catégorie) */}
               <div className="grid grid-cols-2 gap-2 sm:gap-3 mt-2">
                 <input value={quickProduct.sizes} onChange={(e) => setQuickProduct({ ...quickProduct, sizes: e.target.value })} placeholder="Tailles (auto selon catégorie)" className="rounded-xl bg-white px-4 py-3 text-sm outline-none border border-dark/5" />
                 <input value={quickProduct.colors} onChange={(e) => setQuickProduct({ ...quickProduct, colors: e.target.value })} placeholder="Couleurs" className="rounded-xl bg-white px-4 py-3 text-sm outline-none border border-dark/5" />
               </div>
 
-              {/* Étape 4 : Lien source */}
               <input
                 value={quickProduct.sourceUrl}
                 onChange={(e) => setQuickProduct({ ...quickProduct, sourceUrl: e.target.value })}
@@ -1604,7 +1850,6 @@ export default function AdminPanel() {
                 className="rounded-xl bg-white px-4 py-3 text-sm outline-none border border-dark/5 mt-2 w-full"
               />
 
-              {/* Étape 5 : Image (même uploader que pour l'édition, mais en mode single) */}
               <div className="mt-2">
                 <ImageUploader
                   value={quickProduct.imageUrl}
@@ -1614,12 +1859,11 @@ export default function AdminPanel() {
                   maxSize={800}
                   quality={0.75}
                   label="Photo produit"
-                  hint="Glisse-dépose, colle (Ctrl+V) ou clique pour uploader. Une seule photo pour l'ajout rapide. Les images sont stockées sur Supabase Storage."
+                  hint="Glisse-dépose, colle (Ctrl+V) ou clique pour uploader. Une seule photo pour l'ajout rapide. Stockée sur Supabase Storage."
                   dropHeightClass="min-h-[80px]"
                 />
               </div>
 
-              {/* Preview marge + bouton */}
               <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 {(() => {
                   const preview: Product = { ...quickProduct, id: 'preview', status: 'active' };
@@ -1638,6 +1882,7 @@ export default function AdminPanel() {
               </div>
             </div>
 
+            {/* Liste compacte des produits */}
             <div className="divide-y divide-dark/5">
               {filteredProducts.length === 0 ? (
                 <div className="p-8 text-center text-sm text-dark/40">
@@ -1646,22 +1891,14 @@ export default function AdminPanel() {
                     : 'Aucun produit pour le moment. Ajoute ton premier produit ci-dessus.'}
                 </div>
               ) : (
-                filteredProducts.map((product) => {
-                  const isEditing = Boolean(editingId === product.id && draftProduct);
-                  const current = isEditing && draftProduct ? draftProduct : product;
-                  return (
-                    <ProductRow
-                      key={product.id}
-                      product={product}
-                      isEditing={isEditing}
-                      current={current}
-                      onFieldChange={setDraftProduct}
-                      onStartEdit={startEdit}
-                      onSaveEdit={saveEdit}
-                      onRemove={removeProduct}
-                    />
-                  );
-                })
+                filteredProducts.map((product) => (
+                  <ProductListItem
+                    key={product.id}
+                    product={product}
+                    onEdit={openEditDrawer}
+                    onRemove={removeProduct}
+                  />
+                ))
               )}
             </div>
           </div>
@@ -1769,7 +2006,6 @@ export default function AdminPanel() {
 
         {activeTab === 'promos' && (
           <div className="grid lg:grid-cols-3 gap-5">
-            {/* Liste des codes */}
             <div className="lg:col-span-2 space-y-3">
               {promoCodes.length === 0 && (
                 <div className="rounded-3xl bg-white/5 border border-white/10 p-8 text-center text-white/30">Aucun code promo. Crée ton premier code !</div>
@@ -1813,7 +2049,6 @@ export default function AdminPanel() {
               })}
             </div>
 
-            {/* Créer un code */}
             <div className="rounded-3xl bg-white/5 border border-white/10 p-5 h-fit space-y-4">
               <h3 className="font-bold text-white text-lg">Créer un code promo</h3>
               <input
@@ -1992,38 +2227,38 @@ export default function AdminPanel() {
 
                 <div className="rounded-2xl bg-bg p-4 space-y-4">
                   <h4 className="font-bold text-sm">Liens & paiement</h4>
-                <label className="block text-xs text-dark/35">Lien WhatsApp
-                  <input
-                    value={siteSettings.whatsappUrl}
-                    onChange={(e) => setSiteSettings({ ...siteSettings, whatsappUrl: e.target.value })}
-                    placeholder="https://wa.me/33..."
-                    className="mt-1 w-full rounded-xl bg-bg px-4 py-3 text-sm text-dark outline-none"
-                  />
-                </label>
-                <label className="block text-xs text-dark/35">Lien Snapchat
-                  <input
-                    value={siteSettings.snapchatUrl}
-                    onChange={(e) => setSiteSettings({ ...siteSettings, snapchatUrl: e.target.value })}
-                    placeholder="https://www.snapchat.com/add/tonpseudo"
-                    className="mt-1 w-full rounded-xl bg-bg px-4 py-3 text-sm text-dark outline-none"
-                  />
-                </label>
-                <label className="block text-xs text-dark/35">Lien PayPal
-                  <input
-                    value={siteSettings.paypalUrl}
-                    onChange={(e) => setSiteSettings({ ...siteSettings, paypalUrl: e.target.value })}
-                    placeholder="https://paypal.me/tonpseudo"
-                    className="mt-1 w-full rounded-xl bg-bg px-4 py-3 text-sm text-dark outline-none"
-                  />
-                </label>
-                <label className="block text-xs text-dark/35">Texte paiement
-                  <textarea
-                    value={siteSettings.paymentText}
-                    onChange={(e) => setSiteSettings({ ...siteSettings, paymentText: e.target.value })}
-                    rows={3}
-                    className="mt-1 w-full rounded-xl bg-bg px-4 py-3 text-sm text-dark outline-none resize-none"
-                  />
-                </label>
+                  <label className="block text-xs text-dark/35">Lien WhatsApp
+                    <input
+                      value={siteSettings.whatsappUrl}
+                      onChange={(e) => setSiteSettings({ ...siteSettings, whatsappUrl: e.target.value })}
+                      placeholder="https://wa.me/33..."
+                      className="mt-1 w-full rounded-xl bg-bg px-4 py-3 text-sm text-dark outline-none"
+                    />
+                  </label>
+                  <label className="block text-xs text-dark/35">Lien Snapchat
+                    <input
+                      value={siteSettings.snapchatUrl}
+                      onChange={(e) => setSiteSettings({ ...siteSettings, snapchatUrl: e.target.value })}
+                      placeholder="https://www.snapchat.com/add/tonpseudo"
+                      className="mt-1 w-full rounded-xl bg-bg px-4 py-3 text-sm text-dark outline-none"
+                    />
+                  </label>
+                  <label className="block text-xs text-dark/35">Lien PayPal
+                    <input
+                      value={siteSettings.paypalUrl}
+                      onChange={(e) => setSiteSettings({ ...siteSettings, paypalUrl: e.target.value })}
+                      placeholder="https://paypal.me/tonpseudo"
+                      className="mt-1 w-full rounded-xl bg-bg px-4 py-3 text-sm text-dark outline-none"
+                    />
+                  </label>
+                  <label className="block text-xs text-dark/35">Texte paiement
+                    <textarea
+                      value={siteSettings.paymentText}
+                      onChange={(e) => setSiteSettings({ ...siteSettings, paymentText: e.target.value })}
+                      rows={3}
+                      className="mt-1 w-full rounded-xl bg-bg px-4 py-3 text-sm text-dark outline-none resize-none"
+                    />
+                  </label>
                 </div>
               </div>
             </div>
@@ -2076,7 +2311,6 @@ export default function AdminPanel() {
 
           return (
             <div className="grid lg:grid-cols-3 gap-5" style={{ minHeight: 500 }}>
-              {/* Liste conversations */}
               <div className="rounded-3xl bg-white text-dark overflow-hidden">
                 <div className="p-4 border-b border-dark/5">
                   <h3 className="font-bold">Conversations ({convoList.length})</h3>
@@ -2113,7 +2347,6 @@ export default function AdminPanel() {
                 </div>
               </div>
 
-              {/* Messages conversation */}
               <div className="lg:col-span-2 rounded-3xl bg-white text-dark flex flex-col overflow-hidden" style={{ minHeight: 500 }}>
                 {!activeConvo ? (
                   <div className="flex-1 flex items-center justify-center text-dark/30 text-sm">
@@ -2185,7 +2418,6 @@ export default function AdminPanel() {
 
         {activeTab === 'notes' && (
           <div className="space-y-5">
-            {/* Barre de progression */}
             {noteStats.total > 0 && (
               <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
                 <div className="flex items-center justify-between mb-2">
@@ -2198,7 +2430,6 @@ export default function AdminPanel() {
               </div>
             )}
 
-            {/* Stats + actions */}
             <div className="flex flex-col sm:flex-row sm:items-center gap-3">
               <div className="flex gap-2 overflow-x-auto pb-1 flex-1">
                 {[
@@ -2237,7 +2468,6 @@ export default function AdminPanel() {
             </div>
 
             <div className="grid lg:grid-cols-3 gap-5">
-              {/* Liste des notes */}
               <div className="lg:col-span-2 space-y-3">
                 {filteredNotes.length === 0 && (
                   <div className="rounded-3xl bg-white/5 border border-white/10 p-8 text-center text-white/30">
@@ -2315,7 +2545,6 @@ export default function AdminPanel() {
                 ))}
               </div>
 
-              {/* Formulaire ajout */}
               <div className="rounded-3xl bg-white/5 border border-white/10 p-5 h-fit space-y-4">
                 <h3 className="font-bold text-white text-lg">Ajouter une note</h3>
                 <textarea
@@ -2449,6 +2678,17 @@ export default function AdminPanel() {
           </div>
         )}
       </div>
+
+      {/* Drawer d'édition / création produit */}
+      <ProductEditDrawer
+        open={drawerOpen}
+        isNew={drawerIsNew}
+        draft={drawerDraft}
+        onChange={setDrawerDraft}
+        onClose={closeDrawer}
+        onSave={saveDrawer}
+        onAutoPrice={autoPriceDrawer}
+      />
     </section>
   );
 }
