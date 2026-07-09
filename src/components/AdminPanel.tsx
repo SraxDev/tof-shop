@@ -20,6 +20,7 @@ import { showToast, showActionToast } from './Toast';
 import { playNewOrder, playCopy, playDelete } from '../lib/sounds';
 import ImageUploader from './ImageUploader';
 import { uploadProductImage, uploadDropImage, pathFromStorageUrl, isStorageUrl, deleteProductImages } from '../lib/storage';
+import { extractSourceUrl, resolveShortlink, isShortlink } from '../lib/resolveSourceUrl';
 import { useDebounce } from '../hooks/useDebounce';
 import ConfirmDialog from './ui/ConfirmDialog';
 
@@ -700,6 +701,142 @@ function Field({ label, error, children }: { label: string; error?: string; chil
   );
 }
 
+/**
+ * Source URL input with auto-clean + shortlink resolution.
+ * Pastes the full 1688 share blob (with Chinese text + `https://qr.1688.com/s/xxx`)
+ * and it auto-extracts the shortlink, resolves the redirect, and writes the final
+ * `detail.1688.com/offer/xxx.html` URL into the field.
+ */
+function SourceUrlInput({
+  value,
+  onChange,
+  compact = false,
+  isNew = false,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  compact?: boolean;
+  isNew?: boolean;
+}) {
+  const [resolving, setResolving] = useState(false);
+  const [lastResolved, setLastResolved] = useState('');
+  const resolveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const tryResolve = useCallback(
+    async (raw: string) => {
+      const cleaned = extractSourceUrl(raw);
+      if (!cleaned) return;
+      if (!isShortlink(cleaned)) {
+        // Already a direct URL — still update to cleaned version (strip Chinese)
+        if (cleaned !== raw) onChange(cleaned);
+        return;
+      }
+      if (cleaned === lastResolved) return;
+      setResolving(true);
+      try {
+        const finalUrl = await resolveShortlink(cleaned);
+        setLastResolved(cleaned);
+        if (finalUrl && finalUrl !== raw) {
+          onChange(finalUrl);
+          showToast('Lien source nettoyé ✓');
+        }
+      } catch {
+        // silent — keep the extracted shortlink as-is
+        if (cleaned !== raw) onChange(cleaned);
+      } finally {
+        setResolving(false);
+      }
+    },
+    [lastResolved, onChange],
+  );
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = e.target.value;
+    onChange(v);
+    // Debounced auto-resolve
+    if (resolveTimeoutRef.current) clearTimeout(resolveTimeoutRef.current);
+    if (isShortlink(extractSourceUrl(v))) {
+      resolveTimeoutRef.current = setTimeout(() => tryResolve(v), 300);
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    // Let the default paste happen first, then clean up
+    setTimeout(() => {
+      const el = e.currentTarget;
+      const pasted = el.value;
+      if (!pasted) return;
+      const cleaned = extractSourceUrl(pasted);
+      if (cleaned && cleaned !== pasted) {
+        // Replace the whole field content with the extracted URL first
+        onChange(cleaned);
+        if (isShortlink(cleaned)) {
+          if (resolveTimeoutRef.current) clearTimeout(resolveTimeoutRef.current);
+          resolveTimeoutRef.current = setTimeout(() => tryResolve(cleaned), 100);
+        } else {
+          showToast('Lien extrait du texte ✓');
+        }
+      } else if (cleaned && isShortlink(cleaned)) {
+        if (resolveTimeoutRef.current) clearTimeout(resolveTimeoutRef.current);
+        resolveTimeoutRef.current = setTimeout(() => tryResolve(cleaned), 100);
+      }
+    }, 0);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (resolveTimeoutRef.current) clearTimeout(resolveTimeoutRef.current);
+    };
+  }, []);
+
+  return (
+    <div className="relative mt-1">
+      <input
+        value={value}
+        onChange={handleChange}
+        onPaste={handlePaste}
+        onBlur={() => {
+          // On blur, also try to clean up any pasted noise
+          const cleaned = extractSourceUrl(value);
+          if (cleaned && cleaned !== value && !isShortlink(cleaned)) onChange(cleaned);
+        }}
+        placeholder="Colle le partage 1688 ou l'URL directe…"
+        spellCheck={false}
+        autoComplete="off"
+        className={`${
+          compact
+            ? 'w-full rounded-xl bg-white px-4 py-2.5 sm:py-3 text-sm text-dark outline-none border border-dark/5 focus:border-accent/40 focus:ring-4 focus:ring-accent/5 transition-colors'
+            : 'w-full rounded-xl bg-white/10 border border-white/10 px-4 py-2.5 text-sm text-white outline-none transition-colors focus:border-accent/40'
+        } ${resolving ? 'pr-20' : 'pr-10'} text-xs`}
+      />
+      {resolving ? (
+        <span className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[10px] font-semibold text-accent">
+          <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
+          résolution…
+        </span>
+      ) : isShortlink(extractSourceUrl(value)) ? (
+        <button
+          type="button"
+          onClick={() => tryResolve(value)}
+          className="absolute right-2 top-1/2 -translate-y-1/2 h-7 px-2 rounded-md bg-white/10 hover:bg-white/20 text-[10px] font-bold text-accent"
+        >
+          résoudre
+        </button>
+      ) : value && !isNew ? (
+        <a
+          href={value}
+          target="_blank"
+          rel="noreferrer"
+          className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 rounded-md bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/60 hover:text-white transition-colors"
+          title="Ouvrir le lien"
+        >
+          <ExternalLink size={13} />
+        </a>
+      ) : null}
+    </div>
+  );
+}
+
 const ProductEditDrawer = memo(function ProductEditDrawer({
   open, isNew, draft, original, onChange, onClose, onSave, onDuplicate, onAutoPrice,
 }: ProductEditDrawerProps) {
@@ -844,11 +981,10 @@ const ProductEditDrawer = memo(function ProductEditDrawer({
               </Field>
             </div>
             <Field label="Lien source (1688 / Taobao / Weidian…)">
-              <input
+              <SourceUrlInput
                 value={draft.sourceUrl}
-                onChange={(e) => onChange({ ...draft, sourceUrl: e.target.value })}
-                placeholder="https://detail.1688.com/offer/..."
-                className={inputCls(false) + ' text-xs'}
+                onChange={(v) => onChange({ ...draft, sourceUrl: v })}
+                isNew={isNew}
               />
             </Field>
           </div>
@@ -2454,11 +2590,10 @@ export default function AdminPanel() {
                   <input value={quickProduct.sizes} onChange={(e) => setQuickProduct({ ...quickProduct, sizes: e.target.value })} placeholder="Tailles" className="rounded-xl bg-white px-3 sm:px-4 py-2.5 sm:py-3 text-sm outline-none border border-dark/5" />
                   <input value={quickProduct.colors} onChange={(e) => setQuickProduct({ ...quickProduct, colors: e.target.value })} placeholder="Couleurs" className="rounded-xl bg-white px-3 sm:px-4 py-2.5 sm:py-3 text-sm outline-none border border-dark/5" />
                 </div>
-                <input
+                <SourceUrlInput
                   value={quickProduct.sourceUrl}
-                  onChange={(e) => setQuickProduct({ ...quickProduct, sourceUrl: e.target.value })}
-                  placeholder="Lien 1688 / Taobao / Weidian *"
-                  className="rounded-xl bg-white px-3 sm:px-4 py-2.5 sm:py-3 text-sm outline-none border border-dark/5 w-full"
+                  onChange={(v) => setQuickProduct({ ...quickProduct, sourceUrl: v })}
+                  compact
                 />
                 <div>
                   <ImageUploader
