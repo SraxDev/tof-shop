@@ -1,11 +1,12 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Copy, ExternalLink, Package, Pencil, Plus, Save, Send, Trash2, Truck } from 'lucide-react';
+import { Copy, ExternalLink, Package, Pencil, Plus, Save, Search, Send, Trash2, Truck } from 'lucide-react';
 import { defaultDrop, type FeaturedDropConfig } from './FeaturedDrop';
 import { defaultSettings, readSiteSettings, saveSiteSettings, hydrateSiteSettings, type SiteSettings } from '../lib/siteSettings';
 import { fetchProducts, upsertProduct, deleteProduct as dbDeleteProduct, fetchOrders, updateOrder, insertOrder as dbInsertOrder, fetchDrop, saveDrop as dbSaveDrop, fetchNotes, upsertNote, deleteNote as dbDeleteNote, subscribeToOrders, subscribeToProducts, onOnlineCountChange, getPresenceState, trackVisitor, fetchConversations, sendChatMessage, subscribeToChatMessages, deleteConversation, deleteChatMessage, fetchPromoCodes, upsertPromoCode, deletePromoCode, type DbProduct, type DbOrder, type DbDrop, type DbNote, type DbChatMessage, type DbPromoCode } from '../lib/db';
 import { showToast } from './Toast';
 import { playNewOrder, playCopy, playDelete } from '../lib/sounds';
-import { compressImage, compressImages } from '../utils/compressImage';
+import ImageUploader from './ImageUploader';
+import { uploadProductImage, uploadDropImage } from '../lib/storage';
 
 type Product = {
   id: string;
@@ -357,6 +358,12 @@ type ProductRowProps = {
   onRemove: (id: string) => void;
 };
 
+// Handler d'upload stable (référence de module, pas de state) — on évite
+// de devoir le passer en prop à chaque ProductRow, ce qui simplifie le
+// typage et ne casse pas la mémoïsation.
+const productImageUploadHandler = (file: File) =>
+  uploadProductImage(file, 800, 0.75).then((r) => r.url);
+
 // Mémoïsé : évite de re-render (et re-décoder les images) de TOUTE la liste
 // de produits quand un seul produit est édité / copié / supprimé.
 const ProductRow = memo(function ProductRow({ product, isEditing, current, onFieldChange, onStartEdit, onSaveEdit, onRemove }: ProductRowProps) {
@@ -397,75 +404,48 @@ const ProductRow = memo(function ProductRow({ product, isEditing, current, onFie
               <input disabled={!isEditing} value={current.colors || ''} onChange={(e) => onFieldChange({ ...current, colors: e.target.value })} placeholder="Black, White, Red" className="mt-1 w-full rounded-xl bg-bg px-3 py-2 text-sm text-dark outline-none" />
             </label>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex-1">
-              <label className="text-xs text-dark/35">Images (Séparez les URLs par un pipe | pour les coloris)
-                <textarea
-                  disabled={!isEditing}
-                  value={current.imageUrl || ''}
-                  onChange={(e) => onFieldChange({ ...current, imageUrl: e.target.value })}
-                  placeholder="URL1 | URL2 | URL3..."
-                  className="mt-1 w-full rounded-xl bg-bg px-3 py-2 text-sm text-dark outline-none min-h-[80px]"
-                />
-              </label>
-            </div>
-            {isEditing && (
-              <div className="flex flex-col gap-2">
-                <label className="cursor-pointer rounded-xl bg-dark px-4 py-2 text-xs font-bold text-white hover:bg-accent transition-colors text-center">
-                  Upload
-                  <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => {
-                    const files = Array.from(e.target.files || []);
-                    if (files.length === 0) return;
-
-                    compressImages(files, 800, 0.75)
-                      .then((results) => {
-                        const currentImages = current.imageUrl ? current.imageUrl.split('|').map(s => s.trim()).filter(Boolean) : [];
-                        const nextImages = [...currentImages, ...results].join('|');
-                        onFieldChange({ ...current, imageUrl: nextImages });
-                      })
-                      .catch(() => showToast("Erreur lors du traitement des images"));
-                  }} />
-                </label>
-                <button
-                  type="button"
-                  onClick={() => onFieldChange({ ...current, imageUrl: '' })}
-                  className="rounded-xl bg-red-500/10 px-4 py-2 text-[10px] font-bold text-red-500 hover:bg-red-500/20 transition-colors"
-                >
-                  Vider
-                </button>
-              </div>
-            )}
-          </div>
+          <ImageUploader
+            value={current.imageUrl}
+            onChange={(next) => onFieldChange({ ...current, imageUrl: next })}
+            disabled={!isEditing}
+            uploadHandler={productImageUploadHandler}
+            maxSize={800}
+            quality={0.75}
+            label="Images produit"
+            hint="Glisse-dépose, colle (Ctrl+V) ou ajoute une URL. Les fichiers sont compressés puis uploadés sur Supabase Storage. Ordre 1:1 avec les coloris."
+          />
 
           {current.imageUrl && (
-            <div className="mt-3">
-              <p className="text-[10px] font-bold text-dark/30 uppercase mb-2">Correspondance photos / coloris</p>
+            <div className="mt-1">
+              <p className="text-[10px] font-bold text-dark/30 uppercase mb-2">
+                Correspondance photos / coloris
+              </p>
               <div className="flex flex-wrap gap-3">
                 {current.imageUrl.split('|').map((url, idx) => {
                   const trimmedUrl = url.trim();
                   if (!trimmedUrl) return null;
-                  const colorNames = current.colors ? current.colors.split(',').map(s => s.trim()) : [];
+                  const colorNames = current.colors
+                    ? current.colors.split(',').map((s) => s.trim())
+                    : [];
                   const colorName = colorNames[idx] || `Photo ${idx + 1}`;
 
                   return (
-                    <div key={idx} className="relative group/img flex flex-col items-center gap-1">
+                    <div
+                      key={idx}
+                      className="relative group/img flex flex-col items-center gap-1"
+                    >
                       <div className="relative">
-                        <img src={trimmedUrl} alt="" loading="lazy" decoding="async" className="h-16 w-16 rounded-xl object-contain bg-subtle border border-dark/10" />
-                        {isEditing && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const urls = current.imageUrl.split('|').map(s => s.trim()).filter(Boolean);
-                              urls.splice(idx, 1);
-                              onFieldChange({ ...current, imageUrl: urls.join('|') });
-                            }}
-                            className="absolute -top-1.5 -right-1.5 h-5 w-5 bg-red-500 text-white rounded-full text-[10px] flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity z-10 shadow-sm"
-                          >
-                            ✕
-                          </button>
-                        )}
+                        <img
+                          src={trimmedUrl}
+                          alt={colorName}
+                          loading="lazy"
+                          decoding="async"
+                          className="h-16 w-16 rounded-xl object-contain bg-subtle border border-dark/10"
+                        />
                       </div>
-                      <span className="text-[9px] font-bold text-dark/40 uppercase truncate max-w-[64px]">{colorName}</span>
+                      <span className="text-[9px] font-bold text-dark/40 uppercase truncate max-w-[64px]">
+                        {colorName}
+                      </span>
                     </div>
                   );
                 })}
@@ -664,19 +644,8 @@ const OrderCard = memo(function OrderCard({ order, product, margin, copied, copi
 
 export default function AdminPanel() {
   const [isAdminAuthed] = useState(() => sessionStorage.getItem('tof-admin-auth') === 'true');
-  
+
   const [products, setProducts] = useState<Product[]>(initialProducts);
-  // ... other states
-
-  if (!isAdminAuthed) {
-    return (
-      <div className="p-10 text-center">
-        <h2 className="text-red-500 font-bold">Accès non autorisé</h2>
-        <p className="text-white/40 mt-2">Veuillez vous connecter via le panel admin.</p>
-      </div>
-    );
-  }
-
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'products' | 'drop' | 'promos' | 'settings' | 'estimate' | 'notes' | 'chat'>('dashboard');
@@ -695,7 +664,8 @@ export default function AdminPanel() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftProduct, setDraftProduct] = useState<Product | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [selectedEstimateProduct, setSelectedEstimateProduct] = useState(products[0]?.id || '');
+  const [productSearch, setProductSearch] = useState('');
+  const [selectedEstimateProduct, setSelectedEstimateProduct] = useState<string>('');
   const [newOrder, setNewOrder] = useState<Omit<Order, 'id' | 'status'>>({
     productId: products[0]?.id || '',
     size: '42',
@@ -739,6 +709,19 @@ export default function AdminPanel() {
     );
   }, [products]);
 
+  // Recherche / filtre produits — calculé une seule fois par changement
+  // de liste ou de terme, pas à chaque render.
+  const filteredProducts = useMemo(() => {
+    const q = productSearch.trim().toLowerCase();
+    if (!q) return products;
+    return products.filter((p) =>
+      p.brand.toLowerCase().includes(q) ||
+      p.name.toLowerCase().includes(q) ||
+      p.category.toLowerCase().includes(q) ||
+      p.sourceUrl.toLowerCase().includes(q),
+    );
+  }, [products, productSearch]);
+
   // ── Supabase load ──
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -760,13 +743,27 @@ export default function AdminPanel() {
     loadAll();
     trackVisitor('admin');
     onOnlineCountChange(setOnlineCount);
+    // Ne pas ajouter de listener tof-*-updated qui appelle loadAll() :
+    // les opérations CRUD font déjà un setState optimiste, et le realtime
+    // Supabase gère les mises à jour ciblées. Évite 6 requêtes parallèles
+    // en rafale à chaque sauvegarde.
   }, [loadAll]);
 
+  // Quand les produits chargent depuis Supabase, si le sélecteur
+  // "estimation" / "nouvelle commande" pointe sur un id vide ou
+  // qui n'existe plus, on retombe sur le premier produit.
   useEffect(() => {
-    const refresh = () => { loadAll(); };
-    window.addEventListener('tof-orders-updated', refresh);
-    window.addEventListener('tof-products-updated', refresh);
+    if (products.length === 0) return;
+    const exists = products.some((p) => p.id === selectedEstimateProduct);
+    if (!exists) setSelectedEstimateProduct(products[0].id);
+    const orderExists = products.some((p) => p.id === newOrder.productId);
+    if (!orderExists) setNewOrder((prev) => ({ ...prev, productId: products[0].id }));
+  }, [products, selectedEstimateProduct, newOrder.productId]);
 
+  useEffect(() => {
+    // Realtime Supabase : mises à jour ciblées pour les changements
+    // provenant d'autres onglets / admins / clients (pas nos propres
+    // modifications qui sont déjà reflétées par setState optimiste).
     const unsubOrders = subscribeToOrders(
       () => {
         fetchOrders().then((data) => setOrders(data.map(dbToOrder)));
@@ -787,20 +784,33 @@ export default function AdminPanel() {
     });
 
     return () => {
-      window.removeEventListener('tof-orders-updated', refresh);
-      window.removeEventListener('tof-products-updated', refresh);
       unsubOrders();
       unsubProducts();
       unsubChat();
     };
-  }, [loadAll]);
+  }, []);
 
   // ── Save helpers ──
-  const saveProducts = async (next: Product[], itemToSave?: Product) => {
-    setProducts(next);
-    // On ne sauvegarde que l'item qui a été réellement modifié ou ajouté
+  const saveProducts = async (
+    next: Product[] | ((prev: Product[]) => Product[]),
+    itemToSave?: Product,
+  ) => {
+    // Permet de passer un updater fonctionnel pour éviter les closures
+    // obsolètes quand on enchaîne ajouts/sauvegardes rapidement.
+    setProducts((prev) => (typeof next === 'function' ? next(prev) : next));
     if (itemToSave) {
-      await upsertProduct(productToDb(itemToSave));
+      try {
+        await upsertProduct(productToDb(itemToSave));
+      } catch (err) {
+        // Rollback optimiste : si l'upsert échoue, on recharge depuis la DB
+        // et on prévient l'utilisateur (pas de silence radio).
+        console.error('save product failed', err);
+        showToast('Erreur lors de la sauvegarde du produit');
+        fetchProducts()
+          .then((data) => setProducts(data.map(dbToProduct).map(normalizedProduct)))
+          .catch(() => { /* dernier filet, on ne peut rien faire de plus */ });
+        return;
+      }
     }
     showToast('Mise à jour réussie ✓');
   };
@@ -823,13 +833,6 @@ export default function AdminPanel() {
     await dbSaveDrop(dropToDb(dropDraft));
     window.dispatchEvent(new CustomEvent('tof-drop-updated'));
     showToast('Drop de la semaine sauvegardé ✓');
-  };
-
-  const uploadDropImage = (file?: File) => {
-    if (!file) return;
-    compressImage(file, 1200, 0.8)
-      .then((dataUrl) => setDropDraft((prev) => ({ ...prev, imageUrl: dataUrl })))
-      .catch(() => showToast("Erreur lors du traitement de l'image"));
   };
 
   const addNote = async () => {
@@ -923,6 +926,15 @@ export default function AdminPanel() {
     showToast('Réglages sauvegardés ✓');
   };
 
+  // Handlers d'upload vers Supabase Storage. handleDropImageUpload est une
+  // référence stable (useCallback sans dépendances) pour ne pas casser la
+  // mémoïsation des composants enfants. Les produits utilisent directement
+  // la constante module `productImageUploadHandler`.
+  const handleDropImageUpload = useCallback(
+    (file: File) => uploadDropImage(file, 1200, 0.8).then((r) => r.url),
+    [],
+  );
+
   const startEdit = useCallback((product: Product) => {
     setEditingId(product.id);
     setDraftProduct({ ...product });
@@ -947,7 +959,7 @@ export default function AdminPanel() {
     setDraftProduct(null);
   }, []);
 
-  const addProduct = () => {
+  const addProduct = useCallback(() => {
     const product: Product = {
       id: `p${Date.now()}`,
       brand: 'Nouvelle marque',
@@ -964,10 +976,12 @@ export default function AdminPanel() {
       sourceUrl: 'https://detail.1688.com/offer/...',
       status: 'active',
     };
-    // Sauvegarde immédiate du nouveau produit
-    saveProducts([product, ...products], product);
+    // Updater fonctionnel → pas de closure obsolète sur `products`.
+    void saveProducts((prev) => [product, ...prev], product);
+    setSelectedEstimateProduct(product.id);
+    setNewOrder((prev) => ({ ...prev, productId: product.id }));
     startEdit(product);
-  };
+  }, [startEdit]);
 
   const addQuickProduct = async () => {
     if (!quickProduct.brand || !quickProduct.name || !quickProduct.sourceUrl) return;
@@ -976,19 +990,34 @@ export default function AdminPanel() {
       id: `p${Date.now()}`,
       status: 'active',
     };
-    // On ajoute et on force la sauvegarde immédiate de ce nouveau produit
-    const nextList = [product, ...products];
-    setProducts(nextList);
-    await upsertProduct(productToDb(product));
-    
+    setProducts((prev) => [product, ...prev]);
+    try {
+      await upsertProduct(productToDb(product));
+    } catch (err) {
+      console.error('quick add failed', err);
+      setProducts((prev) => prev.filter((p) => p.id !== product.id));
+      showToast("Erreur lors de l'ajout du produit");
+      return;
+    }
+
     setSelectedEstimateProduct(product.id);
-    setNewOrder({ ...newOrder, productId: product.id });
+    setNewOrder((prev) => ({ ...prev, productId: product.id }));
+    // Reset du formulaire d'ajout rapide tout en gardant la catégorie
+    // précédemment choisie pour faciliter les ajouts en rafale.
+    const resetPreset = categoryPresets.find((p) => p.label === quickProduct.category) || defaultPreset;
     setQuickProduct({
-      ...quickProduct,
       brand: '',
       name: '',
+      category: quickProduct.category,
+      salePrice: suggestedSalePrice(150, resetPreset.weight, resetPreset.packaging),
+      sourcePriceCny: 150,
+      weightGrams: resetPreset.weight,
+      packaging: resetPreset.packaging,
+      sizes: resetPreset.defaultSizes,
+      colors: resetPreset.defaultColors,
+      imageUrl: '',
+      gender: 'mixte',
       sourceUrl: '',
-      salePrice: suggestedSalePrice(quickProduct.sourcePriceCny, quickProduct.weightGrams, quickProduct.packaging),
     });
     showToast('Produit ajouté au catalogue ✓');
   };
@@ -1024,10 +1053,16 @@ export default function AdminPanel() {
       status: 'to_order',
       paymentStatus: 'pending',
     };
-    const dbOrd = orderToDb(order);
-    await dbInsertOrder(dbOrd);
-    setOrders([order, ...orders]);
-    setNewOrder({ ...newOrder, customerName: '', phone: '', address: '', city: '', zip: '', snapOrWhatsapp: '' });
+    setOrders((prev) => [order, ...prev]);
+    try {
+      await dbInsertOrder(orderToDb(order));
+    } catch (err) {
+      console.error('add order failed', err);
+      setOrders((prev) => prev.filter((o) => o.id !== order.id));
+      showToast('Erreur lors de la création de la commande');
+      return;
+    }
+    setNewOrder((prev) => ({ ...prev, customerName: '', phone: '', address: '', city: '', zip: '', snapOrWhatsapp: '' }));
     showToast('Commande créée ✓');
   };
 
@@ -1078,29 +1113,6 @@ export default function AdminPanel() {
 
     const topProducts = Array.from(productStats.values()).sort((a, b) => b.units - a.units).slice(0, 5);
 
-    const lastOrderTime = orders.length > 0 && orders[0].id ? (() => {
-      const match = orders.find((o) => o.status === 'to_order' || o.status === 'new');
-      return match ? 'en attente' : 'toutes traitées';
-    })() : 'aucune';
-
-    const now = new Date();
-    const today = now.toISOString().slice(0, 10);
-
-    const todayOrders = orders.filter((o) => {
-      try {
-        const dbOrder = orders.find((x) => x.id === o.id);
-        if (!dbOrder) return false;
-        return true;
-      } catch { return false; }
-    });
-
-    const ordersToday = todayOrders.length;
-    const revenueToday = todayOrders.reduce((s, o) => {
-      if (o.items && o.items.length > 0) return s + o.items.reduce((si, i) => si + i.price * i.quantity, 0);
-      const p = getProduct(o.productId);
-      return s + p.salePrice * o.quantity;
-    }, 0);
-
     const paidOrders = orders.filter((o) => o.paymentStatus === 'paid');
     const paidRevenue = paidOrders.reduce((s, o) => {
       if (o.items && o.items.length > 0) return s + o.items.reduce((si, i) => si + i.price * i.quantity, 0);
@@ -1108,13 +1120,11 @@ export default function AdminPanel() {
       return s + p.salePrice * o.quantity;
     }, 0);
 
-    const lastOrderAgo = (() => {
-      if (orders.length === 0) return 'aucune commande';
-      // Use created_at from raw order if available
-      return 'voir Supabase';
-    })();
-
-    void today; void ordersToday; void revenueToday; void lastOrderAgo;
+    const pendingAction = orders.some((o) => o.status === 'new' || o.status === 'to_order')
+      ? 'en attente'
+      : orders.length === 0
+        ? 'aucune'
+        : 'toutes traitées';
 
     const riskyProducts = products
       .map((product) => ({ product, margin: estimateNetMargin(product).net }))
@@ -1130,20 +1140,18 @@ export default function AdminPanel() {
       statusCounts,
       paymentCounts,
       topProducts,
-      lastOrderTime,
+      pendingAction,
       riskyProducts,
       activeProducts: products.filter((product) => product.status === 'active').length,
       toProcess: statusCounts.new + statusCounts.to_order,
       inProgress: statusCounts.ordered + statusCounts.qc_received + statusCounts.shipped,
       done: statusCounts.done,
-      ordersToday,
-      revenueToday,
       paidRevenue,
       paidOrders: paidOrders.length,
       totalOrders: orders.length,
       conversionRate: orders.length > 0 ? Math.round((paidOrders.length / orders.length) * 100) : 0,
     };
-  }, [orders, products]);
+  }, [orders, products, getProduct]);
 
   const orderText = useCallback((order: Order) => {
     let productsBlock = '';
@@ -1215,6 +1223,18 @@ export default function AdminPanel() {
     const text = encodeURIComponent(clientMessage(order, type));
     return `https://wa.me/${phone}?text=${text}`;
   }, [clientMessage]);
+
+  // Rendu conditionnel de "non autorisé" placé APRÈS tous les hooks
+  // (React interdit les hooks conditionnels : l'ordre des appels doit être
+  // identique à chaque render, même si l'utilisateur n'est pas auth).
+  if (!isAdminAuthed) {
+    return (
+      <div className="p-10 text-center bg-dark min-h-screen">
+        <h2 className="text-red-500 font-bold">Accès non autorisé</h2>
+        <p className="text-white/40 mt-2">Veuillez vous connecter via le panel admin.</p>
+      </div>
+    );
+  }
 
   return (
     <section id="admin" className="py-8 sm:py-20 lg:py-28 bg-dark text-white">
@@ -1499,14 +1519,43 @@ export default function AdminPanel() {
 
         {activeTab === 'products' && (
           <div className="rounded-3xl bg-white text-dark overflow-hidden">
-            <div className="flex items-center justify-between gap-4 p-5 border-b border-dark/5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 border-b border-dark/5">
               <div>
                 <h3 className="font-bold">Produits source</h3>
                 <p className="text-sm text-dark/40">Ajout rapide : lien + prix source + categorie. Le reste est calcule pour toi.</p>
               </div>
-              <button onClick={addProduct} className="inline-flex items-center gap-2 rounded-full bg-dark px-5 py-3 text-sm font-semibold text-white hover:bg-accent transition-colors">
+              <button onClick={addProduct} className="inline-flex items-center gap-2 rounded-full bg-dark px-5 py-3 text-sm font-semibold text-white hover:bg-accent transition-colors self-start sm:self-auto">
                 <Plus size={15} /> Produit
               </button>
+            </div>
+
+            {/* Barre de recherche */}
+            <div className="p-4 sm:p-5 border-b border-dark/5 bg-bg/40">
+              <div className="relative">
+                <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-dark/25" />
+                <input
+                  type="search"
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  placeholder={`Rechercher parmi ${products.length} produits (marque, nom, catégorie, lien)…`}
+                  className="w-full rounded-xl bg-white pl-11 pr-4 py-3 text-sm outline-none border border-dark/5 focus:border-accent/40 transition-colors"
+                />
+                {productSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setProductSearch('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 h-7 w-7 rounded-full text-dark/30 hover:text-dark/60 hover:bg-dark/5 text-xs font-bold flex items-center justify-center"
+                    aria-label="Effacer la recherche"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+              {productSearch && (
+                <p className="mt-2 text-[11px] text-dark/40">
+                  {filteredProducts.length} résultat{filteredProducts.length > 1 ? 's' : ''} sur {products.length}
+                </p>
+              )}
             </div>
 
             <div className="p-4 sm:p-5 border-b border-dark/5 bg-bg/60">
@@ -1547,27 +1596,28 @@ export default function AdminPanel() {
                 <input value={quickProduct.colors} onChange={(e) => setQuickProduct({ ...quickProduct, colors: e.target.value })} placeholder="Couleurs" className="rounded-xl bg-white px-4 py-3 text-sm outline-none border border-dark/5" />
               </div>
 
-              {/* Étape 4 : Image + Lien */}
-              <div className="grid grid-cols-[1fr_auto] gap-2 mt-2">
-                <input value={quickProduct.sourceUrl} onChange={(e) => setQuickProduct({ ...quickProduct, sourceUrl: e.target.value })} placeholder="Lien 1688 / Taobao / Weidian *" className="rounded-xl bg-white px-4 py-3 text-sm outline-none border border-dark/5" />
-                <label className="cursor-pointer rounded-xl bg-dark/10 px-4 py-3 text-sm font-bold text-dark/50 hover:bg-dark/20 transition-colors flex items-center gap-2">
-                  📷
-                  <input type="file" accept="image/*" className="hidden" onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    compressImage(file, 800, 0.75)
-                      .then((dataUrl) => setQuickProduct((prev) => ({ ...prev, imageUrl: dataUrl })))
-                      .catch(() => showToast("Erreur lors du traitement de l'image"));
-                  }} />
-                </label>
-              </div>
+              {/* Étape 4 : Lien source */}
+              <input
+                value={quickProduct.sourceUrl}
+                onChange={(e) => setQuickProduct({ ...quickProduct, sourceUrl: e.target.value })}
+                placeholder="Lien 1688 / Taobao / Weidian *"
+                className="rounded-xl bg-white px-4 py-3 text-sm outline-none border border-dark/5 mt-2 w-full"
+              />
 
-              {quickProduct.imageUrl && (
-                <div className="mt-2 flex items-center gap-3">
-                  <img src={quickProduct.imageUrl} alt="" loading="lazy" decoding="async" className="h-12 w-12 rounded-xl object-cover border border-dark/5" />
-                  <button onClick={() => setQuickProduct({ ...quickProduct, imageUrl: '' })} className="text-xs text-red-500 font-bold">Retirer</button>
-                </div>
-              )}
+              {/* Étape 5 : Image (même uploader que pour l'édition, mais en mode single) */}
+              <div className="mt-2">
+                <ImageUploader
+                  value={quickProduct.imageUrl}
+                  onChange={(next) => setQuickProduct((prev) => ({ ...prev, imageUrl: next }))}
+                  uploadHandler={productImageUploadHandler}
+                  multiple={false}
+                  maxSize={800}
+                  quality={0.75}
+                  label="Photo produit"
+                  hint="Glisse-dépose, colle (Ctrl+V) ou clique pour uploader. Une seule photo pour l'ajout rapide. Les images sont stockées sur Supabase Storage."
+                  dropHeightClass="min-h-[80px]"
+                />
+              </div>
 
               {/* Preview marge + bouton */}
               <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -1589,22 +1639,30 @@ export default function AdminPanel() {
             </div>
 
             <div className="divide-y divide-dark/5">
-              {products.map((product) => {
-                const isEditing = Boolean(editingId === product.id && draftProduct);
-                const current = isEditing && draftProduct ? draftProduct : product;
-                return (
-                  <ProductRow
-                    key={product.id}
-                    product={product}
-                    isEditing={isEditing}
-                    current={current}
-                    onFieldChange={setDraftProduct}
-                    onStartEdit={startEdit}
-                    onSaveEdit={saveEdit}
-                    onRemove={removeProduct}
-                  />
-                );
-              })}
+              {filteredProducts.length === 0 ? (
+                <div className="p-8 text-center text-sm text-dark/40">
+                  {productSearch
+                    ? 'Aucun produit ne correspond à ta recherche.'
+                    : 'Aucun produit pour le moment. Ajoute ton premier produit ci-dessus.'}
+                </div>
+              ) : (
+                filteredProducts.map((product) => {
+                  const isEditing = Boolean(editingId === product.id && draftProduct);
+                  const current = isEditing && draftProduct ? draftProduct : product;
+                  return (
+                    <ProductRow
+                      key={product.id}
+                      product={product}
+                      isEditing={isEditing}
+                      current={current}
+                      onFieldChange={setDraftProduct}
+                      onStartEdit={startEdit}
+                      onSaveEdit={saveEdit}
+                      onRemove={removeProduct}
+                    />
+                  );
+                })
+              )}
             </div>
           </div>
         )}
@@ -1641,33 +1699,26 @@ export default function AdminPanel() {
                   <input value={dropDraft.name} onChange={(e) => setDropDraft({ ...dropDraft, name: e.target.value })} className="mt-1 w-full rounded-xl bg-bg px-4 py-3 text-sm text-dark outline-none" />
                 </label>
                 <div className="sm:col-span-2 rounded-2xl bg-bg p-4">
-                  <label className="text-xs text-dark/35">Photo du drop</label>
-                  <div className="mt-2 grid sm:grid-cols-[1fr_auto] gap-3">
-                    <input
-                      value={dropDraft.imageUrl}
-                      onChange={(e) => setDropDraft({ ...dropDraft, imageUrl: e.target.value })}
-                      placeholder="URL image, /images/drop.jpg, ou upload ci-dessous"
-                      className="w-full rounded-xl bg-white px-4 py-3 text-sm text-dark outline-none border border-dark/5"
-                    />
-                    <label className="cursor-pointer rounded-xl bg-dark px-5 py-3 text-center text-sm font-bold text-white hover:bg-accent transition-colors">
-                      Upload
+                  <ImageUploader
+                    value={dropDraft.imageUrl}
+                    onChange={(next) => setDropDraft((prev) => ({ ...prev, imageUrl: next }))}
+                    uploadHandler={handleDropImageUpload}
+                    multiple={false}
+                    maxSize={1200}
+                    quality={0.8}
+                    label="Photo du drop"
+                    hint="Glisse-dépose, colle (Ctrl+V) ou clique pour uploader. Ratio carré recommandé. Stockée sur Supabase Storage."
+                  />
+                  <div className="mt-3 flex items-center gap-3">
+                    <label className="text-xs text-dark/35 flex-1">
+                      Ou URL directe
                       <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => uploadDropImage(e.target.files?.[0])}
+                        value={dropDraft.imageUrl.startsWith('data:') ? '' : dropDraft.imageUrl}
+                        onChange={(e) => setDropDraft({ ...dropDraft, imageUrl: e.target.value })}
+                        placeholder="https://… ou /images/drop.jpg"
+                        className="mt-1 w-full rounded-xl bg-white px-4 py-2.5 text-xs text-dark outline-none border border-dark/5"
                       />
                     </label>
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                    <button
-                      type="button"
-                      onClick={() => setDropDraft({ ...dropDraft, imageUrl: '' })}
-                      className="rounded-full bg-white px-3 py-1 font-semibold text-dark/45 hover:text-accent transition-colors"
-                    >
-                      Retirer la photo
-                    </button>
-                    <span className="text-dark/35 py-1">L'image est sauvegardee dans ton navigateur apres clic sur Sauvegarder.</span>
                   </div>
                 </div>
                 <label className="text-xs text-dark/35 sm:col-span-2">Description
