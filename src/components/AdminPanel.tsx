@@ -480,10 +480,13 @@ export default function AdminPanel() {
   }, [loadAll]);
 
   // ── Save helpers ──
-  const saveProducts = async (next: Product[]) => {
+  const saveProducts = async (next: Product[], itemToSave?: Product) => {
     setProducts(next);
-    for (const p of next) await upsertProduct(productToDb(p));
-    showToast('Produit sauvegardé ✓');
+    // On ne sauvegarde que l'item qui a été réellement modifié ou ajouté
+    if (itemToSave) {
+      await upsertProduct(productToDb(itemToSave));
+    }
+    showToast('Mise à jour réussie ✓');
   };
 
   const removeProduct = async (id: string) => {
@@ -613,7 +616,9 @@ export default function AdminPanel() {
 
   const saveEdit = () => {
     if (!draftProduct) return;
-    saveProducts(products.map((product) => (product.id === draftProduct.id ? draftProduct : product)));
+    const newProducts = products.map((product) => (product.id === draftProduct.id ? draftProduct : product));
+    // On passe le draftProduct à saveProducts pour qu'il soit le seul envoyé à la DB
+    saveProducts(newProducts, draftProduct);
     setEditingId(null);
     setDraftProduct(null);
   };
@@ -635,18 +640,23 @@ export default function AdminPanel() {
       sourceUrl: 'https://detail.1688.com/offer/...',
       status: 'active',
     };
-    saveProducts([product, ...products]);
+    // Sauvegarde immédiate du nouveau produit
+    saveProducts([product, ...products], product);
     startEdit(product);
   };
 
-  const addQuickProduct = () => {
+  const addQuickProduct = async () => {
     if (!quickProduct.brand || !quickProduct.name || !quickProduct.sourceUrl) return;
     const product: Product = {
       ...quickProduct,
       id: `p${Date.now()}`,
       status: 'active',
     };
-    saveProducts([product, ...products]);
+    // On ajoute et on force la sauvegarde immédiate de ce nouveau produit
+    const nextList = [product, ...products];
+    setProducts(nextList);
+    await upsertProduct(productToDb(product));
+    
     setSelectedEstimateProduct(product.id);
     setNewOrder({ ...newOrder, productId: product.id });
     setQuickProduct({
@@ -656,6 +666,7 @@ export default function AdminPanel() {
       sourceUrl: '',
       salePrice: suggestedSalePrice(quickProduct.sourcePriceCny, quickProduct.weightGrams, quickProduct.packaging),
     });
+    showToast('Produit ajouté au catalogue ✓');
   };
 
   const updateQuickPreset = (category: string) => {
