@@ -20,7 +20,7 @@ import { showToast, showActionToast } from './Toast';
 import { playNewOrder, playCopy, playDelete } from '../lib/sounds';
 import ImageUploader from './ImageUploader';
 import { uploadProductImage, uploadDropImage, pathFromStorageUrl, isStorageUrl, deleteProductImages } from '../lib/storage';
-import { extractSourceUrl, resolveShortlink, isShortlink } from '../lib/resolveSourceUrl';
+import { extractSourceUrl, isShortlink } from '../lib/resolveSourceUrl';
 import { useDebounce } from '../hooks/useDebounce';
 import ConfirmDialog from './ui/ConfirmDialog';
 
@@ -702,10 +702,11 @@ function Field({ label, error, children }: { label: string; error?: string; chil
 }
 
 /**
- * Source URL input with auto-clean + shortlink resolution.
- * Pastes the full 1688 share blob (with Chinese text + `https://qr.1688.com/s/xxx`)
- * and it auto-extracts the shortlink, resolves the redirect, and writes the final
- * `detail.1688.com/offer/xxx.html` URL into the field.
+ * Source URL input with auto-cleanup on paste.
+ * When the user pastes the full 1688 share blob (Chinese text + shortlink
+ * like `https://qr.1688.com/s/xxx`), we automatically extract the URL and
+ * replace the field content. Shortlinks are kept as-is — they're valid,
+ * clickable URLs that 1688 redirects to the product page in the browser.
  */
 function SourceUrlInput({
   value,
@@ -718,88 +719,44 @@ function SourceUrlInput({
   compact?: boolean;
   isNew?: boolean;
 }) {
-  const [resolving, setResolving] = useState(false);
-  const [lastResolved, setLastResolved] = useState('');
-  const resolveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const tryResolve = useCallback(
-    async (raw: string) => {
-      const cleaned = extractSourceUrl(raw);
-      if (!cleaned) return;
-      if (!isShortlink(cleaned)) {
-        // Already a direct URL — still update to cleaned version (strip Chinese)
-        if (cleaned !== raw) onChange(cleaned);
-        return;
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    // Don't intercept if user is pasting into a selection that's part of an
+    // already-clean URL (no Chinese, no spaces, looks like a URL).
+    if (value && /^https?:\/\//.test(value) && !/[\u4e00-\u9fff\s]/.test(value)) {
+      return; // let default paste happen
+    }
+    e.preventDefault();
+    const text = e.clipboardData.getData('text');
+    const cleaned = extractSourceUrl(text);
+    if (cleaned && cleaned !== value) {
+      onChange(cleaned);
+      showToast(isShortlink(cleaned) ? 'Lien extrait (shortlink) ✓' : 'Lien nettoyé ✓');
+    } else {
+      // Fallback: just insert pasted text
+      const el = inputRef.current;
+      if (el) {
+        const start = el.selectionStart ?? value.length;
+        const end = el.selectionEnd ?? value.length;
+        onChange(value.slice(0, start) + text + value.slice(end));
       }
-      if (cleaned === lastResolved) return;
-      setResolving(true);
-      try {
-        const finalUrl = await resolveShortlink(cleaned);
-        setLastResolved(cleaned);
-        if (finalUrl && finalUrl !== raw) {
-          onChange(finalUrl);
-          showToast('Lien source nettoyé ✓');
-        }
-      } catch {
-        // silent — keep the extracted shortlink as-is
-        if (cleaned !== raw) onChange(cleaned);
-      } finally {
-        setResolving(false);
-      }
-    },
-    [lastResolved, onChange],
-  );
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const v = e.target.value;
-    onChange(v);
-    // Debounced auto-resolve
-    if (resolveTimeoutRef.current) clearTimeout(resolveTimeoutRef.current);
-    if (isShortlink(extractSourceUrl(v))) {
-      resolveTimeoutRef.current = setTimeout(() => tryResolve(v), 300);
     }
   };
 
-  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
-    // Let the default paste happen first, then clean up
-    setTimeout(() => {
-      const el = e.currentTarget;
-      const pasted = el.value;
-      if (!pasted) return;
-      const cleaned = extractSourceUrl(pasted);
-      if (cleaned && cleaned !== pasted) {
-        // Replace the whole field content with the extracted URL first
-        onChange(cleaned);
-        if (isShortlink(cleaned)) {
-          if (resolveTimeoutRef.current) clearTimeout(resolveTimeoutRef.current);
-          resolveTimeoutRef.current = setTimeout(() => tryResolve(cleaned), 100);
-        } else {
-          showToast('Lien extrait du texte ✓');
-        }
-      } else if (cleaned && isShortlink(cleaned)) {
-        if (resolveTimeoutRef.current) clearTimeout(resolveTimeoutRef.current);
-        resolveTimeoutRef.current = setTimeout(() => tryResolve(cleaned), 100);
-      }
-    }, 0);
+  const handleBlur = () => {
+    const cleaned = extractSourceUrl(value);
+    if (cleaned && cleaned !== value) onChange(cleaned);
   };
-
-  useEffect(() => {
-    return () => {
-      if (resolveTimeoutRef.current) clearTimeout(resolveTimeoutRef.current);
-    };
-  }, []);
 
   return (
     <div className="relative mt-1">
       <input
+        ref={inputRef}
         value={value}
-        onChange={handleChange}
+        onChange={(e) => onChange(e.target.value)}
         onPaste={handlePaste}
-        onBlur={() => {
-          // On blur, also try to clean up any pasted noise
-          const cleaned = extractSourceUrl(value);
-          if (cleaned && cleaned !== value && !isShortlink(cleaned)) onChange(cleaned);
-        }}
+        onBlur={handleBlur}
         placeholder="Colle le partage 1688 ou l'URL directe…"
         spellCheck={false}
         autoComplete="off"
@@ -807,22 +764,9 @@ function SourceUrlInput({
           compact
             ? 'w-full rounded-xl bg-white px-4 py-2.5 sm:py-3 text-sm text-dark outline-none border border-dark/5 focus:border-accent/40 focus:ring-4 focus:ring-accent/5 transition-colors'
             : 'w-full rounded-xl bg-white/10 border border-white/10 px-4 py-2.5 text-sm text-white outline-none transition-colors focus:border-accent/40'
-        } ${resolving ? 'pr-20' : 'pr-10'} text-xs`}
+        } ${value ? 'pr-10' : ''} text-xs`}
       />
-      {resolving ? (
-        <span className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[10px] font-semibold text-accent">
-          <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
-          résolution…
-        </span>
-      ) : isShortlink(extractSourceUrl(value)) ? (
-        <button
-          type="button"
-          onClick={() => tryResolve(value)}
-          className="absolute right-2 top-1/2 -translate-y-1/2 h-7 px-2 rounded-md bg-white/10 hover:bg-white/20 text-[10px] font-bold text-accent"
-        >
-          résoudre
-        </button>
-      ) : value && !isNew ? (
+      {value && !isNew && /^https?:\/\//.test(value) && (
         <a
           href={value}
           target="_blank"
@@ -832,7 +776,7 @@ function SourceUrlInput({
         >
           <ExternalLink size={13} />
         </a>
-      ) : null}
+      )}
     </div>
   );
 }
