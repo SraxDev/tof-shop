@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Copy, ExternalLink, Package, Pencil, Plus, Save, Send, Trash2, Truck } from 'lucide-react';
 import { defaultDrop, type FeaturedDropConfig } from './FeaturedDrop';
 import { defaultSettings, readSiteSettings, saveSiteSettings, hydrateSiteSettings, type SiteSettings } from '../lib/siteSettings';
 import { fetchProducts, upsertProduct, deleteProduct as dbDeleteProduct, fetchOrders, updateOrder, insertOrder as dbInsertOrder, fetchDrop, saveDrop as dbSaveDrop, fetchNotes, upsertNote, deleteNote as dbDeleteNote, subscribeToOrders, subscribeToProducts, onOnlineCountChange, getPresenceState, trackVisitor, fetchConversations, sendChatMessage, subscribeToChatMessages, deleteConversation, deleteChatMessage, fetchPromoCodes, upsertPromoCode, deletePromoCode, type DbProduct, type DbOrder, type DbDrop, type DbNote, type DbChatMessage, type DbPromoCode } from '../lib/db';
 import { showToast } from './Toast';
 import { playNewOrder, playCopy, playDelete } from '../lib/sounds';
+import { compressImage, compressImages } from '../utils/compressImage';
 
 type Product = {
   id: string;
@@ -346,6 +347,321 @@ function rootOrderId(id: string) {
   return match ? match[0] : id;
 }
 
+type ProductRowProps = {
+  product: Product;
+  isEditing: boolean;
+  current: Product;
+  onFieldChange: (next: Product) => void;
+  onStartEdit: (product: Product) => void;
+  onSaveEdit: () => void;
+  onRemove: (id: string) => void;
+};
+
+// Mémoïsé : évite de re-render (et re-décoder les images) de TOUTE la liste
+// de produits quand un seul produit est édité / copié / supprimé.
+const ProductRow = memo(function ProductRow({ product, isEditing, current, onFieldChange, onStartEdit, onSaveEdit, onRemove }: ProductRowProps) {
+  const margin = estimateNetMargin(current);
+  return (
+    <div className="p-5">
+      <div className="grid lg:grid-cols-[1fr_1.5fr_auto] gap-4 items-start">
+        <div className="space-y-2">
+          <input disabled={!isEditing} value={current.brand} onChange={(e) => onFieldChange({ ...current, brand: e.target.value })} className="w-full rounded-xl bg-bg px-4 py-3 text-sm font-bold outline-none disabled:bg-transparent disabled:px-0" />
+          <input disabled={!isEditing} value={current.name} onChange={(e) => onFieldChange({ ...current, name: e.target.value })} className="w-full rounded-xl bg-bg px-4 py-3 text-sm outline-none disabled:bg-transparent disabled:px-0 disabled:py-0 text-dark/60" />
+        </div>
+        <div className="space-y-3">
+          <input disabled={!isEditing} value={current.sourceUrl} onChange={(e) => onFieldChange({ ...current, sourceUrl: e.target.value })} className="w-full rounded-xl bg-bg px-4 py-3 text-xs outline-none disabled:bg-bg text-dark/60" />
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
+            <label className="text-xs text-dark/35">Genre<select disabled={!isEditing} value={current.gender || 'mixte'} onChange={(e) => onFieldChange({ ...current, gender: e.target.value as Product['gender'] })} className="mt-1 w-full rounded-xl bg-bg px-3 py-2 text-sm text-dark outline-none"><option value="homme">Homme</option><option value="femme">Femme</option><option value="mixte">Mixte</option></select></label>
+            <label className="text-xs text-dark/35">Catégorie<select disabled={!isEditing} value={current.category} onChange={(e) => {
+              const preset = categoryPresets.find((item) => item.label === e.target.value);
+              onFieldChange({
+                ...current,
+                category: e.target.value,
+                weightGrams: preset?.weight || current.weightGrams,
+                packaging: preset?.packaging || current.packaging,
+                sizes: preset?.defaultSizes ?? current.sizes,
+                colors: preset?.defaultColors ?? current.colors,
+              });
+            }} className="mt-1 w-full rounded-xl bg-bg px-3 py-2 text-sm text-dark outline-none">{categoryPresets.map((preset) => <option key={preset.label} value={preset.label}>{preset.label}</option>)}</select></label>
+            <label className="text-xs text-dark/35">Packaging<select disabled={!isEditing} value={current.packaging || 'none'} onChange={(e) => onFieldChange({ ...current, packaging: e.target.value as Product['packaging'] })} className="mt-1 w-full rounded-xl bg-bg px-3 py-2 text-sm text-dark outline-none"><option value="none">Standard</option><option value="without_box">Sans boite</option><option value="with_box">Avec boite</option></select></label>
+            <label className="text-xs text-dark/35">Vente €<input disabled={!isEditing} type="number" value={current.salePrice} onChange={(e) => onFieldChange({ ...current, salePrice: Number(e.target.value) })} className="mt-1 w-full rounded-xl bg-bg px-3 py-2 text-sm text-dark outline-none" /></label>
+            <label className="text-xs text-dark/35">Source CNY<input disabled={!isEditing} type="number" value={current.sourcePriceCny} onChange={(e) => onFieldChange({ ...current, sourcePriceCny: Number(e.target.value) })} className="mt-1 w-full rounded-xl bg-bg px-3 py-2 text-sm text-dark outline-none" /></label>
+            <label className="text-xs text-dark/35">Poids g<input disabled={!isEditing} type="number" value={current.weightGrams} onChange={(e) => onFieldChange({ ...current, weightGrams: Number(e.target.value) })} className="mt-1 w-full rounded-xl bg-bg px-3 py-2 text-sm text-dark outline-none" /></label>
+            <label className="text-xs text-dark/35">Statut<select disabled={!isEditing} value={current.status} onChange={(e) => onFieldChange({ ...current, status: e.target.value as Product['status'] })} className="mt-1 w-full rounded-xl bg-bg px-3 py-2 text-sm text-dark outline-none"><option value="active">Actif</option><option value="link_dead">Lien saute</option><option value="paused">Pause</option></select></label>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <label className="text-xs text-dark/35">Tailles disponibles
+              <input disabled={!isEditing} value={current.sizes || ''} onChange={(e) => onFieldChange({ ...current, sizes: e.target.value })} placeholder="39, 40, 41, 42, 43, 44, 45" className="mt-1 w-full rounded-xl bg-bg px-3 py-2 text-sm text-dark outline-none" />
+            </label>
+            <label className="text-xs text-dark/35">Couleurs disponibles
+              <input disabled={!isEditing} value={current.colors || ''} onChange={(e) => onFieldChange({ ...current, colors: e.target.value })} placeholder="Black, White, Red" className="mt-1 w-full rounded-xl bg-bg px-3 py-2 text-sm text-dark outline-none" />
+            </label>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex-1">
+              <label className="text-xs text-dark/35">Images (Séparez les URLs par un pipe | pour les coloris)
+                <textarea
+                  disabled={!isEditing}
+                  value={current.imageUrl || ''}
+                  onChange={(e) => onFieldChange({ ...current, imageUrl: e.target.value })}
+                  placeholder="URL1 | URL2 | URL3..."
+                  className="mt-1 w-full rounded-xl bg-bg px-3 py-2 text-sm text-dark outline-none min-h-[80px]"
+                />
+              </label>
+            </div>
+            {isEditing && (
+              <div className="flex flex-col gap-2">
+                <label className="cursor-pointer rounded-xl bg-dark px-4 py-2 text-xs font-bold text-white hover:bg-accent transition-colors text-center">
+                  Upload
+                  <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => {
+                    const files = Array.from(e.target.files || []);
+                    if (files.length === 0) return;
+
+                    compressImages(files, 800, 0.75)
+                      .then((results) => {
+                        const currentImages = current.imageUrl ? current.imageUrl.split('|').map(s => s.trim()).filter(Boolean) : [];
+                        const nextImages = [...currentImages, ...results].join('|');
+                        onFieldChange({ ...current, imageUrl: nextImages });
+                      })
+                      .catch(() => showToast("Erreur lors du traitement des images"));
+                  }} />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => onFieldChange({ ...current, imageUrl: '' })}
+                  className="rounded-xl bg-red-500/10 px-4 py-2 text-[10px] font-bold text-red-500 hover:bg-red-500/20 transition-colors"
+                >
+                  Vider
+                </button>
+              </div>
+            )}
+          </div>
+
+          {current.imageUrl && (
+            <div className="mt-3">
+              <p className="text-[10px] font-bold text-dark/30 uppercase mb-2">Correspondance photos / coloris</p>
+              <div className="flex flex-wrap gap-3">
+                {current.imageUrl.split('|').map((url, idx) => {
+                  const trimmedUrl = url.trim();
+                  if (!trimmedUrl) return null;
+                  const colorNames = current.colors ? current.colors.split(',').map(s => s.trim()) : [];
+                  const colorName = colorNames[idx] || `Photo ${idx + 1}`;
+
+                  return (
+                    <div key={idx} className="relative group/img flex flex-col items-center gap-1">
+                      <div className="relative">
+                        <img src={trimmedUrl} alt="" loading="lazy" decoding="async" className="h-16 w-16 rounded-xl object-contain bg-subtle border border-dark/10" />
+                        {isEditing && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const urls = current.imageUrl.split('|').map(s => s.trim()).filter(Boolean);
+                              urls.splice(idx, 1);
+                              onFieldChange({ ...current, imageUrl: urls.join('|') });
+                            }}
+                            className="absolute -top-1.5 -right-1.5 h-5 w-5 bg-red-500 text-white rounded-full text-[10px] flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity z-10 shadow-sm"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                      <span className="text-[9px] font-bold text-dark/40 uppercase truncate max-w-[64px]">{colorName}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          <div className="flex flex-wrap gap-2 text-xs">
+            <span className="rounded-full bg-dark/5 px-3 py-1 text-dark/45">Poids retenu {margin.effectiveWeight}g</span>
+            <span className="rounded-full bg-dark/5 px-3 py-1 text-dark/45">Livraison {euro(margin.shipping.low)} - {euro(margin.shipping.high)}</span>
+            <span className="rounded-full bg-dark/5 px-3 py-1 text-dark/45">Securite +20% {euro(margin.shippingWithSafety)}</span>
+            <span className={`rounded-full px-3 py-1 font-bold ${marginTone(margin.net)}`}>Marge nette {marginLabel(margin.net)} : {euro(margin.net)}</span>
+          </div>
+        </div>
+        <div className="flex lg:flex-col gap-2">
+          {isEditing ? (
+            <>
+              <button onClick={onSaveEdit} className="inline-flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-sm font-semibold text-white"><Save size={14} /> Save</button>
+              <button
+                onClick={() => onFieldChange({
+                  ...current,
+                  salePrice: suggestedSalePrice(current.sourcePriceCny, current.weightGrams, current.packaging),
+                })}
+                className="inline-flex items-center gap-2 rounded-full bg-dark/5 px-4 py-2 text-sm font-semibold text-dark/60"
+              >
+                Prix auto
+              </button>
+            </>
+          ) : (
+            <button onClick={() => onStartEdit(product)} className="inline-flex items-center gap-2 rounded-full bg-dark px-4 py-2 text-sm font-semibold text-white"><Pencil size={14} /> Edit</button>
+          )}
+          <a href={current.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full bg-dark/5 px-4 py-2 text-sm font-semibold text-dark/60"><ExternalLink size={14} /> Ouvrir</a>
+          <button onClick={() => { if (confirm('Supprimer ce produit ?')) onRemove(product.id); }} className="inline-flex items-center gap-2 rounded-full bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-500 hover:bg-red-500/20 transition-colors"><Trash2 size={14} /></button>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+type OrderCardProps = {
+  order: Order;
+  product: Product;
+  margin: ReturnType<typeof estimateNetMargin>;
+  copied: boolean;
+  copiedPayment: boolean;
+  onFieldChange: (id: string, field: string, value: string) => void;
+  onCopyOrder: (order: Order) => void;
+  onCopyClientMessage: (order: Order, type: 'payment' | 'paid' | 'tracking' | 'delay') => void;
+  whatsappLink: (order: Order, type: 'payment' | 'paid' | 'tracking' | 'delay') => string;
+};
+
+// Mémoïsé : évite de re-render toute la liste de commandes quand une seule
+// commande change de statut ou est copiée (copied/copiedPayment sont des
+// booléens calculés par commande, pas la string copiedId brute).
+const OrderCard = memo(function OrderCard({ order, product, margin, copied, copiedPayment, onFieldChange, onCopyOrder, onCopyClientMessage, whatsappLink }: OrderCardProps) {
+  return (
+    <div className="rounded-3xl bg-white text-dark p-5 shadow-xl shadow-black/10">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-bold text-accent">{rootOrderId(order.id)}</span>
+            <span className="rounded-full bg-dark/5 px-3 py-1 text-xs font-semibold text-dark/45">
+              {statusLabels[order.status]}
+            </span>
+          </div>
+          <h3 className="font-bold">
+            {order.items && order.items.length > 1
+              ? `${order.items.length} articles`
+              : `${product.brand} - ${product.name}`}
+          </h3>
+          <p className="text-sm text-dark/45 mt-1">
+            {order.items && order.items.length > 1
+              ? `pour ${order.customerName}`
+              : `${order.size} / ${order.color} / x${order.quantity} pour ${order.customerName}`}
+          </p>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <select
+            value={order.paymentStatus || 'pending'}
+            onChange={(event) => onFieldChange(order.id, 'paymentStatus', event.target.value)}
+            className="rounded-xl bg-bg px-3 py-2 text-xs font-semibold outline-none"
+          >
+            {Object.entries(paymentLabels).map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+          <select
+            value={order.status}
+            onChange={(event) => onFieldChange(order.id, 'status', event.target.value)}
+            className="rounded-xl bg-bg px-3 py-2 text-xs font-semibold outline-none"
+          >
+            {Object.entries(statusLabels).map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {order.items && order.items.length > 1 && (
+        <div className="mt-4 space-y-2">
+          <div className="text-xs font-bold text-dark/35">Articles de la commande</div>
+          {order.items.map((item, idx) => (
+            <div key={idx} className="flex items-center justify-between gap-3 rounded-xl bg-bg p-3">
+              <div className="flex-1 min-w-0">
+                <span className="text-[10px] font-bold text-accent uppercase">{item.brand}</span>
+                <div className="text-sm font-semibold text-dark truncate">{item.name}</div>
+                <div className="text-xs text-dark/40">{item.size} / {item.color} × {item.quantity}</div>
+              </div>
+              <span className="text-sm font-800 text-dark flex-shrink-0">{euro(item.price * item.quantity)}</span>
+            </div>
+          ))}
+          <div className="flex justify-between rounded-xl bg-dark/5 p-3">
+            <span className="text-xs font-bold text-dark/50">Total commande</span>
+            <span className="text-sm font-800 text-dark">{euro(order.items.reduce((s, i) => s + i.price * i.quantity, 0))}</span>
+          </div>
+        </div>
+      )}
+
+      <div className="grid sm:grid-cols-3 gap-3 mt-5 text-sm">
+        <div className="rounded-2xl bg-bg p-4">
+          <div className="text-dark/35 text-xs">Client</div>
+          <div className="font-semibold mt-1">{order.customerName}</div>
+          <div className="text-dark/45 text-xs mt-1">{order.phone}</div>
+        </div>
+        <div className="rounded-2xl bg-bg p-4">
+          <div className="text-dark/35 text-xs">Adresse</div>
+          <div className="font-semibold mt-1">{order.city}, {order.zip}</div>
+          <div className="text-dark/45 text-xs mt-1">{order.country}</div>
+        </div>
+        <div className="rounded-2xl bg-bg p-4">
+          <div className="text-dark/35 text-xs">Livraison estimée</div>
+          <div className="font-semibold mt-1">{euro(margin.shipping.low)} - {euro(margin.shipping.high)}</div>
+          <div className="text-dark/45 text-xs mt-1">{margin.shipping.label} · {margin.effectiveWeight}g</div>
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+        <span className={`rounded-full px-3 py-1 font-bold ${marginTone(margin.net)}`}>
+          Marge {marginLabel(margin.net)} : {euro(margin.net)}
+        </span>
+        <span className="rounded-full bg-dark/5 px-3 py-1 text-dark/40">
+          Livraison securisee (+20%) : {euro(margin.shippingWithSafety)}
+        </span>
+        <span className="rounded-full bg-dark/5 px-3 py-1 text-dark/40">
+          Frais paiement : {euro(margin.fees)}
+        </span>
+      </div>
+
+      <div className="mt-4 grid sm:grid-cols-[1fr_auto] gap-2">
+        <input
+          value={order.tracking || ''}
+          onChange={(event) => onFieldChange(order.id, 'tracking', event.target.value)}
+          placeholder="Tracking colis"
+          className="rounded-xl bg-bg px-4 py-3 text-sm outline-none"
+        />
+        <a
+          href={whatsappLink(order, 'tracking')}
+          target="_blank"
+          rel="noreferrer"
+          className="rounded-xl bg-[#25D366]/10 px-4 py-3 text-center text-sm font-bold text-[#1cae54] hover:bg-[#25D366]/20 transition-colors"
+        >
+          Envoyer tracking
+        </a>
+      </div>
+
+      <div className="flex flex-wrap gap-2 mt-5">
+        <button
+          onClick={() => onCopyOrder(order)}
+          className="inline-flex items-center gap-2 rounded-full bg-dark px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-white hover:bg-accent transition-colors"
+        >
+          <Copy size={14} /> {copied ? 'Copie !' : 'Mulebuy'}
+        </button>
+        <a
+          href={product.sourceUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-2 rounded-full bg-dark/5 px-5 py-3 text-sm font-semibold text-dark/60 hover:bg-dark/10 transition-colors"
+        >
+          <ExternalLink size={15} /> Ouvrir lien source
+        </a>
+        <a href={whatsappLink(order, 'payment')} target="_blank" rel="noreferrer" className="rounded-full bg-[#25D366]/10 px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-[#1cae54] hover:bg-[#25D366]/20 transition-colors">
+          WA paiement
+        </a>
+        <a href={whatsappLink(order, 'paid')} target="_blank" rel="noreferrer" className="rounded-full bg-[#25D366]/10 px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-[#1cae54] hover:bg-[#25D366]/20 transition-colors">
+          WA paye
+        </a>
+        <a href={whatsappLink(order, 'delay')} target="_blank" rel="noreferrer" className="rounded-full bg-dark/5 px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-dark/60 hover:bg-dark/10 transition-colors">
+          WA retard
+        </a>
+        <button onClick={() => onCopyClientMessage(order, 'payment')} className="rounded-full bg-dark/5 px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-dark/60 hover:bg-dark/10 transition-colors">
+          {copiedPayment ? 'Copie !' : 'Copier'}
+        </button>
+      </div>
+    </div>
+  );
+});
+
 export default function AdminPanel() {
   const [isAdminAuthed] = useState(() => sessionStorage.getItem('tof-admin-auth') === 'true');
   
@@ -489,19 +805,19 @@ export default function AdminPanel() {
     showToast('Mise à jour réussie ✓');
   };
 
-  const removeProduct = async (id: string) => {
+  const removeProduct = useCallback(async (id: string) => {
     await dbDeleteProduct(id);
     setProducts((prev) => prev.filter((p) => p.id !== id));
     window.dispatchEvent(new CustomEvent('tof-products-updated'));
     showToast('Produit supprimé ✓');
     playDelete();
-  };
+  }, []);
 
-  const saveOrderField = async (id: string, field: string, value: string) => {
+  const saveOrderField = useCallback(async (id: string, field: string, value: string) => {
     const dbField: Record<string, string> = { status: 'status', paymentStatus: 'payment_status', tracking: 'tracking' };
     await updateOrder(id, { [dbField[field] || field]: value });
     setOrders((prev) => prev.map((o) => o.id === id ? { ...o, [field]: value } : o));
-  };
+  }, []);
 
   const saveDrop = async () => {
     await dbSaveDrop(dropToDb(dropDraft));
@@ -511,11 +827,9 @@ export default function AdminPanel() {
 
   const uploadDropImage = (file?: File) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      setDropDraft({ ...dropDraft, imageUrl: String(reader.result) });
-    };
-    reader.readAsDataURL(file);
+    compressImage(file, 1200, 0.8)
+      .then((dataUrl) => setDropDraft((prev) => ({ ...prev, imageUrl: dataUrl })))
+      .catch(() => showToast("Erreur lors du traitement de l'image"));
   };
 
   const addNote = async () => {
@@ -609,19 +923,29 @@ export default function AdminPanel() {
     showToast('Réglages sauvegardés ✓');
   };
 
-  const startEdit = (product: Product) => {
+  const startEdit = useCallback((product: Product) => {
     setEditingId(product.id);
     setDraftProduct({ ...product });
-  };
+  }, []);
 
-  const saveEdit = () => {
-    if (!draftProduct) return;
-    const newProducts = products.map((product) => (product.id === draftProduct.id ? draftProduct : product));
+  // saveEdit lit draftProduct/products via ref pour garder une identité stable
+  // (sinon chaque frappe pendant l'édition changerait la prop de TOUTES les lignes produit et casserait le memo).
+  const draftProductRef = useRef(draftProduct);
+  draftProductRef.current = draftProduct;
+  const productsRef = useRef(products);
+  productsRef.current = products;
+  const siteSettingsRef = useRef(siteSettings);
+  siteSettingsRef.current = siteSettings;
+
+  const saveEdit = useCallback(() => {
+    const draft = draftProductRef.current;
+    if (!draft) return;
+    const newProducts = productsRef.current.map((product) => (product.id === draft.id ? draft : product));
     // On passe le draftProduct à saveProducts pour qu'il soit le seul envoyé à la DB
-    saveProducts(newProducts, draftProduct);
+    saveProducts(newProducts, draft);
     setEditingId(null);
     setDraftProduct(null);
-  };
+  }, []);
 
   const addProduct = () => {
     const product: Product = {
@@ -708,7 +1032,14 @@ export default function AdminPanel() {
   };
 
   const fallbackProduct: Product = { id: '', brand: '-', name: '-', category: 'T-shirt', gender: 'mixte', salePrice: 0, sourcePriceCny: 0, weightGrams: 300, packaging: 'none', sizes: '', colors: '', imageUrl: '', sourceUrl: '', status: 'active' };
-  const getProduct = (id: string) => products.find((product) => product.id === id) || products[0] || fallbackProduct;
+  // getProduct lit products via ref pour garder une identité stable entre les
+  // renders (utilisé par des callbacks passés à des composants mémoïsés).
+  const getProduct = useCallback(
+    (id: string) => productsRef.current.find((product) => product.id === id) || productsRef.current[0] || fallbackProduct,
+    // fallbackProduct ne dépend d'aucun state, sa valeur est constante
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
 
   const dashboard = useMemo(() => {
     const statusCounts = orders.reduce<Record<OrderStatus, number>>((acc, order) => {
@@ -814,7 +1145,7 @@ export default function AdminPanel() {
     };
   }, [orders, products]);
 
-  const orderText = (order: Order) => {
+  const orderText = useCallback((order: Order) => {
     let productsBlock = '';
 
     if (order.items && order.items.length > 0) {
@@ -831,17 +1162,17 @@ export default function AdminPanel() {
     const margin = estimateNetMargin(product, order.quantity);
 
     return `ORDER ${rootOrderId(order.id)}\n\n${productsBlock}\n\nCUSTOMER\nName: ${order.customerName}\nPhone: ${order.phone}\nAddress: ${order.address}\nCity: ${order.city}\nZip: ${order.zip}\nCountry: ${order.country}\nSnap/WhatsApp: ${order.snapOrWhatsapp}\n\nSHIPPING\nEstimated shipping: ${euro(margin.shipping.low)} - ${euro(margin.shipping.high)}\nPackaging: discreet, no invoice\nQC: please send photos before shipping`;
-  };
+  }, [getProduct]);
 
-  const copyOrder = async (order: Order) => {
+  const copyOrder = useCallback(async (order: Order) => {
     await navigator.clipboard.writeText(orderText(order));
     setCopiedId(order.id);
     setTimeout(() => setCopiedId(null), 1800);
     showToast('Bloc Mulebuy copié ✓');
     playCopy();
-  };
+  }, [orderText]);
 
-  const clientMessage = (order: Order, type: 'payment' | 'paid' | 'tracking' | 'delay') => {
+  const clientMessage = useCallback((order: Order, type: 'payment' | 'paid' | 'tracking' | 'delay') => {
     let itemsText = '';
     let totalAmount = '';
 
@@ -855,7 +1186,7 @@ export default function AdminPanel() {
     }
 
     if (type === 'payment') {
-      return `Salut ${order.customerName}, ta commande ${rootOrderId(order.id)} est bien réservée.\n\n${itemsText}\n\nTotal : ${totalAmount}\n\nPaiement PayPal : ${siteSettings.paypalUrl}\n\nEnvoie une capture ici quand c'est fait et je lance la commande.`;
+      return `Salut ${order.customerName}, ta commande ${rootOrderId(order.id)} est bien réservée.\n\n${itemsText}\n\nTotal : ${totalAmount}\n\nPaiement PayPal : ${siteSettingsRef.current.paypalUrl}\n\nEnvoie une capture ici quand c'est fait et je lance la commande.`;
     }
     if (type === 'paid') {
       return `Paiement reçu pour ta commande ${rootOrderId(order.id)}, merci.\nJe lance la commande et je te tiens au courant pour le QC / suivi.`;
@@ -864,17 +1195,17 @@ export default function AdminPanel() {
       return `Ta commande ${rootOrderId(order.id)} est expédiée.\nTracking : ${order.tracking || '[COLLE LE TRACKING ICI]'}\n\nDélai estimé : 7-20 jours selon la ligne.`;
     }
     return `Petit update pour ta commande ${rootOrderId(order.id)} : il y a un léger délai côté traitement/livraison. Je suis dessus et je t'envoie les nouvelles infos dès que je les ai.`;
-  };
+  }, [getProduct]);
 
-  const copyClientMessage = async (order: Order, type: 'payment' | 'paid' | 'tracking' | 'delay') => {
+  const copyClientMessage = useCallback(async (order: Order, type: 'payment' | 'paid' | 'tracking' | 'delay') => {
     await navigator.clipboard.writeText(clientMessage(order, type));
     setCopiedId(`${order.id}-${type}`);
     setTimeout(() => setCopiedId(null), 1800);
     showToast('Message copié ✓');
     playCopy();
-  };
+  }, [clientMessage]);
 
-  const whatsappLink = (order: Order, type: 'payment' | 'paid' | 'tracking' | 'delay') => {
+  const whatsappLink = useCallback((order: Order, type: 'payment' | 'paid' | 'tracking' | 'delay') => {
     let phone = order.phone.replace(/[^0-9+]/g, '');
     // Convert French 0X to 33X
     if (phone.startsWith('0') && phone.length === 10) {
@@ -883,7 +1214,7 @@ export default function AdminPanel() {
     phone = phone.replace(/^\+/, '');
     const text = encodeURIComponent(clientMessage(order, type));
     return `https://wa.me/${phone}?text=${text}`;
-  };
+  }, [clientMessage]);
 
   return (
     <section id="admin" className="py-8 sm:py-20 lg:py-28 bg-dark text-white">
@@ -1118,150 +1449,18 @@ export default function AdminPanel() {
                 const product = getProduct(order.productId);
                 const margin = estimateNetMargin(product, order.quantity);
                 return (
-                  <div key={order.id} className="rounded-3xl bg-white text-dark p-5 shadow-xl shadow-black/10">
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                      <div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-bold text-accent">{rootOrderId(order.id)}</span>
-                          <span className="rounded-full bg-dark/5 px-3 py-1 text-xs font-semibold text-dark/45">
-                            {statusLabels[order.status]}
-                          </span>
-                        </div>
-                        <h3 className="font-bold">
-                          {order.items && order.items.length > 1
-                            ? `${order.items.length} articles`
-                            : `${product.brand} - ${product.name}`}
-                        </h3>
-                        <p className="text-sm text-dark/45 mt-1">
-                          {order.items && order.items.length > 1
-                            ? `pour ${order.customerName}`
-                            : `${order.size} / ${order.color} / x${order.quantity} pour ${order.customerName}`}
-                        </p>
-                      </div>
-                      <div className="flex flex-col sm:flex-row gap-2">
-                        <select
-                          value={order.paymentStatus || 'pending'}
-                          onChange={(event) =>
-                            saveOrderField(order.id, 'paymentStatus', event.target.value)
-                          }
-                          className="rounded-xl bg-bg px-3 py-2 text-xs font-semibold outline-none"
-                        >
-                          {Object.entries(paymentLabels).map(([value, label]) => (
-                            <option key={value} value={value}>{label}</option>
-                          ))}
-                        </select>
-                        <select
-                          value={order.status}
-                          onChange={(event) =>
-                            saveOrderField(order.id, 'status', event.target.value)
-                          }
-                          className="rounded-xl bg-bg px-3 py-2 text-xs font-semibold outline-none"
-                        >
-                          {Object.entries(statusLabels).map(([value, label]) => (
-                            <option key={value} value={value}>{label}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    {order.items && order.items.length > 1 && (
-                      <div className="mt-4 space-y-2">
-                        <div className="text-xs font-bold text-dark/35">Articles de la commande</div>
-                        {order.items.map((item, idx) => (
-                          <div key={idx} className="flex items-center justify-between gap-3 rounded-xl bg-bg p-3">
-                            <div className="flex-1 min-w-0">
-                              <span className="text-[10px] font-bold text-accent uppercase">{item.brand}</span>
-                              <div className="text-sm font-semibold text-dark truncate">{item.name}</div>
-                              <div className="text-xs text-dark/40">{item.size} / {item.color} × {item.quantity}</div>
-                            </div>
-                            <span className="text-sm font-800 text-dark flex-shrink-0">{euro(item.price * item.quantity)}</span>
-                          </div>
-                        ))}
-                        <div className="flex justify-between rounded-xl bg-dark/5 p-3">
-                          <span className="text-xs font-bold text-dark/50">Total commande</span>
-                          <span className="text-sm font-800 text-dark">{euro(order.items.reduce((s, i) => s + i.price * i.quantity, 0))}</span>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="grid sm:grid-cols-3 gap-3 mt-5 text-sm">
-                      <div className="rounded-2xl bg-bg p-4">
-                        <div className="text-dark/35 text-xs">Client</div>
-                        <div className="font-semibold mt-1">{order.customerName}</div>
-                        <div className="text-dark/45 text-xs mt-1">{order.phone}</div>
-                      </div>
-                      <div className="rounded-2xl bg-bg p-4">
-                        <div className="text-dark/35 text-xs">Adresse</div>
-                        <div className="font-semibold mt-1">{order.city}, {order.zip}</div>
-                        <div className="text-dark/45 text-xs mt-1">{order.country}</div>
-                      </div>
-                      <div className="rounded-2xl bg-bg p-4">
-                        <div className="text-dark/35 text-xs">Livraison estimée</div>
-                        <div className="font-semibold mt-1">{euro(margin.shipping.low)} - {euro(margin.shipping.high)}</div>
-                        <div className="text-dark/45 text-xs mt-1">{margin.shipping.label} · {margin.effectiveWeight}g</div>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                      <span className={`rounded-full px-3 py-1 font-bold ${marginTone(margin.net)}`}>
-                        Marge {marginLabel(margin.net)} : {euro(margin.net)}
-                      </span>
-                      <span className="rounded-full bg-dark/5 px-3 py-1 text-dark/40">
-                        Livraison securisee (+20%) : {euro(margin.shippingWithSafety)}
-                      </span>
-                      <span className="rounded-full bg-dark/5 px-3 py-1 text-dark/40">
-                        Frais paiement : {euro(margin.fees)}
-                      </span>
-                      </div>
-
-                    <div className="mt-4 grid sm:grid-cols-[1fr_auto] gap-2">
-                      <input
-                        value={order.tracking || ''}
-                        onChange={(event) =>
-                          saveOrderField(order.id, 'tracking', event.target.value)
-                        }
-                        placeholder="Tracking colis"
-                        className="rounded-xl bg-bg px-4 py-3 text-sm outline-none"
-                      />
-                      <a
-                        href={whatsappLink(order, 'tracking')}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="rounded-xl bg-[#25D366]/10 px-4 py-3 text-center text-sm font-bold text-[#1cae54] hover:bg-[#25D366]/20 transition-colors"
-                      >
-                        Envoyer tracking
-                      </a>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2 mt-5">
-                      <button
-                        onClick={() => copyOrder(order)}
-                        className="inline-flex items-center gap-2 rounded-full bg-dark px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-white hover:bg-accent transition-colors"
-                      >
-                        <Copy size={14} /> {copiedId === order.id ? 'Copie !' : 'Mulebuy'}
-                      </button>
-                      <a
-                        href={product.sourceUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-2 rounded-full bg-dark/5 px-5 py-3 text-sm font-semibold text-dark/60 hover:bg-dark/10 transition-colors"
-                      >
-                        <ExternalLink size={15} /> Ouvrir lien source
-                      </a>
-                      <a href={whatsappLink(order, 'payment')} target="_blank" rel="noreferrer" className="rounded-full bg-[#25D366]/10 px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-[#1cae54] hover:bg-[#25D366]/20 transition-colors">
-                        WA paiement
-                      </a>
-                      <a href={whatsappLink(order, 'paid')} target="_blank" rel="noreferrer" className="rounded-full bg-[#25D366]/10 px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-[#1cae54] hover:bg-[#25D366]/20 transition-colors">
-                        WA paye
-                      </a>
-                      <a href={whatsappLink(order, 'delay')} target="_blank" rel="noreferrer" className="rounded-full bg-dark/5 px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-dark/60 hover:bg-dark/10 transition-colors">
-                        WA retard
-                      </a>
-                      <button onClick={() => copyClientMessage(order, 'payment')} className="rounded-full bg-dark/5 px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-dark/60 hover:bg-dark/10 transition-colors">
-                        {copiedId === `${order.id}-payment` ? 'Copie !' : 'Copier'}
-                      </button>
-                    </div>
-                  </div>
+                  <OrderCard
+                    key={order.id}
+                    order={order}
+                    product={product}
+                    margin={margin}
+                    copied={copiedId === order.id}
+                    copiedPayment={copiedId === `${order.id}-payment`}
+                    onFieldChange={saveOrderField}
+                    onCopyOrder={copyOrder}
+                    onCopyClientMessage={copyClientMessage}
+                    whatsappLink={whatsappLink}
+                  />
                 );
               })}
             </div>
@@ -1356,16 +1555,16 @@ export default function AdminPanel() {
                   <input type="file" accept="image/*" className="hidden" onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
-                    const reader = new FileReader();
-                    reader.onload = () => setQuickProduct({ ...quickProduct, imageUrl: String(reader.result) });
-                    reader.readAsDataURL(file);
+                    compressImage(file, 800, 0.75)
+                      .then((dataUrl) => setQuickProduct((prev) => ({ ...prev, imageUrl: dataUrl })))
+                      .catch(() => showToast("Erreur lors du traitement de l'image"));
                   }} />
                 </label>
               </div>
 
               {quickProduct.imageUrl && (
                 <div className="mt-2 flex items-center gap-3">
-                  <img src={quickProduct.imageUrl} alt="" className="h-12 w-12 rounded-xl object-cover border border-dark/5" />
+                  <img src={quickProduct.imageUrl} alt="" loading="lazy" decoding="async" className="h-12 w-12 rounded-xl object-cover border border-dark/5" />
                   <button onClick={() => setQuickProduct({ ...quickProduct, imageUrl: '' })} className="text-xs text-red-500 font-bold">Retirer</button>
                 </div>
               )}
@@ -1391,155 +1590,19 @@ export default function AdminPanel() {
 
             <div className="divide-y divide-dark/5">
               {products.map((product) => {
-                const isEditing = editingId === product.id && draftProduct;
-                const current = isEditing ? draftProduct : product;
-                const margin = estimateNetMargin(current);
+                const isEditing = Boolean(editingId === product.id && draftProduct);
+                const current = isEditing && draftProduct ? draftProduct : product;
                 return (
-                  <div key={product.id} className="p-5">
-                    <div className="grid lg:grid-cols-[1fr_1.5fr_auto] gap-4 items-start">
-                      <div className="space-y-2">
-                        <input disabled={!isEditing} value={current.brand} onChange={(e) => setDraftProduct({ ...current, brand: e.target.value })} className="w-full rounded-xl bg-bg px-4 py-3 text-sm font-bold outline-none disabled:bg-transparent disabled:px-0" />
-                        <input disabled={!isEditing} value={current.name} onChange={(e) => setDraftProduct({ ...current, name: e.target.value })} className="w-full rounded-xl bg-bg px-4 py-3 text-sm outline-none disabled:bg-transparent disabled:px-0 disabled:py-0 text-dark/60" />
-                      </div>
-                      <div className="space-y-3">
-                        <input disabled={!isEditing} value={current.sourceUrl} onChange={(e) => setDraftProduct({ ...current, sourceUrl: e.target.value })} className="w-full rounded-xl bg-bg px-4 py-3 text-xs outline-none disabled:bg-bg text-dark/60" />
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
-                          <label className="text-xs text-dark/35">Genre<select disabled={!isEditing} value={current.gender || 'mixte'} onChange={(e) => setDraftProduct({ ...current, gender: e.target.value as Product['gender'] })} className="mt-1 w-full rounded-xl bg-bg px-3 py-2 text-sm text-dark outline-none"><option value="homme">Homme</option><option value="femme">Femme</option><option value="mixte">Mixte</option></select></label>
-                          <label className="text-xs text-dark/35">Catégorie<select disabled={!isEditing} value={current.category} onChange={(e) => {
-                            const preset = categoryPresets.find((item) => item.label === e.target.value);
-                            setDraftProduct({
-                              ...current,
-                              category: e.target.value,
-                              weightGrams: preset?.weight || current.weightGrams,
-                              packaging: preset?.packaging || current.packaging,
-                              sizes: preset?.defaultSizes ?? current.sizes,
-                              colors: preset?.defaultColors ?? current.colors,
-                            });
-                          }} className="mt-1 w-full rounded-xl bg-bg px-3 py-2 text-sm text-dark outline-none">{categoryPresets.map((preset) => <option key={preset.label} value={preset.label}>{preset.label}</option>)}</select></label>
-                          <label className="text-xs text-dark/35">Packaging<select disabled={!isEditing} value={current.packaging || 'none'} onChange={(e) => setDraftProduct({ ...current, packaging: e.target.value as Product['packaging'] })} className="mt-1 w-full rounded-xl bg-bg px-3 py-2 text-sm text-dark outline-none"><option value="none">Standard</option><option value="without_box">Sans boite</option><option value="with_box">Avec boite</option></select></label>
-                          <label className="text-xs text-dark/35">Vente €<input disabled={!isEditing} type="number" value={current.salePrice} onChange={(e) => setDraftProduct({ ...current, salePrice: Number(e.target.value) })} className="mt-1 w-full rounded-xl bg-bg px-3 py-2 text-sm text-dark outline-none" /></label>
-                          <label className="text-xs text-dark/35">Source CNY<input disabled={!isEditing} type="number" value={current.sourcePriceCny} onChange={(e) => setDraftProduct({ ...current, sourcePriceCny: Number(e.target.value) })} className="mt-1 w-full rounded-xl bg-bg px-3 py-2 text-sm text-dark outline-none" /></label>
-                          <label className="text-xs text-dark/35">Poids g<input disabled={!isEditing} type="number" value={current.weightGrams} onChange={(e) => setDraftProduct({ ...current, weightGrams: Number(e.target.value) })} className="mt-1 w-full rounded-xl bg-bg px-3 py-2 text-sm text-dark outline-none" /></label>
-                          <label className="text-xs text-dark/35">Statut<select disabled={!isEditing} value={current.status} onChange={(e) => setDraftProduct({ ...current, status: e.target.value as Product['status'] })} className="mt-1 w-full rounded-xl bg-bg px-3 py-2 text-sm text-dark outline-none"><option value="active">Actif</option><option value="link_dead">Lien saute</option><option value="paused">Pause</option></select></label>
-                        </div>
-                        <div className="grid sm:grid-cols-2 gap-3">
-                          <label className="text-xs text-dark/35">Tailles disponibles
-                            <input disabled={!isEditing} value={current.sizes || ''} onChange={(e) => setDraftProduct({ ...current, sizes: e.target.value })} placeholder="39, 40, 41, 42, 43, 44, 45" className="mt-1 w-full rounded-xl bg-bg px-3 py-2 text-sm text-dark outline-none" />
-                          </label>
-                          <label className="text-xs text-dark/35">Couleurs disponibles
-                            <input disabled={!isEditing} value={current.colors || ''} onChange={(e) => setDraftProduct({ ...current, colors: e.target.value })} placeholder="Black, White, Red" className="mt-1 w-full rounded-xl bg-bg px-3 py-2 text-sm text-dark outline-none" />
-                          </label>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="flex-1">
-                            <label className="text-xs text-dark/35">Images (Séparez les URLs par un pipe | pour les coloris)
-                              <textarea 
-                                disabled={!isEditing} 
-                                value={current.imageUrl || ''} 
-                                onChange={(e) => setDraftProduct({ ...current, imageUrl: e.target.value })} 
-                                placeholder="URL1 | URL2 | URL3..." 
-                                className="mt-1 w-full rounded-xl bg-bg px-3 py-2 text-sm text-dark outline-none min-h-[80px]" 
-                              />
-                            </label>
-                          </div>
-                          {isEditing && (
-                            <div className="flex flex-col gap-2">
-                              <label className="cursor-pointer rounded-xl bg-dark px-4 py-2 text-xs font-bold text-white hover:bg-accent transition-colors text-center">
-                                Upload
-                                <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => {
-                                  const files = Array.from(e.target.files || []);
-                                  if (files.length === 0) return;
-                                  
-                                  const readers = files.map(file => {
-                                    return new Promise<string>((resolve) => {
-                                      const reader = new FileReader();
-                                      reader.onload = () => resolve(String(reader.result));
-                                      reader.readAsDataURL(file);
-                                    });
-                                  });
-
-                                  Promise.all(readers).then(results => {
-                                    const currentImages = current.imageUrl ? current.imageUrl.split('|').map(s => s.trim()).filter(Boolean) : [];
-                                    const nextImages = [...currentImages, ...results].join('|');
-                                    setDraftProduct({ ...current, imageUrl: nextImages });
-                                  });
-                                }} />
-                              </label>
-                              <button 
-                                type="button"
-                                onClick={() => setDraftProduct({ ...current, imageUrl: '' })}
-                                className="rounded-xl bg-red-500/10 px-4 py-2 text-[10px] font-bold text-red-500 hover:bg-red-500/20 transition-colors"
-                              >
-                                Vider
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                        
-                        {current.imageUrl && (
-                          <div className="mt-3">
-                            <p className="text-[10px] font-bold text-dark/30 uppercase mb-2">Correspondance photos / coloris</p>
-                            <div className="flex flex-wrap gap-3">
-                              {current.imageUrl.split('|').map((url, idx) => {
-                                const trimmedUrl = url.trim();
-                                if (!trimmedUrl) return null;
-                                const colorNames = current.colors ? current.colors.split(',').map(s => s.trim()) : [];
-                                const colorName = colorNames[idx] || `Photo ${idx + 1}`;
-                                
-                                return (
-                                  <div key={idx} className="relative group/img flex flex-col items-center gap-1">
-                                    <div className="relative">
-                                      <img src={trimmedUrl} alt="" className="h-16 w-16 rounded-xl object-contain bg-subtle border border-dark/10" />
-                                      {isEditing && (
-                                        <button 
-                                          type="button"
-                                          onClick={() => {
-                                            const urls = current.imageUrl.split('|').map(s => s.trim()).filter(Boolean);
-                                            urls.splice(idx, 1);
-                                            setDraftProduct({ ...current, imageUrl: urls.join('|') });
-                                          }}
-                                          className="absolute -top-1.5 -right-1.5 h-5 w-5 bg-red-500 text-white rounded-full text-[10px] flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity z-10 shadow-sm"
-                                        >
-                                          ✕
-                                        </button>
-                                      )}
-                                    </div>
-                                    <span className="text-[9px] font-bold text-dark/40 uppercase truncate max-w-[64px]">{colorName}</span>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
-                        <div className="flex flex-wrap gap-2 text-xs">
-                          <span className="rounded-full bg-dark/5 px-3 py-1 text-dark/45">Poids retenu {margin.effectiveWeight}g</span>
-                          <span className="rounded-full bg-dark/5 px-3 py-1 text-dark/45">Livraison {euro(margin.shipping.low)} - {euro(margin.shipping.high)}</span>
-                          <span className="rounded-full bg-dark/5 px-3 py-1 text-dark/45">Securite +20% {euro(margin.shippingWithSafety)}</span>
-                          <span className={`rounded-full px-3 py-1 font-bold ${marginTone(margin.net)}`}>Marge nette {marginLabel(margin.net)} : {euro(margin.net)}</span>
-                        </div>
-                      </div>
-                      <div className="flex lg:flex-col gap-2">
-                        {isEditing ? (
-                          <>
-                            <button onClick={saveEdit} className="inline-flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-sm font-semibold text-white"><Save size={14} /> Save</button>
-                            <button
-                              onClick={() => setDraftProduct({
-                                ...current,
-                                salePrice: suggestedSalePrice(current.sourcePriceCny, current.weightGrams, current.packaging),
-                              })}
-                              className="inline-flex items-center gap-2 rounded-full bg-dark/5 px-4 py-2 text-sm font-semibold text-dark/60"
-                            >
-                              Prix auto
-                            </button>
-                          </>
-                        ) : (
-                          <button onClick={() => startEdit(product)} className="inline-flex items-center gap-2 rounded-full bg-dark px-4 py-2 text-sm font-semibold text-white"><Pencil size={14} /> Edit</button>
-                        )}
-                        <a href={current.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full bg-dark/5 px-4 py-2 text-sm font-semibold text-dark/60"><ExternalLink size={14} /> Ouvrir</a>
-                        <button onClick={() => { if (confirm('Supprimer ce produit ?')) removeProduct(product.id); }} className="inline-flex items-center gap-2 rounded-full bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-500 hover:bg-red-500/20 transition-colors"><Trash2 size={14} /></button>
-                      </div>
-                    </div>
-                  </div>
+                  <ProductRow
+                    key={product.id}
+                    product={product}
+                    isEditing={isEditing}
+                    current={current}
+                    onFieldChange={setDraftProduct}
+                    onStartEdit={startEdit}
+                    onSaveEdit={saveEdit}
+                    onRemove={removeProduct}
+                  />
                 );
               })}
             </div>
@@ -1630,7 +1693,7 @@ export default function AdminPanel() {
               <div className="rounded-3xl bg-white/5 border border-white/10 overflow-hidden">
                 <div className="aspect-square bg-white/5 flex items-center justify-center">
                   {dropDraft.imageUrl ? (
-                    <img src={dropDraft.imageUrl} alt="Preview drop" className="h-full w-full object-cover" />
+                    <img src={dropDraft.imageUrl} alt="Preview drop" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                   ) : (
                     <span className="text-white/20 text-sm">ta photo ici</span>
                   )}
