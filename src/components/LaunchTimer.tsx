@@ -3,52 +3,54 @@ import { useEffect, useState } from 'react';
 /**
  * Timer d'offre d'ouverture.
  *
- * Règle : l'offre démarre à 19h et dure 48h.
- * - Si on est AVANT 19h du jour, le compteur affiche le temps restant
- *   AVANT le lancement (label "Lancement dans").
- * - Si on est APRÈS 19h et que 48h ne sont pas écoulées, on affiche le
- *   temps restant dans l'offre (label "Offre dans" ou temps restant).
- * - Passé 48h, la bannière disparaît.
+ * 🛠️ Pour relancer le compteur à 48h :
+ *   - Option 1 (recommandé) : va dans l'admin → onglet "Réglages" et clique sur
+ *     "Relancer l'offre 48h" OU change la date de fin manuellement.
+ *   - Option 2 (rapide, sans passer par l'admin) : change la valeur de
+ *     DEFAULT_END_MS ci-dessous en `Date.now() + 48 * 60 * 60 * 1000`,
+ *     sauvegarde et redéploie.
+ *
+ * Quand le timer atteint 0 la bannière disparaît automatiquement.
  */
+const STORAGE_KEY = 'tof-offer-end-v2'; // v2 pour ignorer l'ancienne valeur qui était décalée
 
-function getLaunchWindows(now: Date) {
-  // Lancement du jour à 19h
-  const today19 = new Date(now);
-  today19.setHours(19, 0, 0, 0);
-  // Fin = lancement + 48h
-  const end = new Date(today19.getTime() + 48 * 60 * 60 * 1000);
-  return { launch: today19, end };
+function getEndDate(): Date {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const t = Number(stored);
+      if (!Number.isNaN(t) && t > Date.now()) return new Date(t);
+    }
+  } catch { /* ignore */ }
+  // Par défaut : 48h à partir du chargement de la page.
+  const end = new Date(Date.now() + 48 * 60 * 60 * 1000);
+  try { localStorage.setItem(STORAGE_KEY, String(end.getTime())); } catch { /* ignore */ }
+  return end;
 }
 
-type Phase = 'before' | 'running' | 'ended';
+/** Export utilisé par le panneau admin pour relancer/modifier l'offre. */
+export function setOfferEndDate(date: Date) {
+  try { localStorage.setItem(STORAGE_KEY, String(date.getTime())); } catch { /* ignore */ }
+  window.dispatchEvent(new CustomEvent('tof-offer-tick'));
+}
+
+export function resetOfferTo48h() {
+  setOfferEndDate(new Date(Date.now() + 48 * 60 * 60 * 1000));
+}
+
+export function clearOffer() {
+  try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+  window.dispatchEvent(new CustomEvent('tof-offer-tick'));
+}
 
 type TimeLeft = {
   hours: string;
   minutes: string;
   seconds: string;
-  phase: Phase;
 };
 
-function getTimeLeft(): TimeLeft | null {
-  const now = new Date();
-  const { launch, end } = getLaunchWindows(now);
-
-  // Cas 1 : avant le lancement (avant 19h aujourd'hui)
-  if (now.getTime() < launch.getTime()) {
-    const diff = launch.getTime() - now.getTime();
-    return { ...formatDiff(diff), phase: 'before' };
-  }
-  // Cas 2 : pendant l'offre (entre 19h jour J et 19h jour J+2)
-  if (now.getTime() < end.getTime()) {
-    const diff = end.getTime() - now.getTime();
-    return { ...formatDiff(diff), phase: 'running' };
-  }
-  // Cas 3 : fini (plus de 48h après le lancement)
-  return null;
-}
-
-function formatDiff(diff: number) {
-  const totalSeconds = Math.floor(diff / 1000);
+function formatDiff(diff: number): TimeLeft {
+  const totalSeconds = Math.max(0, Math.floor(diff / 1000));
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
@@ -57,6 +59,13 @@ function formatDiff(diff: number) {
     minutes: String(minutes).padStart(2, '0'),
     seconds: String(seconds).padStart(2, '0'),
   };
+}
+
+function getTimeLeft(): TimeLeft | null {
+  const end = getEndDate();
+  const diff = end.getTime() - Date.now();
+  if (diff <= 0) return null;
+  return formatDiff(diff);
 }
 
 function TimerCells({ timeLeft, compact = false }: { timeLeft: TimeLeft; compact?: boolean }) {
@@ -90,10 +99,16 @@ export default function LaunchTimer() {
   const [compactVisible, setCompactVisible] = useState(false);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setTimeLeft(getTimeLeft());
-    }, 1000);
-    return () => clearInterval(interval);
+    const tick = () => setTimeLeft(getTimeLeft());
+    const interval = setInterval(tick, 1000);
+    const onStorage = () => tick();
+    window.addEventListener('tof-offer-tick', tick);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('tof-offer-tick', tick);
+      window.removeEventListener('storage', onStorage);
+    };
   }, []);
 
   useEffect(() => {
@@ -105,8 +120,6 @@ export default function LaunchTimer() {
 
   if (!timeLeft) return null;
 
-  const isBefore = timeLeft.phase === 'before';
-
   return (
     <>
       {/* Grand bloc visible sous la nav */}
@@ -116,14 +129,10 @@ export default function LaunchTimer() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div className="text-center sm:text-left">
                 <p className="text-[10px] sm:text-[11px] uppercase tracking-[0.18em] text-white/45 font-bold">
-                  {isBefore ? 'Bientôt' : 'Offre d\'ouverture'}
+                  Offre d'ouverture
                 </p>
                 <h3 className="mt-0.5 font-display text-lg sm:text-2xl font-800 tracking-tight leading-tight">
-                  {isBefore ? (
-                    <>Lancement dans <span className="text-accent">-15%</span> avec <span className="text-accent">TOFLAUNCH</span></>
-                  ) : (
-                    <>Livraison offerte + <span className="text-accent">-15%</span> avec <span className="text-accent">TOFLAUNCH</span></>
-                  )}
+                  Livraison offerte + <span className="text-accent">-15%</span> avec <span className="text-accent">TOFLAUNCH</span>
                 </h3>
               </div>
 
@@ -142,9 +151,7 @@ export default function LaunchTimer() {
         <div className="rounded-full bg-dark/92 backdrop-blur-xl border border-white/10 px-3 sm:px-4 py-2 shadow-2xl shadow-dark/20">
           <div className="flex items-center gap-3 sm:gap-4">
             <div className="hidden sm:block">
-              <div className="text-[10px] uppercase tracking-[0.18em] text-white/35 font-bold">
-                {isBefore ? 'Bientôt' : 'Offre d\'ouverture'}
-              </div>
+              <div className="text-[10px] uppercase tracking-[0.18em] text-white/35 font-bold">Offre d'ouverture</div>
               <div className="text-xs font-semibold text-white/85">TOFLAUNCH -15%</div>
             </div>
             <div className="sm:hidden text-[11px] font-bold text-white/85 whitespace-nowrap">

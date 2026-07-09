@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { defaultDrop, type FeaturedDropConfig } from './FeaturedDrop';
 import { defaultSettings, readSiteSettings, saveSiteSettings, hydrateSiteSettings, type SiteSettings } from '../lib/siteSettings';
+import { resetOfferTo48h, clearOffer } from './LaunchTimer';
 import {
   fetchProducts, upsertProduct, deleteProduct as dbDeleteProduct,
   fetchOrders, updateOrder, insertOrder as dbInsertOrder,
@@ -2960,6 +2961,42 @@ export default function AdminPanel() {
                       <textarea value={siteSettings.ctaDescription} onChange={(e) => setSiteSettings({ ...siteSettings, ctaDescription: e.target.value })} rows={2} className="mt-1 w-full rounded-xl bg-white px-4 py-3 text-sm text-dark outline-none border border-dark/5 resize-none" />
                     </label>
                   </div>
+                </div>
+
+                <div className="rounded-2xl bg-bg p-4 space-y-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h4 className="font-bold text-sm">Offre d'ouverture (bannière + timer)</h4>
+                      <p className="text-xs text-dark/35 mt-1">Le compte à rebours TOFLAUNCH affiché en haut du site.</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        resetOfferTo48h();
+                        showToast('Timer relancé à 48h ✓');
+                      }}
+                      className="inline-flex items-center gap-2 rounded-full bg-accent hover:bg-accent/90 text-white px-4 py-2.5 text-xs font-bold transition-colors"
+                    >
+                      <RotateCcw size={12} /> Relancer à 48h
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (confirm('Arrêter l\'offre ? La bannière disparaîtra du shop.')) {
+                          clearOffer();
+                          showToast('Offre arrêtée ✓');
+                        }
+                      }}
+                      className="inline-flex items-center gap-2 rounded-full bg-dark/5 hover:bg-dark/10 text-dark/60 px-4 py-2.5 text-xs font-bold transition-colors"
+                    >
+                      <X size={12} /> Arrêter l'offre
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-dark/30">
+                    💡 Le timer repart de 48h pour tout le monde au clic. Si tu veux une date précise, change la valeur <code className="bg-dark/5 px-1 rounded">DEFAULT_END_MS</code> dans <code className="bg-dark/5 px-1 rounded">src/components/LaunchTimer.tsx</code>.
+                  </p>
                 </div>
 
                 <div className="rounded-2xl bg-bg p-4 space-y-4">
