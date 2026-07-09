@@ -55,7 +55,7 @@ export default function Hero() {
   }, []);
 
   return (
-    <section className="relative min-h-[100svh] flex items-center overflow-hidden bg-bg pt-24 sm:pt-20">
+    <section className="relative min-h-[90svh] lg:min-h-[calc(100svh-140px)] flex items-center overflow-hidden bg-bg py-10 sm:py-14 lg:py-20">
       {/* Blobs */}
       <div className="absolute top-20 right-[-10%] w-[500px] h-[500px] bg-accent/10 anim-blob opacity-60 pointer-events-none" />
       <div className="absolute bottom-10 left-[-5%] w-[300px] h-[300px] bg-orange-200/30 anim-blob opacity-40 pointer-events-none" style={{ animationDelay: '4s' }} />
