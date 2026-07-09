@@ -14,6 +14,7 @@ type Product = {
   category: string;
   gender: string;
   salePrice: number;
+  oldPrice?: number;
   sizes?: string;
   colors?: string;
   imageUrl?: string;
@@ -72,6 +73,7 @@ function dbToShopProduct(d: DbProduct): Product {
     category: d.category,
     gender: d.gender || 'mixte',
     salePrice: d.sale_price,
+    oldPrice: (d as DbProduct & { old_price?: number | null }).old_price || undefined,
     sizes: d.sizes,
     colors: d.colors,
     imageUrl: d.image_url || '',
@@ -236,7 +238,12 @@ function ProductCard({
       <button onClick={() => onOpen(product)} className="pt-3 px-1 text-left w-full block min-h-[60px]">
         <span className="text-[10px] font-bold text-accent uppercase tracking-wider">{product.brand}</span>
         <h3 className="text-sm font-medium text-dark/80 mt-0.5 leading-snug line-clamp-2">{product.name}</h3>
-        <span className="text-sm font-800 text-dark mt-1 block">{formatPrice(product.salePrice)}</span>
+        <div className="mt-1 flex items-baseline gap-1.5">
+          <span className="text-sm font-800 text-dark">{formatPrice(product.salePrice)}</span>
+          {product.oldPrice && product.oldPrice > product.salePrice && (
+            <span className="text-xs text-dark/30 line-through">{formatPrice(product.oldPrice)}</span>
+          )}
+        </div>
       </button>
     </div>
   );
@@ -486,8 +493,11 @@ function QuickAddModal({
 
                 <h2 className="font-display text-2xl sm:text-4xl font-800 text-dark leading-tight">{product.name}</h2>
 
-                <div className="flex items-baseline gap-3 mt-3">
+                <div className="flex items-baseline flex-wrap gap-x-3 gap-y-1 mt-3">
                   <span className="text-2xl sm:text-3xl font-800 text-dark">{formatPrice(product.salePrice)}</span>
+                  {product.oldPrice && product.oldPrice > product.salePrice && (
+                    <span className="text-sm text-dark/30 line-through">{formatPrice(product.oldPrice)}</span>
+                  )}
                   <span className="text-xs text-dark/30 font-medium">TVA incluse</span>
                 </div>
 

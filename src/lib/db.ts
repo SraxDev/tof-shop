@@ -9,6 +9,7 @@ export type DbProduct = {
   category: string;
   gender: string;
   sale_price: number;
+  old_price?: number | null;
   source_price_cny: number;
   weight_grams: number;
   packaging: string;

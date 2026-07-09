@@ -32,6 +32,7 @@ type Product = {
   category: string;
   gender: 'homme' | 'femme' | 'mixte';
   salePrice: number;
+  oldPrice?: number;
   sourcePriceCny: number;
   weightGrams: number;
   packaging: 'none' | 'without_box' | 'with_box';
@@ -197,7 +198,7 @@ void _readStorage;
 function productToDb(p: Product): DbProduct {
   return {
     id: p.id, brand: p.brand, name: p.name, category: p.category, gender: p.gender || 'mixte',
-    sale_price: p.salePrice, source_price_cny: p.sourcePriceCny,
+    sale_price: p.salePrice, old_price: p.oldPrice || null, source_price_cny: p.sourcePriceCny,
     weight_grams: p.weightGrams, packaging: p.packaging,
     sizes: p.sizes, colors: p.colors, image_url: p.imageUrl || '',
     source_url: p.sourceUrl, status: p.status,
@@ -207,7 +208,7 @@ function productToDb(p: Product): DbProduct {
 function dbToProduct(d: DbProduct): Product {
   return {
     id: d.id, brand: d.brand, name: d.name, category: d.category, gender: (d.gender || 'mixte') as Product['gender'],
-    salePrice: d.sale_price, sourcePriceCny: d.source_price_cny,
+    salePrice: d.sale_price, oldPrice: d.old_price || undefined, sourcePriceCny: d.source_price_cny,
     weightGrams: d.weight_grams, packaging: d.packaging as Product['packaging'],
     sizes: d.sizes, colors: d.colors, imageUrl: d.image_url || '',
     sourceUrl: d.source_url, status: d.status as Product['status'],
@@ -459,6 +460,16 @@ const ProductListItem = memo(function ProductListItem({ product, ordersCount, on
               Sans photo
             </span>
           )}
+          {(!product.brand || !product.name) && (
+            <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-bold text-red-500">
+              Incomplet
+            </span>
+          )}
+          {!product.sourceUrl && (
+            <span className="rounded-full bg-yellow-500/10 px-2 py-0.5 text-[10px] font-bold text-yellow-600">
+              Sans lien
+            </span>
+          )}
         </div>
         <div className="font-semibold text-sm sm:text-base truncate mt-0.5">
           {product.name || 'Produit sans nom'}
@@ -480,17 +491,30 @@ const ProductListItem = memo(function ProductListItem({ product, ordersCount, on
 
       {/* Actions : toujours visibles sur mobile, toujours visibles au hover desktop */}
       <div className="flex items-center gap-1 flex-shrink-0 sm:opacity-100 sm:pointer-events-auto">
-        {product.sourceUrl && (
+          {product.sourceUrl && (
+            <a
+              href={product.sourceUrl}
+              target="_blank"
+              rel="noreferrer"
+              title="Ouvrir le lien source"
+              className="h-9 w-9 sm:h-8 sm:w-8 inline-flex items-center justify-center rounded-full sm:rounded-lg bg-dark/5 text-dark/50 hover:bg-dark/10 hover:text-dark/80 transition-colors"
+            >
+              <ExternalLink size={14} />
+            </a>
+          )}
           <a
-            href={product.sourceUrl}
+            href={`#shop`}
             target="_blank"
             rel="noreferrer"
-            title="Ouvrir le lien source"
-            className="h-9 w-9 sm:h-8 sm:w-8 inline-flex items-center justify-center rounded-full sm:rounded-lg bg-dark/5 text-dark/50 hover:bg-dark/10 hover:text-dark/80 transition-colors"
+            title="Aperçu dans le shop"
+            onClick={() => {
+              // Store preview ID so Products can highlight/open quickadd for it
+              try { sessionStorage.setItem('tof-preview-product', product.id); } catch {}
+            }}
+            className="hidden sm:inline-flex h-8 w-8 items-center justify-center rounded-lg bg-dark/5 text-dark/50 hover:bg-dark/10 hover:text-dark/80 transition-colors"
           >
-            <ExternalLink size={14} />
+            <span className="text-[10px] font-black">👁</span>
           </a>
-        )}
         <button
           onClick={() => onDuplicate(product)}
           title="Dupliquer"
@@ -830,6 +854,7 @@ const ProductEditDrawer = memo(function ProductEditDrawer({
       draft.packaging !== original.packaging ||
       draft.status !== original.status ||
       draft.salePrice !== original.salePrice ||
+      (draft.oldPrice || 0) !== (original.oldPrice || 0) ||
       draft.sourcePriceCny !== original.sourcePriceCny ||
       draft.weightGrams !== original.weightGrams ||
       draft.sizes !== original.sizes ||
@@ -991,7 +1016,7 @@ const ProductEditDrawer = memo(function ProductEditDrawer({
 
           <div className="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-3">
             <h4 className="text-xs font-bold uppercase tracking-wider text-white/50">Prix &amp; poids</h4>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <Field label="Prix vente €" error={validation.price ? '>0' : undefined}>
                 <input
                   type="number"
@@ -1000,11 +1025,28 @@ const ProductEditDrawer = memo(function ProductEditDrawer({
                   className={inputCls(validation.price)}
                 />
               </Field>
+              <Field label="Prix barré €">
+                <input
+                  type="number"
+                  value={draft.oldPrice || ''}
+                  onChange={(e) => {
+                    const v = Number(e.target.value);
+                    onChange({ ...draft, oldPrice: e.target.value === '' ? undefined : v });
+                  }}
+                  placeholder="—"
+                  className={inputCls(false)}
+                />
+              </Field>
               <Field label="Prix source ¥">
                 <input
                   type="number"
                   value={draft.sourcePriceCny}
-                  onChange={(e) => onChange({ ...draft, sourcePriceCny: Number(e.target.value) })}
+                  onChange={(e) => {
+                    const v = Number(e.target.value);
+                    const next = { ...draft, sourcePriceCny: v };
+                    // live auto-price: recalc sale price if it looks like default/zero
+                    onChange(next);
+                  }}
                   className={inputCls(false)}
                 />
               </Field>
@@ -1024,6 +1066,13 @@ const ProductEditDrawer = memo(function ProductEditDrawer({
               <span className={`rounded-full px-3 py-1 font-bold ${marginTone(margin.net).replace('bg-green-500/10', 'bg-green-500/20').replace('bg-orange-500/10', 'bg-orange-500/20').replace('bg-red-500/10', 'bg-red-500/20').replace('text-green-600', 'text-green-300').replace('text-orange-600', 'text-orange-300').replace('text-red-600', 'text-red-300')}`}>
                 {marginLabel(margin.net)} · {euro(margin.net)}
               </span>
+              <button
+                type="button"
+                onClick={onAutoPrice}
+                className="rounded-full bg-accent/20 hover:bg-accent/30 text-accent px-3 py-1 font-bold transition-colors"
+              >
+                ⚡ Prix auto
+              </button>
             </div>
           </div>
 
@@ -1327,6 +1376,7 @@ export default function AdminPanel() {
     name: '',
     category: defaultPreset.label,
     salePrice: suggestedSalePrice(100, defaultPreset.weight, defaultPreset.packaging),
+    oldPrice: undefined,
     sourcePriceCny: 100,
     weightGrams: defaultPreset.weight,
     packaging: defaultPreset.packaging,
@@ -1815,6 +1865,7 @@ export default function AdminPanel() {
       name: '',
       category: quickProduct.category,
       salePrice: suggestedSalePrice(150, resetPreset.weight, resetPreset.packaging),
+      oldPrice: undefined,
       sourcePriceCny: 150,
       weightGrams: resetPreset.weight,
       packaging: resetPreset.packaging,
