@@ -206,3 +206,20 @@ img.emoji {
     padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
   }
 }
+
+/*
+ * Checker background ultra-subtil pour visualiser immédiatement la
+ * transparence sur les miniatures de l'admin (utile après remove.bg).
+ * Gris très clair sur blanc : quasi-invisible si l'image a un fond,
+ * mais apparent sous les images PNG bien détouragées.
+ */
+.bg-checker {
+  background-image:
+    linear-gradient(45deg, #f0efe9 25%, transparent 25%),
+    linear-gradient(-45deg, #f0efe9 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #f0efe9 75%),
+    linear-gradient(-45deg, transparent 75%, #f0efe9 75%);
+  background-size: 10px 10px;
+  background-position: 0 0, 0 5px, 5px -5px, -5px 0;
+  background-color: #ffffff;
+}

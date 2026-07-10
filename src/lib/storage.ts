@@ -54,6 +54,7 @@ export type UploadedImage = {
   width: number;
   height: number;
   size: number;
+  hasAlpha?: boolean;
 };
 
 async function blobToDataUrl(blob: Blob): Promise<string> {
@@ -87,6 +88,7 @@ export async function uploadProductImage(
       width: compressed.width,
       height: compressed.height,
       size: compressed.blob.size,
+      hasAlpha: compressed.hasAlpha,
     };
   }
 
@@ -110,6 +112,7 @@ export async function uploadProductImage(
     width: compressed.width,
     height: compressed.height,
     size: compressed.blob.size,
+    hasAlpha: compressed.hasAlpha,
   };
 }
 
@@ -129,6 +132,7 @@ export async function uploadDropImage(
       width: compressed.width,
       height: compressed.height,
       size: compressed.blob.size,
+      hasAlpha: compressed.hasAlpha,
     };
   }
 
@@ -152,6 +156,7 @@ export async function uploadDropImage(
     width: compressed.width,
     height: compressed.height,
     size: compressed.blob.size,
+    hasAlpha: compressed.hasAlpha,
   };
 }
 

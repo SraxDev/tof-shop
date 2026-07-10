@@ -15,6 +15,7 @@ export type CompressedBlob = {
   blob: Blob;
   width: number;
   height: number;
+  hasAlpha: boolean;
 };
 
 /**
@@ -95,12 +96,16 @@ export function compressImageToBlob(
           }
         }
 
+        // Détection préliminaire sur le type MIME (un JPEG ne peut jamais
+        // avoir d'alpha). Utile aussi en fallback si le contexte 2D plante.
+        const mimeAllowsAlpha = file.type === 'image/png' || file.type === 'image/webp';
+
         const canvas = document.createElement('canvas');
         canvas.width = width;
         canvas.height = height;
         const ctx = canvas.getContext('2d');
         if (!ctx) {
-          resolve({ blob: file, width: img.naturalWidth, height: img.naturalHeight });
+          resolve({ blob: file, width: img.naturalWidth, height: img.naturalHeight, hasAlpha: mimeAllowsAlpha });
           return;
         }
 
@@ -111,7 +116,6 @@ export function compressImageToBlob(
         // Détection : d'abord sur le canvas (réel), puis sur le type MIME.
         // Un JPEG ne peut jamais avoir d'alpha ; un PNG/webp peut en avoir.
         const canvasHasAlpha = hasTransparency(ctx, width, height);
-        const mimeAllowsAlpha = file.type === 'image/png' || file.type === 'image/webp';
         const sourceHasAlpha = canvasHasAlpha || mimeAllowsAlpha;
 
         let mime: string;
@@ -144,7 +148,7 @@ export function compressImageToBlob(
               // ⚠️ Alpha détectée = on garde coûte que coûte le PNG, même si
               // c'est plus gros. Pas de fallback JPEG (ça collerait un fond
               // blanc sur les images remove.bg).
-              resolve({ blob, width, height });
+              resolve({ blob, width, height, hasAlpha: true });
               return;
             }
             // Seulement si on a choisi PNG "par défaut" (fichier PNG/webp
@@ -159,9 +163,9 @@ export function compressImageToBlob(
               canvas.toBlob(
                 (jpegBlob) => {
                   if (jpegBlob) {
-                    resolve({ blob: jpegBlob, width, height });
+                    resolve({ blob: jpegBlob, width, height, hasAlpha: false });
                   } else {
-                    resolve({ blob, width, height });
+                    resolve({ blob, width, height, hasAlpha: false });
                   }
                 },
                 'image/jpeg',
@@ -169,7 +173,7 @@ export function compressImageToBlob(
               );
               return;
             }
-            resolve({ blob, width, height });
+            resolve({ blob, width, height, hasAlpha: false });
           },
           mime,
           mime === 'image/jpeg' ? quality : undefined,

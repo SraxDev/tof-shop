@@ -389,7 +389,7 @@ function rootOrderId(id: string) {
 // Handler d'upload stable (référence de module, pas de state) — évite de
 // recréer la fonction à chaque render et ne casse pas la mémoïsation.
 const productImageUploadHandler = (file: File) =>
-  uploadProductImage(file, 800, 0.75).then((r) => r.url);
+  uploadProductImage(file, 800, 0.75).then((r) => ({ url: r.url, hasAlpha: r.hasAlpha }));
 
 // ────────────────────────────────────────────────────────────────────────────
 // ProductListItem : ligne compacte dans la liste (miniature + infos clés)
@@ -1837,7 +1837,7 @@ export default function AdminPanel() {
   };
 
   const handleDropImageUpload = useCallback(
-    (file: File) => uploadDropImage(file, 1200, 0.8).then((r) => r.url),
+    (file: File) => uploadDropImage(file, 1200, 0.8).then((r) => ({ url: r.url, hasAlpha: r.hasAlpha })),
     [],
   );
 
@@ -3085,137 +3085,346 @@ export default function AdminPanel() {
         )}
 
         {activeTab === 'chat' && (() => {
-          const convos = new Map<string, { name: string; messages: DbChatMessage[]; lastMsg: DbChatMessage }>();
+          const convos = new Map<string, { name: string; messages: DbChatMessage[]; lastMsg: DbChatMessage; hasUnread: boolean }>();
           chatMessages.forEach((m) => {
             const existing = convos.get(m.conversation_id);
             if (existing) {
               existing.messages.push(m);
               existing.lastMsg = m;
+              if (m.sender === 'client' && m.id.startsWith('m-')) {
+                // Heuristique non-lu : dernier message client dont l'id est plus récent que le dernier message admin/bot
+                const hasAdminReply = existing.messages.some(
+                  (x) => x.sender === 'admin' && x.id > m.id,
+                );
+                if (!hasAdminReply) existing.hasUnread = true;
+              }
             } else {
-              convos.set(m.conversation_id, { name: m.client_name || 'Anonyme', messages: [m], lastMsg: m });
+              convos.set(m.conversation_id, {
+                name: m.client_name || 'Anonyme',
+                messages: [m],
+                lastMsg: m,
+                hasUnread: m.sender === 'client',
+              });
             }
           });
-          const convoList = Array.from(convos.entries()).sort((a, b) => (b[1].lastMsg.created_at || '').localeCompare(a[1].lastMsg.created_at || ''));
+          let convoList = Array.from(convos.entries()).sort(
+            (a, b) => (b[1].lastMsg.created_at || '').localeCompare(a[1].lastMsg.created_at || ''),
+          );
+          // Les non-lus d'abord
+          convoList = convoList.sort((a, b) => Number(b[1].hasUnread) - Number(a[1].hasUnread));
           const activeMessages = activeConvo ? convos.get(activeConvo)?.messages || [] : [];
+          const activeConvoData = activeConvo ? convos.get(activeConvo) : null;
 
-          const sendAdminReply = async () => {
-            if (!chatReply.trim() || !activeConvo) return;
+          // Messages rapides admin
+          const quickReplies = [
+            'Salut ! Comment puis-je t\'aider ?',
+            'Je regarde ça et je reviens vers toi rapidement.',
+            'Tu peux commander directement depuis le shop, le lien est dans la bio !',
+            'Le paiement se fait via PayPal, lien disponible après validation du panier.',
+            'Les délais de livraison sont de 10-20 jours en standard, 5-10 jours en express.',
+            'Je t\'envoie les photos QC très vite !',
+            'C\'est noté, je m\'en occupe.',
+          ];
+
+          const sendAdminReply = async (textOverride?: string) => {
+            const text = (textOverride ?? chatReply).trim();
+            if (!text || !activeConvo) return;
             const convo = convos.get(activeConvo);
             const msg: DbChatMessage = {
               id: `m-admin-${Date.now()}`,
               conversation_id: activeConvo,
               sender: 'admin',
-              message: chatReply.trim(),
+              message: text,
               client_name: convo?.name || '',
             };
             await sendChatMessage(msg);
             setChatMessages((prev) => [...prev, msg]);
             setChatReply('');
             showToast('Réponse envoyée ✓');
+            playNewOrder();
           };
 
+          // Auto-sélection de la première conversation avec unread à l'arrivée
+          useEffect(() => {
+            if (!activeConvo && convoList.length > 0) {
+              const firstUnread = convoList.find(([, c]) => c.hasUnread);
+              setActiveConvo(firstUnread ? firstUnread[0] : convoList[0][0]);
+            }
+            // eslint-disable-next-line react-hooks/exhaustive-deps
+          }, [convoList.length]);
+
+          function timeAgo(dateStr?: string): string {
+            if (!dateStr) return '';
+            const diff = Date.now() - new Date(dateStr).getTime();
+            const m = Math.floor(diff / 60000);
+            if (m < 1) return 'à l\'instant';
+            if (m < 60) return `il y a ${m}min`;
+            const h = Math.floor(m / 60);
+            if (h < 24) return `il y a ${h}h`;
+            const d = Math.floor(h / 24);
+            return `il y a ${d}j`;
+          }
+
+          function formatTime(dateStr?: string): string {
+            if (!dateStr) return '';
+            const d = new Date(dateStr);
+            return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+          }
+
+          const unreadTotal = convoList.filter(([, c]) => c.hasUnread).length;
+
           return (
-            <div className="grid lg:grid-cols-3 gap-5" style={{ minHeight: 500 }}>
-              <div className="rounded-3xl bg-white text-dark overflow-hidden">
-                <div className="p-4 border-b border-dark/5">
-                  <h3 className="font-bold">Conversations ({convoList.length})</h3>
+            <div className="space-y-4">
+              {/* Stats bar */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+                <div className="rounded-2xl bg-white/5 border border-white/10 p-3 sm:p-4">
+                  <div className="text-[10px] uppercase tracking-widest text-white/35 font-bold">Total</div>
+                  <div className="text-xl sm:text-2xl font-800 mt-1">{convoList.length}</div>
+                  <div className="text-[10px] text-white/30">conversations</div>
                 </div>
-                <div className="divide-y divide-dark/5 max-h-[500px] overflow-y-auto">
-                  {convoList.length === 0 && (
-                    <div className="p-6 text-center text-sm text-dark/30">Aucune conversation pour l'instant.</div>
-                  )}
-                  {convoList.map(([id, convo]) => {
-                    const unread = convo.messages.filter((m) => m.sender === 'client').length;
-                    return (
-                      <button
-                        key={id}
-                        onClick={() => setActiveConvo(id)}
-                        className={`w-full text-left p-4 hover:bg-bg transition-colors ${activeConvo === id ? 'bg-bg' : ''}`}
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="h-9 w-9 rounded-full bg-accent/10 text-accent flex items-center justify-center text-xs font-bold flex-shrink-0">
-                              {convo.name[0]?.toUpperCase()}
-                            </div>
-                            <div className="min-w-0">
-                              <div className="font-bold text-sm truncate">{convo.name}</div>
-                              <div className="text-xs text-dark/40 truncate">{convo.lastMsg.message}</div>
-                            </div>
-                          </div>
-                          {unread > 0 && (
-                            <span className="h-5 min-w-5 bg-accent rounded-full text-[10px] font-bold text-white flex items-center justify-center flex-shrink-0 px-1">{unread}</span>
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })}
+                <div className="rounded-2xl bg-accent/15 border border-accent/30 p-3 sm:p-4">
+                  <div className="text-[10px] uppercase tracking-widest text-accent font-bold">À répondre</div>
+                  <div className="text-xl sm:text-2xl font-800 mt-1 text-accent">{unreadTotal}</div>
+                  <div className="text-[10px] text-accent/60">en attente</div>
+                </div>
+                <div className="rounded-2xl bg-white/5 border border-white/10 p-3 sm:p-4">
+                  <div className="text-[10px] uppercase tracking-widest text-white/35 font-bold">En ligne</div>
+                  <div className="text-xl sm:text-2xl font-800 mt-1">{onlineCount}</div>
+                  <div className="text-[10px] text-white/30">visiteurs</div>
+                </div>
+                <div className="rounded-2xl bg-white/5 border border-white/10 p-3 sm:p-4">
+                  <div className="text-[10px] uppercase tracking-widest text-white/35 font-bold">Msg aujourd'hui</div>
+                  <div className="text-xl sm:text-2xl font-800 mt-1">
+                    {chatMessages.filter((m) => {
+                      if (!m.created_at) return false;
+                      const d = new Date(m.created_at);
+                      const today = new Date();
+                      return d.toDateString() === today.toDateString();
+                    }).length}
+                  </div>
+                  <div className="text-[10px] text-white/30">messages</div>
                 </div>
               </div>
 
-              <div className="lg:col-span-2 rounded-3xl bg-white text-dark flex flex-col overflow-hidden" style={{ minHeight: 500 }}>
-                {!activeConvo ? (
-                  <div className="flex-1 flex items-center justify-center text-dark/30 text-sm">
-                    Sélectionne une conversation
+              <div className="grid lg:grid-cols-3 gap-5">
+                <div className="rounded-3xl bg-white text-dark overflow-hidden">
+                  <div className="p-4 border-b border-dark/5 flex items-center justify-between">
+                    <h3 className="font-bold">Conversations</h3>
+                    {unreadTotal > 0 && (
+                      <span className="bg-accent text-white text-[10px] font-bold px-2 py-1 rounded-full">
+                        {unreadTotal} à répondre
+                      </span>
+                    )}
                   </div>
-                ) : (
-                  <>
-                    <div className="p-4 border-b border-dark/5 flex items-center justify-between gap-2">
-                      <div className="font-bold">{convos.get(activeConvo)?.name}</div>
-                      <div className="flex items-center gap-2">
-                        <button onClick={async () => {
-                          if (confirm('Supprimer cette conversation ?')) {
-                            await deleteConversation(activeConvo);
-                            setChatMessages((prev) => prev.filter((m) => m.conversation_id !== activeConvo));
-                            setActiveConvo(null);
-                            showToast('Conversation supprimée ✓');
-                          }
-                        }} className="text-xs text-red-400 hover:text-red-500 font-bold">Supprimer</button>
-                        <button onClick={() => setActiveConvo(null)} className="text-xs text-dark/30 hover:text-dark lg:hidden">Retour</button>
+                  <div className="divide-y divide-dark/5 max-h-[560px] overflow-y-auto">
+                    {convoList.length === 0 && (
+                      <div className="p-8 text-center text-sm text-dark/30">
+                        Aucune conversation pour l'instant.<br />
+                        <span className="text-xs">Les visiteurs qui utilisent le chat apparaîtront ici.</span>
                       </div>
-                    </div>
-                    <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                      {activeMessages.map((msg) => (
-                        <div key={msg.id} className={`group/msg flex ${msg.sender === 'client' ? 'justify-start' : 'justify-end'}`}>
-                          <div className="relative">
-                            <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                              msg.sender === 'client' ? 'bg-bg text-dark rounded-bl-sm' :
-                              msg.sender === 'admin' ? 'bg-accent text-white rounded-br-sm' :
-                              'bg-dark/5 text-dark/60 rounded-bl-sm'
-                            }`}>
-                              {msg.sender === 'bot' && <div className="text-[10px] font-bold text-dark/30 mb-1">Bot</div>}
-                              {msg.sender === 'admin' && <div className="text-[10px] font-bold text-white/60 mb-1">Toi</div>}
-                              <p className="whitespace-pre-wrap">{msg.message}</p>
-                              {msg.created_at && (
-                                <div className={`text-[10px] mt-1 ${msg.sender === 'client' ? 'text-dark/20' : msg.sender === 'admin' ? 'text-white/40' : 'text-dark/20'}`}>
-                                  {new Date(msg.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                                </div>
+                    )}
+                    {convoList.map(([id, convo]) => {
+                      const isActive = activeConvo === id;
+                      const isClientLast = convo.lastMsg.sender === 'client';
+                      return (
+                        <button
+                          key={id}
+                          onClick={() => setActiveConvo(id)}
+                          className={`w-full text-left p-3 sm:p-4 hover:bg-bg transition-colors ${isActive ? 'bg-bg' : ''}`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="relative flex-shrink-0">
+                              <div className={`h-10 w-10 rounded-full flex items-center justify-center text-xs font-bold text-white ${
+                                convo.hasUnread ? 'bg-accent' : 'bg-dark/70'
+                              }`}>
+                                {convo.name[0]?.toUpperCase() || '?'}
+                              </div>
+                              {convo.hasUnread && (
+                                <span className="absolute -top-0.5 -right-0.5 h-3 w-3 bg-red-500 rounded-full border-2 border-white" />
                               )}
                             </div>
-                            <button
-                              onClick={async () => {
-                                await deleteChatMessage(msg.id);
-                                setChatMessages((prev) => prev.filter((m) => m.id !== msg.id));
-                              }}
-                              className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-red-500 text-white text-[10px] items-center justify-center hidden group-hover/msg:flex"
-                            >✕</button>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className={`font-bold text-sm truncate ${convo.hasUnread ? 'text-dark' : 'text-dark/70'}`}>
+                                  {convo.name}
+                                </span>
+                                <span className="text-[10px] text-dark/30 flex-shrink-0">{timeAgo(convo.lastMsg.created_at)}</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <span className={`text-xs truncate ${convo.hasUnread && isClientLast ? 'text-dark font-semibold' : 'text-dark/40'}`}>
+                                  {convo.lastMsg.sender === 'admin' ? 'Toi : ' : convo.lastMsg.sender === 'bot' ? 'Bot : ' : ''}
+                                  {convo.lastMsg.message}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1 mt-1">
+                                <span className="text-[9px] font-bold text-dark/25 uppercase">
+                                  {convo.messages.length} msg
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="lg:col-span-2 rounded-3xl bg-white text-dark flex flex-col overflow-hidden" style={{ minHeight: 560 }}>
+                  {!activeConvo || !activeConvoData ? (
+                    <div className="flex-1 flex flex-col items-center justify-center text-dark/30 text-sm p-8 text-center gap-3">
+                      <div className="h-16 w-16 rounded-3xl bg-bg flex items-center justify-center text-3xl">💬</div>
+                      <p>Sélectionne une conversation pour voir les messages</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="p-4 border-b border-dark/5 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-full bg-accent text-white flex items-center justify-center text-sm font-bold">
+                            {activeConvoData.name[0]?.toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="font-bold">{activeConvoData.name}</div>
+                            <div className="text-[10px] text-dark/30 uppercase tracking-widest font-bold">
+                              {activeConvoData.messages.length} messages · {timeAgo(activeConvoData.lastMsg.created_at)}
+                            </div>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                    <div className="border-t border-dark/5 p-3 flex gap-2">
-                      <input
-                        value={chatReply}
-                        onChange={(e) => setChatReply(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && sendAdminReply()}
-                        placeholder="Répondre..."
-                        className="flex-1 rounded-xl bg-bg px-4 py-3 text-sm outline-none"
-                      />
-                      <button onClick={sendAdminReply} disabled={!chatReply.trim()} className="h-11 w-11 rounded-xl bg-accent text-white flex items-center justify-center hue-rotate-0 hover:brightness-110 transition-colors disabled:opacity-30">
-                        <Send size={16} />
-                      </button>
-                    </div>
-                  </>
-                )}
+                        <div className="flex items-center gap-1">
+                          <a
+                            href={`https://wa.me/?text=${encodeURIComponent(`Salut ${activeConvoData.name} !`)}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="h-9 px-3 rounded-xl bg-[#25D366]/10 text-[#25D366] text-xs font-bold hover:bg-[#25D366] hover:text-white transition-colors inline-flex items-center gap-1"
+                            title="Contacter sur WhatsApp"
+                          >
+                            WhatsApp
+                          </a>
+                          <button
+                            onClick={() => {
+                              const text = activeMessages.map((m) => {
+                                const who = m.sender === 'client' ? activeConvoData.name : m.sender === 'admin' ? 'Toi' : 'Bot';
+                                return `[${formatTime(m.created_at)}] ${who}: ${m.message}`;
+                              }).join('\n');
+                              navigator.clipboard.writeText(text);
+                              showToast('Conversation copiée ✓');
+                              playCopy();
+                            }}
+                            className="h-9 w-9 rounded-xl bg-dark/5 hover:bg-dark/10 text-dark/50 flex items-center justify-center"
+                            title="Copier la conversation"
+                          >
+                            <Copy size={14} />
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (confirm(`Supprimer la conversation avec ${activeConvoData.name} ?`)) {
+                                await deleteConversation(activeConvo);
+                                setChatMessages((prev) => prev.filter((m) => m.conversation_id !== activeConvo));
+                                setActiveConvo(null);
+                                showToast('Conversation supprimée ✓');
+                              }
+                            }}
+                            className="h-9 w-9 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-500 flex items-center justify-center"
+                            title="Supprimer"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                          <button onClick={() => setActiveConvo(null)} className="lg:hidden h-9 w-9 rounded-xl bg-dark/5 flex items-center justify-center text-dark/50">
+                            <ArrowLeft size={16} />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#F9F9F9]">
+                        {activeMessages.map((msg) => {
+                          const isClient = msg.sender === 'client';
+                          const isAdmin = msg.sender === 'admin';
+                          const isBot = msg.sender === 'bot';
+                          return (
+                            <div key={msg.id} className={`group/msg flex ${isClient ? 'justify-start' : 'justify-end'}`}>
+                              <div className="relative max-w-[85%]">
+                                <div
+                                  className={`rounded-[20px] px-4 py-2.5 text-[13.5px] leading-relaxed shadow-sm ${
+                                    isClient
+                                      ? 'bg-white text-dark rounded-bl-md border border-dark/[0.03]'
+                                      : isAdmin
+                                        ? 'bg-accent text-white rounded-br-md'
+                                        : 'bg-dark/5 text-dark/60 rounded-bl-md italic'
+                                  }`}
+                                >
+                                  {isBot && (
+                                    <div className="text-[9px] font-black text-dark/25 mb-1 uppercase tracking-tighter flex items-center gap-1">
+                                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-dark/30" />
+                                      Assistant auto
+                                    </div>
+                                  )}
+                                  {isAdmin && (
+                                    <div className="text-[9px] font-black text-white/60 mb-1 uppercase tracking-tighter">
+                                      Toi
+                                    </div>
+                                  )}
+                                  <p className="whitespace-pre-wrap">{msg.message}</p>
+                                  <div className={`text-[9px] mt-1.5 font-bold opacity-40 ${isClient ? 'text-left' : 'text-right'}`}>
+                                    {formatTime(msg.created_at)}
+                                  </div>
+                                </div>
+                                {!isBot && (
+                                  <button
+                                    onClick={async () => {
+                                      await deleteChatMessage(msg.id);
+                                      setChatMessages((prev) => prev.filter((m) => m.id !== msg.id));
+                                    }}
+                                    className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-red-500 text-white text-[10px] items-center justify-center hidden group-hover/msg:flex"
+                                  >
+                                    ✕
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Quick replies */}
+                      <div className="px-3 pt-2 border-t border-dark/5">
+                        <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-2 -mx-1 px-1">
+                          {quickReplies.map((q) => (
+                            <button
+                              key={q}
+                              onClick={() => setChatReply(q)}
+                              className="flex-shrink-0 rounded-full bg-bg hover:bg-dark hover:text-white text-dark/60 text-[11px] font-bold px-3 py-1.5 h-8 transition-colors"
+                            >
+                              {q.length > 40 ? q.slice(0, 40) + '…' : q}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="border-t border-dark/5 p-3 flex gap-2 pb-[calc(env(safe-area-inset-bottom,0px)+0.75rem)]">
+                        <input
+                          value={chatReply}
+                          onChange={(e) => setChatReply(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault();
+                              void sendAdminReply();
+                            }
+                          }}
+                          placeholder={`Répondre à ${activeConvoData.name}...`}
+                          className="flex-1 rounded-xl bg-bg px-4 h-11 text-sm outline-none focus:ring-4 focus:ring-accent/5"
+                          autoFocus
+                        />
+                        <button
+                          onClick={() => void sendAdminReply()}
+                          disabled={!chatReply.trim()}
+                          aria-label="Envoyer"
+                          className="h-11 w-11 rounded-xl bg-accent text-white flex items-center justify-center hover:bg-accent/90 transition-colors disabled:opacity-30 shadow-lg shadow-accent/20"
+                        >
+                          <Send size={18} strokeWidth={2.5} />
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           );

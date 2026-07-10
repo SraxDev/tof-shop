@@ -201,7 +201,7 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
                     <div key={`${item.productId}-${item.size}-${item.color}`} className="flex gap-4 rounded-2xl bg-bg p-4">
                       <div className="h-16 w-16 rounded-xl bg-subtle flex items-center justify-center overflow-hidden flex-shrink-0">
                         {item.imageUrl ? (
-                          <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" />
+                          <img src={item.imageUrl} alt={item.name} className="h-full w-full object-contain p-1" loading="lazy" decoding="async" />
                         ) : (
                           <span className="text-2xl">
                             {item.category?.toLowerCase().includes('sneaker') ? '👟' : item.category?.toLowerCase().includes('sac') ? '👜' : '👕'}

@@ -35,8 +35,10 @@ export function serializeImageList(urls: string[]): string {
   return urls.join('|');
 }
 
-/** Signature du handler d'upload : fichier compressé → URL publique. */
-export type ImageUploadHandler = (file: File) => Promise<string>;
+/** Signature du handler d'upload : fichier → URL publique (ou objet avec métadonnées). */
+export type ImageUploadHandler = (
+  file: File,
+) => Promise<string | { url: string; hasAlpha?: boolean }>;
 
 type UploaderStatus = 'idle' | 'compressing' | 'uploading' | 'ready';
 
@@ -139,14 +141,22 @@ export default function ImageUploader({
       const picked = multiple ? list : [list[0]];
 
       let finalUrls: string[] = [];
+      let alphaCount = 0;
+      let opaqueCount = 0;
 
       if (uploadHandler) {
         // L'handler gère sa compression lui-même (ex: storage.uploadProductImage).
         setStatus('uploading');
         try {
           for (let i = 0; i < picked.length; i += 1) {
-            const url = await uploadHandler(picked[i]);
-            finalUrls.push(url);
+            const res = await uploadHandler(picked[i]);
+            if (typeof res === 'string') {
+              finalUrls.push(res);
+            } else {
+              finalUrls.push(res.url);
+              if (res.hasAlpha) alphaCount += 1;
+              else opaqueCount += 1;
+            }
           }
         } catch {
           showToast("Erreur lors de l'upload des images");
@@ -170,6 +180,17 @@ export default function ImageUploader({
       const next = multiple ? [...urls.current, ...finalUrls] : [finalUrls[0]];
       commit(next);
       setStatus('ready');
+
+      // Toast récapitulatif si on connaît le statut alpha (via handler métadonné)
+      if (uploadHandler && (alphaCount > 0 || opaqueCount > 0)) {
+        if (alphaCount > 0 && opaqueCount === 0) {
+          showToast(`✓ ${alphaCount} image${alphaCount > 1 ? 's' : ''} PNG avec fond transparent sauvegardée${alphaCount > 1 ? 's' : ''}`);
+        } else if (opaqueCount > 0 && alphaCount === 0) {
+          showToast(`⚠ ${opaqueCount} image${opaqueCount > 1 ? 's' : ''} sans transparence — encodée${opaqueCount > 1 ? 's' : ''} en JPEG (fond blanc si le produit est découpé)`);
+        } else {
+          showToast(`${alphaCount} transparent${alphaCount > 1 ? 's' : ''} ✓ · ${opaqueCount} opaque${opaqueCount > 1 ? 's' : ''}`);
+        }
+      }
 
       const input = document.getElementById(inputId) as HTMLInputElement | null;
       if (input) input.value = '';
@@ -449,7 +470,7 @@ export default function ImageUploader({
                   alt={`Photo ${index + 1}`}
                   loading="lazy"
                   decoding="async"
-                  className="h-full w-full object-cover cursor-zoom-in"
+                  className="h-full w-full object-contain bg-checker cursor-zoom-in"
                   onClick={(e) => {
                     e.stopPropagation();
                     setPreviewUrl(url);

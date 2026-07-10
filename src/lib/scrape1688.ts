@@ -10,23 +10,33 @@ export type ScrapedProduct = {
 };
 
 // CORS proxies (tried in order — first to succeed wins).
-// Each takes a URL and returns the proxy-fetch URL.
 const PROXIES = [
+  // allorigins /get returns JSON { contents: "..." } — follow redirects server-side
+  (u: string) => `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`,
   (u: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-  (u: string) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+  (u: string) => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
   (u: string) => `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(u)}`,
-  (u: string) => `https://cors.isomorphic-git.org/${u}`,
+  (u: string) => `https://thingproxy.freeboard.io/fetch/${u}`,
 ];
 
-async function fetchViaProxy(url: string, timeoutMs = 12000): Promise<string | null> {
+async function fetchViaProxy(url: string, timeoutMs = 15000): Promise<string | null> {
   for (const make of PROXIES) {
     const controller = new AbortController();
     const t = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const res = await fetch(make(url), { signal: controller.signal });
+      const proxyUrl = make(url);
+      const res = await fetch(proxyUrl, { signal: controller.signal });
       clearTimeout(t);
       if (!res.ok) continue;
-      const html = await res.text();
+      const ct = res.headers.get('content-type') || '';
+      let html: string;
+      if (ct.includes('application/json')) {
+        const json = await res.json();
+        // allorigins /get format: { contents: "html..." }
+        html = json.contents || json.data || JSON.stringify(json);
+      } else {
+        html = await res.text();
+      }
       if (html && html.length > 500) return html;
     } catch {
       clearTimeout(t);
