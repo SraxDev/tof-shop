@@ -2,7 +2,7 @@ import { createPortal } from 'react-dom';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Copy, ExternalLink, Package, Pencil, Plus, RotateCcw, Save, Search, Send,
-  Trash2, Truck, X, ArrowUpDown, Flame, ArrowLeft,
+  Trash2, Truck, X, ArrowUpDown, Flame, ArrowLeft, Calculator,
 } from 'lucide-react';
 import { defaultDrop, type FeaturedDropConfig } from './FeaturedDrop';
 import { defaultSettings, readSiteSettings, saveSiteSettings, hydrateSiteSettings, type SiteSettings } from '../lib/siteSettings';
@@ -79,8 +79,13 @@ type Order = {
 // const STORAGE_PRODUCTS = 'tof-admin-products-v1';
 // const STORAGE_ORDERS = 'tof-orders-v1';
 // const STORAGE_DROP = 'tof-featured-drop-v1';
-const CNY_TO_EUR = 0.13;
+// Taux agent réel 1688 (¥ → €) : ~7.5 ¥ = 1 € (commission agent ~6% + change + assurance)
+const CNY_TO_EUR = 1 / 7.5; // ≈ 0.1333
 const SHIPPING_SAFETY_MULTIPLIER = 1.2;
+const PAYMENT_FEE_PCT = 0.03;
+const PAYMENT_FEE_FIXED = 0.25;
+const RETURN_RISK_PCT = 0.03;
+const AGENT_FEE_PCT = 0.06;
 
 const categoryPresets = [
   { label: 'T-shirt', weight: 320, packaging: 'none' as const, defaultSizes: 'S, M, L, XL, XXL', defaultColors: '1, 2' },
@@ -262,17 +267,22 @@ function euro(value: number) {
 }
 
 function estimateMulebuyShipping(weightGrams: number, line: 'tax_free' | 'economy' | 'express' = 'tax_free') {
+  // Tarifs 2026 lignes "agent 1688" FR (GD-EMS / KR-EMS / DHL tax-free)
+  // Taux nets, marge sécurité appliquée côté appel via SHIPPING_SAFETY_MULTIPLIER
   const kg = Math.max(weightGrams / 1000, 0.3);
   const rates = {
-    economy: { base: 6.5, perKg: 10, label: 'Economy line' },
-    tax_free: { base: 9.5, perKg: 13, label: 'Tax Free / Tariffless' },
-    express: { base: 13, perKg: 18, label: 'Express' },
-  };
+    economy:   { base: 0,    perKg: 75,  label: 'Économique (SAL, 15-25j)' },    // ~10€/kg
+    tax_free:  { base: 0,    perKg: 80,  label: 'Tax-free GD-EMS (10-20j)' },   // ~10.7€/kg, douanes évitées
+    express:   { base: 10,   perKg: 120, label: 'Express DHL (5-10j)' },        // ~16€/kg
+  } as const;
+  // Note : perKg est en ¥/kg → converti en € après le calcul
   const rate = rates[line];
+  const costCny = rate.base + kg * rate.perKg;
+  const costEur = costCny * CNY_TO_EUR;
   return {
     label: rate.label,
-    low: rate.base + kg * rate.perKg,
-    high: rate.base + kg * rate.perKg * 1.25,
+    low:  costEur,
+    high: costEur * 1.15,
   };
 }
 
@@ -314,8 +324,13 @@ function normalizedProduct(product: Product): Product {
 }
 
 function estimatePaymentFees(amount: number) {
-  // Approximation PayPal/fees: percentage + fixed fee, adjustable later if needed.
-  return amount * 0.045 + 0.35;
+  // PayPal FR marchand : 2.9% + 0.25€ arrondi large à 3% + 0.25 (couvre aussi les futurs Stripe)
+  return amount * PAYMENT_FEE_PCT + PAYMENT_FEE_FIXED;
+}
+
+function estimateSourceCostEur(sourcePriceCny: number, quantity = 1) {
+  // Prix ¥ converti + commission agent 6%
+  return sourcePriceCny * CNY_TO_EUR * quantity * (1 + AGENT_FEE_PCT);
 }
 
 function roundPrice(value: number) {
@@ -323,26 +338,18 @@ function roundPrice(value: number) {
   return Math.max(19, Math.ceil(value / 10) * 10 - 1);
 }
 
-function suggestedSalePrice(sourcePriceCny: number, weightGrams: number, packaging: Product['packaging'], targetMargin = 45) {
-  const tempProduct: Product = {
-    id: 'temp',
-    brand: '',
-    name: '',
-    category: '',
-    salePrice: 0,
-    sourcePriceCny,
-    weightGrams,
-    packaging,
-    sizes: '',
-    colors: '',
-    imageUrl: '',
-    gender: 'mixte',
-    sourceUrl: '',
-    status: 'active',
-  };
-  const sourceCost = sourcePriceCny * CNY_TO_EUR;
-  const shipping = estimateMulebuyShipping(effectiveWeight(tempProduct)).high * SHIPPING_SAFETY_MULTIPLIER;
-  const raw = (sourceCost + shipping + 0.35 + targetMargin) / (1 - 0.045);
+function suggestedSalePrice(sourcePriceCny: number, weightGrams: number, packaging: Product['packaging'], targetMarginPct = 45) {
+  // Résolution itérative : le prix suggéré doit donner ~targetMarginPct de marge nette
+  const effWeight = weightGrams + (packaging === 'with_box' ? 450 : packaging === 'without_box' ? -100 : 0);
+  const sourceCost = estimateSourceCostEur(sourcePriceCny);
+  const shippingWithSafety = estimateMulebuyShipping(Math.max(effWeight, 200)).high * SHIPPING_SAFETY_MULTIPLIER;
+  // Équation : net = price - sourceCost - shipping - (price*pct_fees + fixed) - price*risk_pct
+  // => price * (1 - pct_fees - risk_pct) = sourceCost + shipping + fixed + net
+  // On veut net = targetPct * price
+  // => price * (1 - pct_fees - risk_pct - targetPct/100) = sourceCost + shipping + fixed
+  const denom = 1 - PAYMENT_FEE_PCT - RETURN_RISK_PCT - targetMarginPct / 100;
+  if (denom <= 0) return 99;
+  const raw = (sourceCost + shippingWithSafety + PAYMENT_FEE_FIXED) / denom;
   return roundPrice(raw);
 }
 
@@ -356,28 +363,50 @@ function estimateNetMargin(product: Product, quantity = 1) {
   const effective = effectiveWeight(product) * quantity;
   const shipping = estimateMulebuyShipping(effective);
   const shippingWithSafety = shipping.high * SHIPPING_SAFETY_MULTIPLIER;
-  const sourceCost = product.sourcePriceCny * CNY_TO_EUR * quantity;
+  const sourceCost = estimateSourceCostEur(product.sourcePriceCny, quantity);
   const revenue = product.salePrice * quantity;
-  const fees = estimatePaymentFees(revenue);
+  const paymentFees = estimatePaymentFees(revenue);
+  const riskProvision = revenue * RETURN_RISK_PCT;
+  const totalCost = sourceCost + shippingWithSafety + paymentFees + riskProvision;
+  const net = revenue - totalCost;
+  const netPct = revenue > 0 ? (net / revenue) * 100 : 0;
   return {
     effectiveWeight: effective,
     shipping,
     shippingWithSafety,
     sourceCost,
-    fees,
-    net: revenue - sourceCost - shippingWithSafety - fees,
+    paymentFees,
+    riskProvision,
+    totalCost,
+    net,
+    netPct,
   };
 }
 
-function marginTone(margin: number) {
-  if (margin >= 45) return 'bg-green-500/10 text-green-600';
-  if (margin >= 20) return 'bg-orange-500/10 text-orange-600';
+/** Calcul rapide de marge sans passer par un Product (pour l'onglet Estimation). */
+function estimateQuickMargin(sourceCny: number, weightGrams: number, salePriceEur: number, packaging: Product['packaging'] = 'none', quantity = 1) {
+  const effWeight = (weightGrams + (packaging === 'with_box' ? 450 : packaging === 'without_box' ? -100 : 0)) * quantity;
+  const shipping = estimateMulebuyShipping(Math.max(effWeight, 200));
+  const shippingWithSafety = shipping.high * SHIPPING_SAFETY_MULTIPLIER;
+  const sourceCost = estimateSourceCostEur(sourceCny, quantity);
+  const revenue = salePriceEur * quantity;
+  const paymentFees = estimatePaymentFees(revenue);
+  const riskProvision = revenue * RETURN_RISK_PCT;
+  const totalCost = sourceCost + shippingWithSafety + paymentFees + riskProvision;
+  const net = revenue - totalCost;
+  const netPct = revenue > 0 ? (net / revenue) * 100 : 0;
+  return { effWeight: Math.max(effWeight, 200), shipping, shippingWithSafety, sourceCost, paymentFees, riskProvision, totalCost, net, netPct };
+}
+
+function marginTone(pct: number) {
+  if (pct >= 45) return 'bg-green-500/10 text-green-600';
+  if (pct >= 30) return 'bg-orange-500/10 text-orange-600';
   return 'bg-red-500/10 text-red-600';
 }
 
-function marginLabel(margin: number) {
-  if (margin >= 45) return 'OK';
-  if (margin >= 20) return 'Moyen';
+function marginLabel(pct: number) {
+  if (pct >= 45) return 'OK';
+  if (pct >= 30) return 'Moyen';
   return 'Danger';
 }
 
@@ -415,8 +444,8 @@ const ProductListItem = memo(function ProductListItem({ product, ordersCount, on
     : '';
   const sBadge = statusMeta[product.status];
   const marginColor =
-    margin.net >= 45 ? 'text-green-600' :
-    margin.net >= 20 ? 'text-orange-500' :
+    margin.netPct >= 45 ? 'text-green-600' :
+    margin.netPct >= 30 ? 'text-orange-500' :
     'text-red-500';
 
   return (
@@ -451,7 +480,7 @@ const ProductListItem = memo(function ProductListItem({ product, ordersCount, on
           <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${sBadge.cls}`}>
             {sBadge.label}
           </span>
-          {margin.net < 20 && product.status === 'active' && (
+          {margin.netPct < 30 && product.status === 'active' && (
             <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-bold text-red-500">
               Marge faible
             </span>
@@ -924,10 +953,10 @@ const ProductEditDrawer = memo(function ProductEditDrawer({
           </button>
         </div>
 
-        {margin.net < 20 && draft.status === 'active' && (
+        {margin.netPct < 30 && draft.status === 'active' && (
           <div className="mx-4 sm:mx-5 mt-4 rounded-xl bg-red-500/10 border border-red-500/20 px-4 py-2.5 text-xs text-red-200 flex items-start gap-2 flex-shrink-0">
             <span className="font-bold text-red-300">⚠ Marge faible</span>
-            <span className="opacity-90">Marge estimée {euro(margin.net)}. Augmente le prix ou vérifie le poids.</span>
+            <span className="opacity-90">Marge nette {euro(margin.net)} ({margin.netPct.toFixed(0)}%). Augmente le prix ou vérifie le poids.</span>
           </div>
         )}
 
@@ -1064,8 +1093,8 @@ const ProductEditDrawer = memo(function ProductEditDrawer({
               <span className="rounded-full bg-white/10 px-3 py-1 text-white/60">Poids {margin.effectiveWeight}g</span>
               <span className="rounded-full bg-white/10 px-3 py-1 text-white/60">Livr. {euro(margin.shipping.low)}–{euro(margin.shipping.high)}</span>
               <span className="rounded-full bg-white/10 px-3 py-1 text-white/60">+20% {euro(margin.shippingWithSafety)}</span>
-              <span className={`rounded-full px-3 py-1 font-bold ${marginTone(margin.net).replace('bg-green-500/10', 'bg-green-500/20').replace('bg-orange-500/10', 'bg-orange-500/20').replace('bg-red-500/10', 'bg-red-500/20').replace('text-green-600', 'text-green-300').replace('text-orange-600', 'text-orange-300').replace('text-red-600', 'text-red-300')}`}>
-                {marginLabel(margin.net)} · {euro(margin.net)}
+              <span className={`rounded-full px-3 py-1 font-bold ${marginTone(margin.netPct).replace('bg-green-500/10', 'bg-green-500/20').replace('bg-orange-500/10', 'bg-orange-500/20').replace('bg-red-500/10', 'bg-red-500/20').replace('text-green-600', 'text-green-300').replace('text-orange-600', 'text-orange-300').replace('text-red-600', 'text-red-300')}`}>
+                {marginLabel(margin.netPct)} · {euro(margin.net)} ({margin.netPct.toFixed(0)}%)
               </span>
               <button
                 type="button"
@@ -1251,14 +1280,14 @@ const OrderCard = memo(function OrderCard({ order, product, margin, copied, copi
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-        <span className={`rounded-full px-3 py-1 font-bold ${marginTone(margin.net)}`}>
-          Marge {marginLabel(margin.net)} : {euro(margin.net)}
+        <span className={`rounded-full px-3 py-1 font-bold ${marginTone(margin.netPct)}`}>
+          Marge {marginLabel(margin.netPct)} : {euro(margin.net)} ({margin.netPct.toFixed(0)}%)
         </span>
         <span className="rounded-full bg-dark/5 px-3 py-1 text-dark/40">
           Livraison securisee (+20%) : {euro(margin.shippingWithSafety)}
         </span>
         <span className="rounded-full bg-dark/5 px-3 py-1 text-dark/40">
-          Frais paiement : {euro(margin.fees)}
+          Frais paiement : {euro(margin.paymentFees)}
         </span>
       </div>
 
@@ -1314,6 +1343,226 @@ const OrderCard = memo(function OrderCard({ order, product, margin, copied, copi
 // ────────────────────────────────────────────────────────────────────────────
 // AdminPanel
 // ────────────────────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────────────────
+// EstimatorTab : calculateur de marge rapide ¥ + poids → prix suggéré
+// ────────────────────────────────────────────────────────────────────────────
+type EstimatorTabProps = {
+  products: Product[];
+  selectedEstimateProduct: string;
+  setSelectedEstimateProduct: (id: string) => void;
+  getProduct: (id: string) => Product;
+};
+
+function EstimatorTab({ products, selectedEstimateProduct, setSelectedEstimateProduct, getProduct }: EstimatorTabProps) {
+  // Calculateur rapide (sans produit existant)
+  const [cny, setCny] = useState(150);
+  const [weight, setWeight] = useState(900);
+  const [packaging, setPackaging] = useState<'none' | 'without_box' | 'with_box'>('none');
+  const [salePrice, setSalePrice] = useState(75);
+  const [qty, setQty] = useState(1);
+
+  const product = products.length > 0 ? getProduct(selectedEstimateProduct) : null;
+  const productMargin = product ? estimateNetMargin(product) : null;
+
+  // Auto-prix suggéré sur le calculateur
+  useEffect(() => {
+    setSalePrice(suggestedSalePrice(cny, weight, packaging, 45));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cny, weight, packaging]);
+
+  const q = estimateQuickMargin(cny, weight, salePrice, packaging, qty);
+  const suggested = suggestedSalePrice(cny, weight, packaging, 45);
+  const suggestedConservative = suggestedSalePrice(cny, weight, packaging, 50);
+
+  const tone = (pct: number) =>
+    pct >= 45 ? 'bg-green-500/10 text-green-700 border-green-500/20' :
+    pct >= 30 ? 'bg-orange-500/10 text-orange-700 border-orange-500/20' :
+    'bg-red-500/10 text-red-600 border-red-500/20';
+  const toneLabel = (pct: number) =>
+    pct >= 45 ? 'Bonne marge' :
+    pct >= 30 ? 'Marge juste' :
+    'Danger — perte possible';
+
+  return (
+    <div className="grid lg:grid-cols-2 gap-5">
+      {/* Calculateur ¥ → € rapide */}
+      <div className="rounded-3xl bg-white text-dark p-6 space-y-5">
+        <h3 className="font-bold text-xl flex items-center gap-2">
+          <Calculator size={20} className="text-accent" /> Calculateur ¥ → €
+        </h3>
+        <p className="text-sm text-dark/40 -mt-3">
+          Entre le prix 1688 en <b>¥ CNY</b> et le poids estimé. Le taux utilisé est <b>7.5 ¥ = 1 €</b> (commission agent 6% incluse).
+        </p>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <label className="space-y-1 col-span-1">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-dark/35">Prix 1688 (¥)</span>
+            <input type="number" min={0} value={cny} onChange={(e) => setCny(Number(e.target.value) || 0)}
+              className="w-full rounded-xl bg-bg px-3 py-2.5 text-sm font-semibold outline-none focus:ring-4 focus:ring-accent/5" />
+          </label>
+          <label className="space-y-1 col-span-1">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-dark/35">Poids (g)</span>
+            <input type="number" min={100} step={50} value={weight} onChange={(e) => setWeight(Number(e.target.value) || 0)}
+              className="w-full rounded-xl bg-bg px-3 py-2.5 text-sm font-semibold outline-none focus:ring-4 focus:ring-accent/5" />
+          </label>
+          <label className="space-y-1 col-span-1">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-dark/35">Quantité</span>
+            <input type="number" min={1} value={qty} onChange={(e) => setQty(Math.max(1, Number(e.target.value) || 1))}
+              className="w-full rounded-xl bg-bg px-3 py-2.5 text-sm font-semibold outline-none focus:ring-4 focus:ring-accent/5" />
+          </label>
+          <label className="space-y-1 col-span-1">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-dark/35">Boîte</span>
+            <select value={packaging} onChange={(e) => setPackaging(e.target.value as typeof packaging)}
+              className="w-full rounded-xl bg-bg px-3 py-2.5 text-sm font-semibold outline-none">
+              <option value="none">Sans boîte</option>
+              <option value="without_box">Sans boîte (-100g)</option>
+              <option value="with_box">Avec boîte (+450g)</option>
+            </select>
+          </label>
+        </div>
+
+        <label className="space-y-1 block">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-dark/35">Prix de vente (€)</span>
+          <div className="flex gap-2">
+            <input type="number" min={0} value={salePrice} onChange={(e) => setSalePrice(Number(e.target.value) || 0)}
+              className="flex-1 rounded-xl bg-bg px-3 py-2.5 text-sm font-semibold outline-none focus:ring-4 focus:ring-accent/5" />
+            <button type="button" onClick={() => setSalePrice(suggested)}
+              className="rounded-xl bg-accent text-white px-4 text-xs font-bold hover:bg-accent/90">
+              Auto 45%
+            </button>
+            <button type="button" onClick={() => setSalePrice(suggestedConservative)}
+              className="rounded-xl bg-dark text-white px-4 text-xs font-bold hover:bg-dark/80">
+              Sécu 50%
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2 pt-2">
+            {[55, 65, 70, 75, 85, 95, 110, 120].map((p) => (
+              <button key={p} type="button" onClick={() => setSalePrice(p)}
+                className={`rounded-full px-3 py-1 text-[11px] font-bold transition-colors ${
+                  salePrice === p ? 'bg-accent text-white' : 'bg-bg text-dark/50 hover:bg-dark/10'
+                }`}>
+                {p}€
+              </button>
+            ))}
+          </div>
+        </label>
+
+        {/* Détail des coûts */}
+        <div className="rounded-2xl bg-bg p-4 text-sm space-y-2">
+          <div className="flex justify-between"><span className="text-dark/50">Prix article {qty > 1 ? `×${qty}` : ''}</span><span className="font-semibold">{q.sourceCost.toFixed(2)} €</span></div>
+          <div className="flex justify-between"><span className="text-dark/50">Livraison tax-free (sécurité 20%)</span><span className="font-semibold">{q.shippingWithSafety.toFixed(2)} €</span></div>
+          <div className="flex justify-between"><span className="text-dark/50">Frais PayPal 3%+0.25€</span><span className="font-semibold">{q.paymentFees.toFixed(2)} €</span></div>
+          <div className="flex justify-between"><span className="text-dark/50">Provision retours/pertes 3%</span><span className="font-semibold">{q.riskProvision.toFixed(2)} €</span></div>
+          <div className="border-t border-dark/10 pt-2 flex justify-between">
+            <span className="text-dark/70 font-bold">Coût total</span><span className="font-bold">{q.totalCost.toFixed(2)} €</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-dark/70">Chiffre d'affaires</span><span className="font-semibold">{(salePrice * qty).toFixed(2)} €</span>
+          </div>
+          <div className="flex justify-between items-center pt-1">
+            <span className="font-bold">Marge nette</span>
+            <span className={`rounded-full px-3 py-1 font-bold text-sm ${tone(q.netPct)} border`}>
+              {q.net.toFixed(2)} € · {q.netPct.toFixed(0)}%
+            </span>
+          </div>
+          <div className="text-[11px] text-dark/40 pt-1">{toneLabel(q.netPct)}. Poids retenu : {q.effWeight}g · Livraison estimée {q.shipping.low.toFixed(2)}–{q.shipping.high.toFixed(2)}€.</div>
+        </div>
+
+        {qty > 1 && (
+          <div className="rounded-2xl bg-accent/10 border border-accent/20 p-3 text-sm">
+            <b className="text-accent">×{qty} articles</b> — marge totale <b>{q.net.toFixed(2)} €</b> (soit {(q.net / qty).toFixed(2)} € / article).
+            Les commandes multiples augmentent la marge grâce au groupage de port.
+          </div>
+        )}
+      </div>
+
+      {/* Estimation produit existant */}
+      <div className="space-y-5">
+        <div className="rounded-3xl bg-white text-dark p-6">
+          <h3 className="font-bold text-xl flex items-center gap-2"><Truck size={20} /> Marge d'un produit existant</h3>
+          <p className="text-sm text-dark/40 mt-2">Sélectionne un produit de ta boutique pour voir sa marge réelle.</p>
+          {products.length === 0 ? (
+            <div className="mt-5 rounded-2xl bg-bg p-6 text-center text-sm text-dark/40">Ajoute un produit d'abord.</div>
+          ) : (
+            <>
+              <select
+                value={selectedEstimateProduct}
+                onChange={(event) => setSelectedEstimateProduct(event.target.value)}
+                className="mt-5 w-full rounded-2xl bg-bg px-5 py-4 text-sm font-semibold outline-none"
+              >
+                {products.map((p) => (
+                  <option key={p.id} value={p.id}>{p.brand} - {p.name} · {p.salePrice}€</option>
+                ))}
+              </select>
+              {productMargin && product && (
+                <div className="mt-5 space-y-4">
+                  <div className="grid grid-cols-3 gap-3">
+                    {(['economy', 'tax_free', 'express'] as const).map((line) => {
+                      const est = estimateMulebuyShipping(productMargin.effectiveWeight, line);
+                      return (
+                        <div key={line} className="rounded-2xl bg-bg p-3">
+                          <div className="text-[10px] font-bold uppercase tracking-widest text-dark/35">{est.label}</div>
+                          <div className="font-800 text-base mt-1">{est.low.toFixed(2)} €</div>
+                          <div className="text-[10px] text-dark/35">à {est.high.toFixed(2)} €</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="rounded-2xl bg-bg p-4 text-sm space-y-1.5">
+                    <div className="flex justify-between"><span className="text-dark/50">Poids retenu</span><span className="font-semibold">{productMargin.effectiveWeight}g</span></div>
+                    <div className="flex justify-between"><span className="text-dark/50">Prix source</span><span className="font-semibold">{product.sourcePriceCny} ¥ · {productMargin.sourceCost.toFixed(2)} €</span></div>
+                    <div className="flex justify-between"><span className="text-dark/50">Livraison sécu</span><span className="font-semibold">{productMargin.shippingWithSafety.toFixed(2)} €</span></div>
+                    <div className="flex justify-between"><span className="text-dark/50">Frais paiement</span><span className="font-semibold">{productMargin.paymentFees.toFixed(2)} €</span></div>
+                    <div className="flex justify-between"><span className="text-dark/50">Provision risques</span><span className="font-semibold">{productMargin.riskProvision.toFixed(2)} €</span></div>
+                    <div className="border-t border-dark/10 pt-2 flex justify-between items-center">
+                      <span className="font-bold">Marge nette</span>
+                      <span className={`rounded-full px-3 py-1 font-bold ${marginTone(productMargin.netPct)}`}>
+                        {productMargin.net.toFixed(2)} € · {productMargin.netPct.toFixed(0)}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Aide / taux */}
+        <div className="rounded-3xl bg-white/5 border border-white/10 p-6 text-white/80">
+          <h3 className="font-bold text-xl flex items-center gap-2"><Package size={20} /> Taux & règles utilisées</h3>
+          <div className="mt-4 grid sm:grid-cols-2 gap-3 text-sm">
+            <div className="rounded-2xl bg-white/5 p-3">
+              <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Taux ¥→€</div>
+              <div className="text-lg font-800 mt-1">1 € = 7.5 ¥</div>
+              <div className="text-[11px] text-white/40">commission agent 6% incluse</div>
+            </div>
+            <div className="rounded-2xl bg-white/5 p-3">
+              <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Port tax-free</div>
+              <div className="text-lg font-800 mt-1">~10.7 €/kg</div>
+              <div className="text-[11px] text-white/40">GD-EMS 10-20j + marge sécu 20%</div>
+            </div>
+            <div className="rounded-2xl bg-white/5 p-3">
+              <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Frais paiement</div>
+              <div className="text-lg font-800 mt-1">3% + 0.25€</div>
+              <div className="text-[11px] text-white/40">PayPal/Stripe</div>
+            </div>
+            <div className="rounded-2xl bg-white/5 p-3">
+              <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Risques</div>
+              <div className="text-lg font-800 mt-1">3% du CA</div>
+              <div className="text-[11px] text-white/40">retours, pertes, douane</div>
+            </div>
+          </div>
+          <div className="mt-5 space-y-2 text-sm text-white/50 leading-relaxed">
+            <p><b className="text-white/80">Règle simple :</b> vise <b>≥45% de marge nette</b> (bouton Auto), mets <b>50% (Sécu)</b> sur les pièces à risque (premium, tailles rares).</p>
+            <p>En dessous de 30%, c'est dangereux : un retour ou une saisie douanière et tu perds de l'argent.</p>
+            <p>Les prix ronds "finissant par 5" (65/75/85€) convertissent mieux que les prix ronds à 0.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminPanel() {
   const [isAdminAuthed] = useState(() => sessionStorage.getItem('tof-admin-auth') === 'true');
 
@@ -2726,7 +2975,7 @@ export default function AdminPanel() {
                       <div className="flex flex-wrap gap-2 text-[11px]">
                         <span className="rounded-full bg-white px-2.5 py-1 text-dark/40">{margin.effectiveWeight}g</span>
                         <span className="rounded-full bg-white px-2.5 py-1 text-dark/40">Livr. {euro(margin.shippingWithSafety)}</span>
-                        <span className={`rounded-full px-2.5 py-1 font-bold ${marginTone(margin.net)}`}>Marge {euro(margin.net)}</span>
+                        <span className={`rounded-full px-2.5 py-1 font-bold ${marginTone(margin.netPct)}`}>Marge {euro(margin.net)} · {margin.netPct.toFixed(0)}%</span>
                       </div>
                     );
                   })()}
@@ -3620,76 +3869,12 @@ export default function AdminPanel() {
           </div>
         )}
 
-        {activeTab === 'estimate' && (
-          <div className="grid lg:grid-cols-2 gap-5">
-            <div className="rounded-3xl bg-white text-dark p-6">
-              <h3 className="font-bold text-xl flex items-center gap-2"><Truck size={20} /> Estimation Mulebuy</h3>
-              <p className="text-sm text-dark/40 mt-2">Ce n'est pas un tarif officiel, mais une estimation pour te donner une marge avant de commander.</p>
-              {products.length === 0 ? (
-                <div className="mt-5 rounded-2xl bg-bg p-6 text-center text-sm text-dark/40">Ajoute un produit d'abord pour estimer la livraison.</div>
-              ) : (
-              <>
-              <select
-                value={selectedEstimateProduct}
-                onChange={(event) => setSelectedEstimateProduct(event.target.value)}
-                className="mt-5 w-full rounded-2xl bg-bg px-5 py-4 text-sm font-semibold outline-none"
-              >
-                {products.map((product) => (
-                  <option key={product.id} value={product.id}>{product.brand} - {product.name}</option>
-                ))}
-              </select>
-              {(() => {
-                const product = getProduct(selectedEstimateProduct);
-                const margin = estimateNetMargin(product);
-                return (
-                  <>
-                    <div className="grid sm:grid-cols-3 gap-3 mt-5">
-                      {(['economy', 'tax_free', 'express'] as const).map((line) => {
-                        const estimate = estimateMulebuyShipping(effectiveWeight(product), line);
-                        return (
-                          <div key={line} className="rounded-2xl bg-bg p-4">
-                            <div className="text-xs text-dark/35">{estimate.label}</div>
-                            <div className="font-800 text-lg mt-2">{euro(estimate.low)}</div>
-                            <div className="text-xs text-dark/35">a {euro(estimate.high)}</div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div className="mt-5 rounded-2xl bg-bg p-4 text-sm">
-                      <div className="flex flex-wrap gap-2">
-                        <span className="rounded-full bg-white px-3 py-1 text-dark/45">Poids retenu {margin.effectiveWeight}g</span>
-                        <span className="rounded-full bg-white px-3 py-1 text-dark/45">Frais paiement {euro(margin.fees)}</span>
-                        <span className={`rounded-full px-3 py-1 font-bold ${marginTone(margin.net)}`}>Marge apres livraison {euro(margin.net)}</span>
-                      </div>
-                    </div>
-                  </>
-                );
-              })()}
-              </>
-              )}
-            </div>
-            <div className="rounded-3xl bg-white/5 border border-white/10 p-6">
-              <h3 className="font-bold text-xl flex items-center gap-2"><Package size={20} /> Comment l'utiliser</h3>
-              <div className="space-y-4 mt-5 text-sm text-white/45 leading-relaxed">
-                <p>1. Tu mets le vrai prix source en CNY et le poids estime du produit.</p>
-                <p>2. Le panel estime la livraison Mulebuy avec une fourchette basse/haute.</p>
-                <p>3. Quand une commande arrive, tu copies le bloc Mulebuy et tu commandes en verifiant les infos.</p>
-                <p>4. Si un lien saute, tu passes le produit en "Lien saute" ou tu colles un nouveau lien source.</p>
-              </div>
-              <div className="mt-6 rounded-2xl bg-white/5 border border-white/10 p-4">
-                <h4 className="font-bold text-sm mb-3">Poids par defaut</h4>
-                <div className="grid grid-cols-2 gap-2 text-xs text-white/45">
-                  {categoryPresets.map((preset) => (
-                    <div key={preset.label} className="flex justify-between gap-3 border-b border-white/5 pb-1">
-                      <span>{preset.label}</span>
-                      <span className="text-white/70">{preset.weight}g</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        {activeTab === 'estimate' && <EstimatorTab
+          products={products}
+          selectedEstimateProduct={selectedEstimateProduct}
+          setSelectedEstimateProduct={setSelectedEstimateProduct}
+          getProduct={getProduct}
+        />}
       </div>
 
       {/* Drawer d'édition / création produit */}
