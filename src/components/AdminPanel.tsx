@@ -79,7 +79,7 @@ type Order = {
 // const STORAGE_PRODUCTS = 'tof-admin-products-v1';
 // const STORAGE_ORDERS = 'tof-orders-v1';
 // const STORAGE_DROP = 'tof-featured-drop-v1';
-// Taux agent réel 1688 (¥ → €) : ~7.5 ¥ = 1 € (commission agent ~6% + change + assurance)
+// Taux agent ¥→€ : ~7.5 ¥ = 1 € (commission agent ~6% + change + assurance)
 const CNY_TO_EUR = 1 / 7.5; // ≈ 0.1333
 const SHIPPING_SAFETY_MULTIPLIER = 1.2;
 const PAYMENT_FEE_PCT = 0.03;
@@ -136,7 +136,7 @@ const initialProducts: Product[] = [
     sizes: '39, 40, 41, 42, 43, 44, 45',
     colors: 'Black, White',
     imageUrl: '',
-    sourceUrl: 'https://detail.1688.com/offer/EXEMPLE-AF1.html',
+    sourceUrl: 'https://mulebuy.com/product?id=EXEMPLE-AF1',
     status: 'active',
   },
   {
@@ -152,7 +152,7 @@ const initialProducts: Product[] = [
     sizes: 'S, M, L, XL',
     colors: 'Black, White, Beige',
     imageUrl: '',
-    sourceUrl: 'https://detail.1688.com/offer/EXEMPLE-GUCCI-TEE.html',
+    sourceUrl: 'https://mulebuy.com/product?id=EXEMPLE-GUCCI',
     status: 'active',
   },
   {
@@ -168,7 +168,7 @@ const initialProducts: Product[] = [
     sizes: 'S, M, L, XL, XXL',
     colors: 'Black, Brown',
     imageUrl: '',
-    sourceUrl: 'https://detail.1688.com/offer/EXEMPLE-LV-HOODIE.html',
+    sourceUrl: 'https://mulebuy.com/product?id=EXEMPLE-LV',
     status: 'active',
   },
 ];
@@ -267,7 +267,7 @@ function euro(value: number) {
 }
 
 function estimateMulebuyShipping(weightGrams: number, line: 'tax_free' | 'economy' | 'express' = 'tax_free') {
-  // Tarifs 2026 lignes "agent 1688" FR (GD-EMS / KR-EMS / DHL tax-free)
+  // Tarifs 2026 lignes agent FR (GD-EMS / KR-EMS / DHL tax-free)
   // Taux nets, marge sécurité appliquée côté appel via SHIPPING_SAFETY_MULTIPLIER
   const kg = Math.max(weightGrams / 1000, 0.3);
   const rates = {
@@ -758,10 +758,9 @@ function Field({ label, error, children }: { label: string; error?: string; chil
 
 /**
  * Source URL input with auto-cleanup on paste.
- * When the user pastes the full 1688 share blob (Chinese text + shortlink
- * like `https://qr.1688.com/s/xxx`), we automatically extract the URL and
- * replace the field content. Shortlinks are kept as-is — they're valid,
- * clickable URLs that 1688 redirects to the product page in the browser.
+ *
+ * Quand tu colles un lien Mulebuy (mulebuy.com/product?id=…), l'URL est
+ * extraite automatiquement et nettoyée (ponctuation de fin enlevée).
  */
 function SourceUrlInput({
   value,
@@ -812,7 +811,7 @@ function SourceUrlInput({
         onChange={(e) => onChange(e.target.value)}
         onPaste={handlePaste}
         onBlur={handleBlur}
-        placeholder="Colle le partage 1688 ou l'URL directe…"
+        placeholder="Colle le lien Mulebuy (mulebuy.com/product?id=…)…"
         spellCheck={false}
         autoComplete="off"
         className={`${
@@ -980,7 +979,7 @@ const ProductEditDrawer = memo(function ProductEditDrawer({
                 />
               </Field>
             </div>
-            <Field label="Lien source (1688 / Taobao / Weidian…)">
+            <Field label="Lien source (Mulebuy)">
               <SourceUrlInput
                 value={draft.sourceUrl}
                 onChange={(v) => onChange({ ...draft, sourceUrl: v })}
@@ -1391,12 +1390,12 @@ function EstimatorTab({ products, selectedEstimateProduct, setSelectedEstimatePr
           <Calculator size={20} className="text-accent" /> Calculateur ¥ → €
         </h3>
         <p className="text-sm text-dark/40 -mt-3">
-          Entre le prix 1688 en <b>¥ CNY</b> et le poids estimé. Le taux utilisé est <b>7.5 ¥ = 1 €</b> (commission agent 6% incluse).
+          Entre le prix source en <b>¥ CNY</b> (celui affiché sur Mulebuy) et le poids estimé. Le taux utilisé est <b>7.5 ¥ = 1 €</b> (commission agent 6% incluse).
         </p>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <label className="space-y-1 col-span-1">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-dark/35">Prix 1688 (¥)</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-dark/35">Prix source (¥)</span>
             <input type="number" min={0} value={cny} onChange={(e) => setCny(Number(e.target.value) || 0)}
               className="w-full rounded-xl bg-bg px-3 py-2.5 text-sm font-semibold outline-none focus:ring-4 focus:ring-accent/5" />
           </label>
@@ -3845,7 +3844,7 @@ export default function AdminPanel() {
                   <h4 className="font-bold text-white/60 text-sm mb-3">Suggestions rapides</h4>
                   <div className="space-y-2">
                     {[
-                      'Ajouter mes vrais produits avec liens 1688',
+                      'Ajouter mes vrais produits avec liens Mulebuy',
                       'Mettre les photos produits',
                       'Trouver un agent pour le fulfillment',
                       'Tester avec 2-3 commandes réelles',
