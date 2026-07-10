@@ -1334,6 +1334,102 @@ export default function AdminPanel() {
   const [promoCodes, setPromoCodes] = useState<DbPromoCode[]>([]);
   const [newPromo, setNewPromo] = useState({ code: '', discount: 15, maxUses: 0, expiresIn: '' });
 
+  // ── Conversations chat (dérivées de chatMessages) ──
+  const convoMap = useMemo(() => {
+    const convos = new Map<string, { name: string; messages: DbChatMessage[]; lastMsg: DbChatMessage; hasUnread: boolean }>();
+    chatMessages.forEach((m) => {
+      const existing = convos.get(m.conversation_id);
+      if (existing) {
+        existing.messages.push(m);
+        existing.lastMsg = m;
+        if (m.sender === 'client') {
+          const hasAdminReply = existing.messages.some(
+            (x) => x.sender === 'admin' && x.id > m.id,
+          );
+          existing.hasUnread = !hasAdminReply;
+        }
+      } else {
+        convos.set(m.conversation_id, {
+          name: m.client_name || 'Anonyme',
+          messages: [m],
+          lastMsg: m,
+          hasUnread: m.sender === 'client',
+        });
+      }
+    });
+    return convos;
+  }, [chatMessages]);
+
+  const convoList = useMemo(() => {
+    const list = Array.from(convoMap.entries()).sort(
+      (a, b) => (b[1].lastMsg.created_at || '').localeCompare(a[1].lastMsg.created_at || ''),
+    );
+    return list.sort((a, b) => Number(b[1].hasUnread) - Number(a[1].hasUnread));
+  }, [convoMap]);
+
+  // Auto-sélection de la première conversation non-lue à l'arrivée
+  useEffect(() => {
+    if (!activeConvo && convoList.length > 0) {
+      const firstUnread = convoList.find(([, c]) => c.hasUnread);
+      setActiveConvo(firstUnread ? firstUnread[0] : convoList[0][0]);
+    }
+  }, [activeConvo, convoList]);
+
+  function timeAgo(dateStr?: string): string {
+    if (!dateStr) return '';
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return 'à l\'instant';
+    if (m < 60) return `il y a ${m}min`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `il y a ${h}h`;
+    const d = Math.floor(h / 24);
+    return `il y a ${d}j`;
+  }
+
+  function formatTime(dateStr?: string): string {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  }
+
+  // Messages rapides admin
+  const quickReplies = useMemo(() => [
+    'Salut ! Comment puis-je t\'aider ?',
+    'Je regarde ça et je reviens vers toi rapidement.',
+    'Tu peux commander directement depuis le shop, le lien est dans la bio !',
+    'Le paiement se fait via PayPal, lien disponible après validation du panier.',
+    'Les délais de livraison sont de 10-20 jours en standard, 5-10 jours en express.',
+    'Je t\'envoie les photos QC très vite !',
+    'C\'est noté, je m\'en occupe.',
+  ], []);
+
+  const sendAdminReply = useCallback(async (textOverride?: string) => {
+    const text = (textOverride ?? chatReply).trim();
+    if (!text || !activeConvo) return;
+    const convo = convoMap.get(activeConvo);
+    const msg: DbChatMessage = {
+      id: `m-admin-${Date.now()}`,
+      conversation_id: activeConvo,
+      sender: 'admin',
+      message: text,
+      client_name: convo?.name || '',
+    };
+    await sendChatMessage(msg);
+    setChatMessages((prev) => [...prev, msg]);
+    setChatReply('');
+    showToast('Réponse envoyée ✓');
+    playNewOrder();
+  }, [chatReply, activeConvo, convoMap]);
+
+  const activeMessages = activeConvo ? convoMap.get(activeConvo)?.messages || [] : [];
+  const activeConvoData = activeConvo ? convoMap.get(activeConvo) : null;
+  const unreadTotal = convoList.filter(([, c]) => c.hasUnread).length;
+  const todayMsgCount = useMemo(() => chatMessages.filter((m) => {
+    if (!m.created_at) return false;
+    return new Date(m.created_at).toDateString() === new Date().toDateString();
+  }).length, [chatMessages]);
+
   // Drawer produit (remplace l'édition inline editingId/draftProduct)
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerIsNew, setDrawerIsNew] = useState(false);
@@ -3084,96 +3180,7 @@ export default function AdminPanel() {
           </div>
         )}
 
-        {activeTab === 'chat' && (() => {
-          const convos = new Map<string, { name: string; messages: DbChatMessage[]; lastMsg: DbChatMessage; hasUnread: boolean }>();
-          chatMessages.forEach((m) => {
-            const existing = convos.get(m.conversation_id);
-            if (existing) {
-              existing.messages.push(m);
-              existing.lastMsg = m;
-              if (m.sender === 'client' && m.id.startsWith('m-')) {
-                // Heuristique non-lu : dernier message client dont l'id est plus récent que le dernier message admin/bot
-                const hasAdminReply = existing.messages.some(
-                  (x) => x.sender === 'admin' && x.id > m.id,
-                );
-                if (!hasAdminReply) existing.hasUnread = true;
-              }
-            } else {
-              convos.set(m.conversation_id, {
-                name: m.client_name || 'Anonyme',
-                messages: [m],
-                lastMsg: m,
-                hasUnread: m.sender === 'client',
-              });
-            }
-          });
-          let convoList = Array.from(convos.entries()).sort(
-            (a, b) => (b[1].lastMsg.created_at || '').localeCompare(a[1].lastMsg.created_at || ''),
-          );
-          // Les non-lus d'abord
-          convoList = convoList.sort((a, b) => Number(b[1].hasUnread) - Number(a[1].hasUnread));
-          const activeMessages = activeConvo ? convos.get(activeConvo)?.messages || [] : [];
-          const activeConvoData = activeConvo ? convos.get(activeConvo) : null;
-
-          // Messages rapides admin
-          const quickReplies = [
-            'Salut ! Comment puis-je t\'aider ?',
-            'Je regarde ça et je reviens vers toi rapidement.',
-            'Tu peux commander directement depuis le shop, le lien est dans la bio !',
-            'Le paiement se fait via PayPal, lien disponible après validation du panier.',
-            'Les délais de livraison sont de 10-20 jours en standard, 5-10 jours en express.',
-            'Je t\'envoie les photos QC très vite !',
-            'C\'est noté, je m\'en occupe.',
-          ];
-
-          const sendAdminReply = async (textOverride?: string) => {
-            const text = (textOverride ?? chatReply).trim();
-            if (!text || !activeConvo) return;
-            const convo = convos.get(activeConvo);
-            const msg: DbChatMessage = {
-              id: `m-admin-${Date.now()}`,
-              conversation_id: activeConvo,
-              sender: 'admin',
-              message: text,
-              client_name: convo?.name || '',
-            };
-            await sendChatMessage(msg);
-            setChatMessages((prev) => [...prev, msg]);
-            setChatReply('');
-            showToast('Réponse envoyée ✓');
-            playNewOrder();
-          };
-
-          // Auto-sélection de la première conversation avec unread à l'arrivée
-          useEffect(() => {
-            if (!activeConvo && convoList.length > 0) {
-              const firstUnread = convoList.find(([, c]) => c.hasUnread);
-              setActiveConvo(firstUnread ? firstUnread[0] : convoList[0][0]);
-            }
-            // eslint-disable-next-line react-hooks/exhaustive-deps
-          }, [convoList.length]);
-
-          function timeAgo(dateStr?: string): string {
-            if (!dateStr) return '';
-            const diff = Date.now() - new Date(dateStr).getTime();
-            const m = Math.floor(diff / 60000);
-            if (m < 1) return 'à l\'instant';
-            if (m < 60) return `il y a ${m}min`;
-            const h = Math.floor(m / 60);
-            if (h < 24) return `il y a ${h}h`;
-            const d = Math.floor(h / 24);
-            return `il y a ${d}j`;
-          }
-
-          function formatTime(dateStr?: string): string {
-            if (!dateStr) return '';
-            const d = new Date(dateStr);
-            return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-          }
-
-          const unreadTotal = convoList.filter(([, c]) => c.hasUnread).length;
-
-          return (
+        {activeTab === 'chat' && (
             <div className="space-y-4">
               {/* Stats bar */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
@@ -3194,14 +3201,7 @@ export default function AdminPanel() {
                 </div>
                 <div className="rounded-2xl bg-white/5 border border-white/10 p-3 sm:p-4">
                   <div className="text-[10px] uppercase tracking-widest text-white/35 font-bold">Msg aujourd'hui</div>
-                  <div className="text-xl sm:text-2xl font-800 mt-1">
-                    {chatMessages.filter((m) => {
-                      if (!m.created_at) return false;
-                      const d = new Date(m.created_at);
-                      const today = new Date();
-                      return d.toDateString() === today.toDateString();
-                    }).length}
-                  </div>
+                  <div className="text-xl sm:text-2xl font-800 mt-1">{todayMsgCount}</div>
                   <div className="text-[10px] text-white/30">messages</div>
                 </div>
               </div>
@@ -3409,7 +3409,7 @@ export default function AdminPanel() {
                               void sendAdminReply();
                             }
                           }}
-                          placeholder={`Répondre à ${activeConvoData.name}...`}
+                          placeholder={activeConvoData ? `Répondre à ${activeConvoData.name}...` : 'Répondre...'}
                           className="flex-1 rounded-xl bg-bg px-4 h-11 text-sm outline-none focus:ring-4 focus:ring-accent/5"
                           autoFocus
                         />
@@ -3427,8 +3427,7 @@ export default function AdminPanel() {
                 </div>
               </div>
             </div>
-          );
-        })()}
+        )}
 
         {activeTab === 'notes' && (
           <div className="space-y-5">
