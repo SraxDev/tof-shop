@@ -2,7 +2,6 @@ import { Suspense, lazy, useEffect, useState } from 'react';
 import { useTwemoji } from './hooks/useTwemoji';
 import { hydrateSiteSettings } from './lib/siteSettings';
 import { trackVisitor } from './lib/db';
-import AnnouncementBar from './components/AnnouncementBar';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import Products from './components/Products';
@@ -13,7 +12,6 @@ import ToastContainer from './components/Toast';
 import AdminPanel from './components/AdminPanel';
 
 // Lazy-load below-the-fold sections for faster TTI
-const LaunchTimer = lazy(() => import('./components/LaunchTimer'));
 const BrandMarquee = lazy(() => import('./components/BrandMarquee'));
 const FeaturedDrop = lazy(() => import('./components/FeaturedDrop'));
 const Brands = lazy(() => import('./components/Brands'));
@@ -126,10 +124,6 @@ export default function App() {
   return (
     <div className="font-sans antialiased bg-bg text-dark">
       <Navbar />
-      <AnnouncementBar />
-      <Suspense fallback={null}>
-        <LaunchTimer />
-      </Suspense>
       <Hero />
       <Suspense fallback={<SectionFallback />}>
         <BrandMarquee />
