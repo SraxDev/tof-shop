@@ -23,7 +23,7 @@ export default function Footer() {
               tof<span className="text-accent">.</span>
             </span>
             <p className="text-sm mt-2 text-white/30 leading-relaxed">
-              Petit shop géré par une SEULE personne depuis Limoges. Sneakers & streetwear sélectionnés pièce par pièce, vérifiés à l'entrepôt, livrés chez toi.
+              Sneakers & streetwear sélectionnés pièce par pièce, vérifiés avant expédition.
             </p>
           </div>
 
@@ -72,7 +72,7 @@ export default function Footer() {
               </div>
             ))}
           </div>
-          <span>© {new Date().getFullYear()} tof. · Fait à la main à Limoges 🇫🇷</span>
+          <span>© {new Date().getFullYear()} tof.</span>
         </div>
       </div>
     </footer>

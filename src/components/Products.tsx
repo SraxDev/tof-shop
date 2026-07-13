@@ -887,66 +887,6 @@ export default function Products() {
         </div>
       </section>
 
-      {/* FAQ */}
-      <section className="py-12 sm:py-16 bg-bg">
-        <div className="mx-auto max-w-3xl px-5">
-          <div className="text-center mb-8 sm:mb-10">
-            <h2 className="font-display text-3xl sm:text-4xl font-800 tracking-tight text-dark">Questions fréquentes</h2>
-            <p className="mt-2 text-dark/50 text-sm">Les réponses aux questions que tout le monde pose.</p>
-          </div>
-          <div className="space-y-3">
-            {[
-              {
-                q: "Est-ce que c'est vraiment 1:1 ?",
-                a: "Je sélectionne les meilleurs batches fournisseur pièce par pièce. Chaque pièce passe par un contrôle qualité photo à l'entrepôt avant expédition. Je vérifie coutures, logos, matières et étiquettes, et je refuse tout ce qui ne correspond pas. Si quelque chose ne passe pas, je demande un échange gratuitement. Tu reçois les photos de TA pièce pour info avant que ça parte.",
-              },
-              {
-                q: "Pourquoi c'est moins cher qu'en boutique ?",
-                a: "Pas de loyer de magasin, pas de stock, pas d'intermédiaires qui prennent leur marge. Je travaille direct avec les fournisseurs par le biais d'un agent de confiance. Les pièces sont exactement les mêmes, vendues sans surcoût de marque.",
-              },
-              {
-                q: "Combien de temps pour recevoir ma commande ?",
-                a: "Compte 2-5 jours pour le contrôle qualité à l'entrepôt après ta commande, puis 10-20 jours ouvrés de livraison. Tu reçois un numéro de suivi dès que le colis part. La plupart des colis arrivent en 12-15 jours.",
-              },
-              {
-                q: "Je paye quand ?",
-                a: "Tu payes via PayPal juste après avoir validé ton panier. C'est ce qui me permet de commander ta pièce à l'agent. Tu restes protégé 180 jours par la protection acheteur PayPal : si le colis arrive défectueux ou n'arrive pas, tu ouvres un litige et tu es remboursé.",
-              },
-              {
-                q: "Et la douane ?",
-                a: "Tous les colis sont expédiés en ligne tax-free (pas de frais de douane à prévoir dans 98% des cas). Si exceptionnellement il y avait des frais, je m'en occupe avec toi.",
-              },
-              {
-                q: "Comment ça taille ?",
-                a: "Globalement TTS (true to size) : prends ta taille habituelle. Entre deux tailles, prends la plus grande. Si tu hésites sur un modèle précis, envoie moi un Snap @tofh2b avec la pièce et ta taille habituelle, je te donne la réponse en 5min.",
-              },
-              {
-                q: "Si je change d'avis ?",
-                a: "Tu peux annuler sans frais tant que je n'ai pas encore transmis ta commande à l'agent (généralement dans les 2h). Une fois la pièce commandée, ce n'est plus possible car j'ai déjà payé le fournisseur. Si la pièce ne correspond pas à ce qui était annoncé à la réception, on trouve une solution : échange ou remboursement selon le cas.",
-              },
-              {
-                q: "Pourquoi je ne peux pas « valider » les photos QC moi-même avant envoi ?",
-                a: "C'est un choix qui me permet de garder des prix bas. Si les clients pouvaient annuler après QC, je devrais absorber les pièces refusées et augmenter tous les prix de 10-15€. Je préfère vérifier MOI-MÊME chaque pièce comme si c'était pour moi, et refuser systématiquement ce qui ne va pas. Si quelque chose m'échappe et que le colis arrive avec un défaut, tu es protégé par PayPal et on arrange ça.",
-              },
-            ].map((item, i) => (
-              <details
-                key={i}
-                className="group rounded-2xl bg-white border border-dark/5 p-4 sm:p-5 open:shadow-md transition-shadow"
-              >
-                <summary className="cursor-pointer list-none flex items-start justify-between gap-4 font-semibold text-sm sm:text-base text-dark">
-                  {item.q}
-                  <span className="text-accent text-xl leading-none mt-0.5 transition-transform group-open:rotate-40 flex-shrink-0">+</span>
-                </summary>
-                <p className="mt-3 text-dark/55 text-sm leading-relaxed">{item.a}</p>
-              </details>
-            ))}
-          </div>
-          <p className="text-center mt-8 text-sm text-dark/40">
-            Une autre question ? Snap <a href="https://t.snapchat.com/tofh2b" target="_blank" rel="noreferrer" className="text-accent font-bold hover:underline">@tofh2b</a> ou WhatsApp, réponse en ~5min.
-          </p>
-        </div>
-      </section>
-
       <section id="shop" className="py-14 sm:py-20 lg:py-28 bg-bg" ref={ref}>
         <div className="mx-auto max-w-6xl px-5">
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5 mb-8">
