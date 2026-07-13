@@ -1,78 +1,64 @@
-import { fetchSettings, saveSettings as dbSaveSettings } from './db';
+export default function WhyUs() {
+  const points = [
+    {
+      emoji: '🔍',
+      title: 'Vérification systématique',
+      desc: "Chaque pièce est contrôlée sur photo QC à l'entrepôt avant de partir. Je refuse ce qui ne va pas.",
+      stat: '100%',
+      statLabel: 'vérifié',
+    },
+    {
+      emoji: '💳',
+      title: 'Paiement sécurisé',
+      desc: 'Paiement via PayPal, protection acheteur 180 jours. Zéro risque à commander.',
+      stat: '180j',
+      statLabel: 'protection',
+    },
+    {
+      emoji: '📦',
+      title: 'Livraison suivie',
+      desc: 'Tracking envoyé sur Snap/WhatsApp dès expédition. Colis discret.',
+      stat: '10-20j',
+      statLabel: 'ouvré',
+    },
+    {
+      emoji: '⚡',
+      title: 'Réponse rapide',
+      desc: "C'est moi qui gère tout seul — je réponds en 5-10min sur Snap ou WhatsApp, 7j/7.",
+      stat: '~5min',
+      statLabel: 'réponse',
+    },
+  ];
 
-export type SiteSettings = {
-  whatsappUrl: string;
-  snapchatUrl: string;
-  paypalUrl: string;
-  paymentText: string;
-  freeShipping: boolean;
-  freeShippingThreshold: number;
-  standardShippingFee: number;
-  expressShippingFee: number;
-  announcementEnabled: boolean;
-  announcementText: string;
-  heroBadge: string;
-  heroTitleStart: string;
-  heroTitleHighlight: string;
-  heroDescription: string;
-  heroSubnote: string;
-  heroStatValue: string;
-  heroStatLabel: string;
-  heroTopBadge: string;
-  ctaTitle: string;
-  ctaDescription: string;
-};
+  return (
+    <section id="apropos" className="py-14 sm:py-20 lg:py-28 bg-bg">
+      <div className="mx-auto max-w-6xl px-5">
+        <div className="text-center mb-10 sm:mb-14">
+          <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-800 tracking-tight text-dark">
+            pourquoi <span className="text-accent">tof</span> ?
+          </h2>
+          <p className="mt-3 text-dark/40 max-w-md mx-auto text-sm sm:text-base">
+            petit shop géré par une seule personne, pas de grosse équipe, pas de magasin — juste des pièces vérifiées une par une
+          </p>
+        </div>
 
-export const SETTINGS_STORAGE_KEY = 'tof-site-settings-v2';
-
-export const defaultSettings: SiteSettings = {
-  whatsappUrl: 'https://wa.me/33744596043',
-  snapchatUrl: 'https://t.snapchat.com/tofh2b',
-  paypalUrl: '#',
-  paymentText: 'Paiement PayPal, finalisation sur WhatsApp.',
-  freeShipping: false,
-  freeShippingThreshold: 140,
-  standardShippingFee: 5,
-  expressShippingFee: 12,
-  announcementEnabled: true,
-  announcementText: "🆕 Nouveau shop — -15% avec TOFLAUNCH pour les 5 premières commandes. Vérification systématique de chaque pièce. Paiement PayPal.",
-  heroBadge: '🔥 Nouveau shop',
-  heroTitleStart: 'Les meilleurs',
-  heroTitleHighlight: 'reps 1:1',
-  heroDescription: 'Sneakers et streetwear sélectionnés pièce par pièce. Chaque pièce est vérifiée sur photo QC par moi à l\'entrepôt avant expédition. Paiement PayPal protection acheteur. Livraison suivie 10-20 jours.',
-  heroSubnote: 'Géré tout seul depuis Limoges — réponses rapide sur Snap & WhatsApp.',
-  heroStatValue: '10-20j',
-  heroStatLabel: 'livraison suivie',
-  heroTopBadge: 'VÉRIFIÉ 🔍',
-  ctaTitle: 'Une question ?',
-  ctaDescription: 'On répond en 5min sur Snap ou WhatsApp — même pour une question bête. Ça prend 2s.',
-};
-
-// Local cache for instant reads (hydrated from Supabase)
-let cached: SiteSettings = { ...defaultSettings };
-let hydrated = false;
-
-export function readSiteSettings(): SiteSettings {
-  return cached;
-}
-
-export async function hydrateSiteSettings() {
-  try {
-    const remote = await fetchSettings();
-    cached = { ...defaultSettings, ...(remote as unknown as Partial<SiteSettings>) };
-    hydrated = true;
-    window.dispatchEvent(new CustomEvent('tof-settings-updated'));
-  } catch {
-    // keep defaults
-  }
-}
-
-export async function saveSiteSettings(settings: SiteSettings) {
-  cached = settings;
-  window.dispatchEvent(new CustomEvent('tof-settings-updated'));
-  await dbSaveSettings(settings as unknown as Record<string, unknown>);
-}
-
-export function isHydrated() {
-  return hydrated;
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          {points.map((p, i) => (
+            <div
+              key={p.title}
+              className="bg-white rounded-2xl p-5 sm:p-6 border border-dark/5 hover:shadow-xl hover:shadow-dark/5 hover:-translate-y-1 transition-all duration-300"
+            >
+              <div className="text-3xl mb-3">{p.emoji}</div>
+              <h3 className="font-bold text-dark text-sm sm:text-base mb-1">{p.title}</h3>
+              <p className="text-xs sm:text-sm text-dark/40 leading-relaxed mb-3">{p.desc}</p>
+              <div className="pt-3 border-t border-dark/5">
+                <span className="text-lg sm:text-xl font-800 text-accent">{p.stat}</span>
+                <span className="text-[10px] sm:text-xs text-dark/30 ml-1.5">{p.statLabel}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
 }
