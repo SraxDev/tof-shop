@@ -846,16 +846,46 @@ export default function Products() {
   }, [products, quickAdd]);
 
   return (
-    <section id="shop" className="py-14 sm:py-20 lg:py-28 bg-bg" ref={ref}>
-      <div className="mx-auto max-w-6xl px-5">
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5 mb-8">
-          <div className={sectionInView ? 'anim-fade-up opacity-0' : 'opacity-0'}>
-            <h2 className="font-display text-4xl sm:text-5xl font-800 tracking-tight text-dark flex items-center gap-3">
-              le shop <AppleEmoji emoji="🛒" size={36} />
-            </h2>
-            <p className="mt-2 text-dark/40">choisis ta pièce, ajoute au panier</p>
+    <>
+      {/* Comment ça marche */}
+      <section className="py-14 sm:py-16 bg-bg border-t border-dark/5">
+        <div className="mx-auto max-w-6xl px-5">
+          <div className="text-center mb-8 sm:mb-10">
+            <h2 className="font-display text-3xl sm:text-4xl font-800 tracking-tight text-dark">Comment ça marche ?</h2>
+            <p className="mt-2 text-dark/50 text-sm sm:text-base">Pas de stock, pas de surprise — on vérifie chaque pièce avant que tu payes.</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {[
+              { emoji: '🛒', title: '1. Tu choisis', text: 'Ajoute ta pièce au panier et remplis tes infos. Pas de paiement tout de suite.' },
+              { emoji: '🔍', title: '2. Je contrôle', text: "Je commande la pièce à mon agent et je reçois 5-6 photos QC détaillées (coutures, logo, matière). Je te les envoie — tu valides, ou je change." },
+              { emoji: '✅', title: '3. Tu payes, tu reçois', text: "Une fois validé, tu payes via PayPal (protection acheteur). Je expédie, tu as le suivi. Livraison en 10-20 jours ouvrés." },
+            ].map((step, i) => (
+              <div key={i} className="rounded-2xl bg-white border border-dark/5 p-5 sm:p-6">
+                <div className="text-3xl mb-3">{step.emoji}</div>
+                <h3 className="font-bold text-dark text-base sm:text-lg">{step.title}</h3>
+                <p className="text-dark/55 text-sm mt-1.5 leading-relaxed">{step.text}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-6 flex flex-wrap justify-center gap-2">
+            <span className="rounded-full bg-green-500/10 text-green-700 px-3 py-1.5 text-xs font-bold">✓ QC avant paiement</span>
+            <span className="rounded-full bg-green-500/10 text-green-700 px-3 py-1.5 text-xs font-bold">✓ PayPal protection acheteur</span>
+            <span className="rounded-full bg-green-500/10 text-green-700 px-3 py-1.5 text-xs font-bold">✓ Livraison suivie</span>
+            <span className="rounded-full bg-green-500/10 text-green-700 px-3 py-1.5 text-xs font-bold">✓ Retours 14j si erreur</span>
           </div>
         </div>
+      </section>
+
+      <section id="shop" className="py-14 sm:py-20 lg:py-28 bg-bg" ref={ref}>
+        <div className="mx-auto max-w-6xl px-5">
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5 mb-8">
+            <div className={sectionInView ? 'anim-fade-up opacity-0' : 'opacity-0'}>
+              <h2 className="font-display text-4xl sm:text-5xl font-800 tracking-tight text-dark flex items-center gap-3">
+                le shop <AppleEmoji emoji="🛒" size={36} />
+              </h2>
+              <p className="mt-2 text-dark/40">choisis ta pièce, ajoute au panier</p>
+            </div>
+          </div>
 
         {/* Search */}
         <div className={`relative mb-3 ${sectionInView ? 'anim-fade-up opacity-0 delay-100' : 'opacity-0'}`}>
@@ -1002,5 +1032,6 @@ export default function Products() {
         />
       )}
     </section>
+    </>
   );
 }

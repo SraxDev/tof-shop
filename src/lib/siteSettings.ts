@@ -23,29 +23,29 @@ export type SiteSettings = {
   ctaDescription: string;
 };
 
-export const SETTINGS_STORAGE_KEY = 'tof-site-settings-v1';
+export const SETTINGS_STORAGE_KEY = 'tof-site-settings-v2';
 
 export const defaultSettings: SiteSettings = {
   whatsappUrl: 'https://wa.me/33744596043',
   snapchatUrl: 'https://t.snapchat.com/tofh2b',
   paypalUrl: '#',
   paymentText: 'Paiement PayPal, finalisation sur WhatsApp.',
-  freeShipping: true,
-  freeShippingThreshold: 0,
-  standardShippingFee: 7.9,
-  expressShippingFee: 14.9,
+  freeShipping: false,
+  freeShippingThreshold: 140,
+  standardShippingFee: 5,
+  expressShippingFee: 12,
   announcementEnabled: true,
-  announcementText: "Livraison offerte dès 150€ d'achat — Paiement PayPal, finalisation WhatsApp",
-  heroBadge: '🔥 Drops chaque semaine',
-  heroTitleStart: 'Ton style,',
-  heroTitleHighlight: 'ta vibe',
-  heroDescription: 'Gucci, Prada, LV, Balenciaga... Les plus grandes marques au meilleur prix, livre chez toi.',
-  heroSubnote: 'Tu commandes sur le site, tu finalises sur WhatsApp.',
-  heroStatValue: '+200 pièces',
-  heroStatLabel: 'cette semaine',
-  heroTopBadge: 'NEW DROP',
-  ctaTitle: 'Reste dans la boucle',
-  ctaDescription: 'Ajoute-nous sur Snap et WhatsApp pour etre alerte des nouveaux drops avant tout le monde.',
+  announcementText: "🆕 Nouveau shop — -15% avec TOFLAUNCH pour les 5 premières commandes. Photos QC avant paiement, paiement PayPal.",
+  heroBadge: '🔥 Nouveau shop',
+  heroTitleStart: 'Les meilleurs',
+  heroTitleHighlight: 'reps 1:1',
+  heroDescription: 'Sneakers et streetwear sélectionnés pièce par pièce. Tu reçois les photos QC de TA commande avant de payer. Paiement PayPal protection acheteur. Livraison 10-20 jours.',
+  heroSubnote: 'Sélection limitée — chaque pièce est vérifiée.',
+  heroStatValue: '10-20j',
+  heroStatLabel: 'livraison suivie',
+  heroTopBadge: 'QC AVANT PAIEMENT',
+  ctaTitle: 'Besoin d\'aide ?',
+  ctaDescription: 'On répond en 5min sur Snap ou WhatsApp — n\'hésite pas si tu cherches une pièce précise.',
 };
 
 // Local cache for instant reads (hydrated from Supabase)
