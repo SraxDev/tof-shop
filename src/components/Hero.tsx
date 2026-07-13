@@ -110,16 +110,16 @@ export default function Hero() {
             {/* Trust badges */}
             <div className="anim-fade-up opacity-0 delay-700 flex flex-wrap items-center gap-2 pt-2">
               <div className="flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-2 text-[11px] font-semibold text-dark/50 border border-dark/5">
-                <span className="text-green-500">✓</span> QC avant paiement
+                <span className="text-green-500">✓</span> Vérifié avant envoi
               </div>
               <div className="flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-2 text-[11px] font-semibold text-dark/50 border border-dark/5">
                 <span className="text-green-500">✓</span> PayPal protection acheteur
               </div>
               <div className="flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-2 text-[11px] font-semibold text-dark/50 border border-dark/5">
-                <span className="text-green-500">✓</span> Livraison suivie
+                <span className="text-green-500">✓</span> Livraison suivie 10-20j
               </div>
               <div className="flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-2 text-[11px] font-semibold text-dark/50 border border-dark/5">
-                <span className="text-green-500">✓</span> 10-20 jours
+                <span className="text-green-500">✓</span> Si problème, on gère
               </div>
             </div>
 

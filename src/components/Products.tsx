@@ -624,16 +624,27 @@ function QuickAddModal({
                   </div>
                 )}
 
-                <div className="mt-8 pt-6 border-t border-dark/5 space-y-3">
+                <div className="mt-6 space-y-2">
+                  <a href={settings.snapchatUrl} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-xl bg-[#FFFC00]/15 hover:bg-[#FFFC00]/25 transition-colors px-3 py-2 text-[11px] font-bold text-[#9a8f00]">
+                    <span>👻</span>
+                    <span>Hésites sur la taille ? Snap @tofh2b → réponse en 5min</span>
+                  </a>
+                </div>
+
+                <div className="mt-6 pt-6 border-t border-dark/5 space-y-3">
                   <div className="flex items-center justify-between text-[11px] font-medium">
-                    <span className="text-dark/30">Livraison</span>
+                    <span className="text-dark/30">Livraison suivie</span>
                     <span className="text-green-600 font-bold">
-                      {settings.freeShipping ? 'Gratuite' : settings.freeShippingThreshold > 0 ? `Offerte dès ${formatPrice(settings.freeShippingThreshold)}` : formatPrice(settings.standardShippingFee || 7.9)}
+                      {settings.freeShipping ? 'Gratuite' : settings.freeShippingThreshold > 0 ? `Offerte dès ${formatPrice(settings.freeShippingThreshold)}` : formatPrice(settings.standardShippingFee || 5) + ' · 10-20j'}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-[11px] font-medium">
-                    <span className="text-dark/30">Retours</span>
-                    <span className="text-dark/60 font-bold">Sous 14 jours</span>
+                    <span className="text-dark/30">Vérification pièce</span>
+                    <span className="text-dark/60 font-bold">Systématique avant envoi</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] font-medium">
+                    <span className="text-dark/30">Paiement</span>
+                    <span className="text-dark/60 font-bold">PayPal sécurisé</span>
                   </div>
                 </div>
               </div>
@@ -856,9 +867,9 @@ export default function Products() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {[
-              { emoji: '🛒', title: '1. Tu choisis', text: 'Ajoute ta pièce au panier et remplis tes infos. Pas de paiement tout de suite.' },
-              { emoji: '🔍', title: '2. Je contrôle', text: "Je commande la pièce à mon agent et je reçois 5-6 photos QC détaillées (coutures, logo, matière). Je te les envoie — tu valides, ou je change." },
-              { emoji: '✅', title: '3. Tu payes, tu reçois', text: "Une fois validé, tu payes via PayPal (protection acheteur). Je expédie, tu as le suivi. Livraison en 10-20 jours ouvrés." },
+              { emoji: '🛒', title: '1. Tu choisis & réserves', text: 'Ajoute ta pièce au panier et remplis tes infos. Le paiement se fait via PayPal juste après.' },
+              { emoji: '🔍', title: '2. Je commande & vérifie', text: "Je commande la pièce et dans les 2-5j je reçois 5-6 photos QC (coutures, logo, semelle, étiquette). Je vérifie tout point par point. Si c'est pas bon, je demande un échange gratuitement." },
+              { emoji: '📦', title: '3. Tu reçois', text: "La pièce validée part de l'entrepôt. Tu as le numéro de suivi, livraison suivie en 10-20j ouvrés, colis discret." },
             ].map((step, i) => (
               <div key={i} className="rounded-2xl bg-white border border-dark/5 p-5 sm:p-6">
                 <div className="text-3xl mb-3">{step.emoji}</div>
@@ -868,11 +879,71 @@ export default function Products() {
             ))}
           </div>
           <div className="mt-6 flex flex-wrap justify-center gap-2">
-            <span className="rounded-full bg-green-500/10 text-green-700 px-3 py-1.5 text-xs font-bold">✓ QC avant paiement</span>
+            <span className="rounded-full bg-green-500/10 text-green-700 px-3 py-1.5 text-xs font-bold">✓ Vérifié avant expédition</span>
             <span className="rounded-full bg-green-500/10 text-green-700 px-3 py-1.5 text-xs font-bold">✓ PayPal protection acheteur</span>
-            <span className="rounded-full bg-green-500/10 text-green-700 px-3 py-1.5 text-xs font-bold">✓ Livraison suivie</span>
-            <span className="rounded-full bg-green-500/10 text-green-700 px-3 py-1.5 text-xs font-bold">✓ Retours 14j si erreur</span>
+            <span className="rounded-full bg-green-500/10 text-green-700 px-3 py-1.5 text-xs font-bold">✓ Livraison suivie 10-20j</span>
+            <span className="rounded-full bg-green-500/10 text-green-700 px-3 py-1.5 text-xs font-bold">✓ Si problème, on gère</span>
           </div>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section className="py-12 sm:py-16 bg-bg">
+        <div className="mx-auto max-w-3xl px-5">
+          <div className="text-center mb-8 sm:mb-10">
+            <h2 className="font-display text-3xl sm:text-4xl font-800 tracking-tight text-dark">Questions fréquentes</h2>
+            <p className="mt-2 text-dark/50 text-sm">Les réponses aux questions que tout le monde pose.</p>
+          </div>
+          <div className="space-y-3">
+            {[
+              {
+                q: "Est-ce que c'est vraiment 1:1 ?",
+                a: "Je sélectionne les meilleurs batches fournisseur pièce par pièce. Chaque pièce passe par un contrôle qualité photo à l'entrepôt avant expédition. Je vérifie coutures, logos, matières et étiquettes, et je refuse tout ce qui ne correspond pas. Si quelque chose ne passe pas, je demande un échange gratuitement. Tu reçois les photos de TA pièce pour info avant que ça parte.",
+              },
+              {
+                q: "Pourquoi c'est moins cher qu'en boutique ?",
+                a: "Pas de loyer de magasin, pas de stock, pas d'intermédiaires qui prennent leur marge. Je travaille direct avec les fournisseurs par le biais d'un agent de confiance. Les pièces sont exactement les mêmes, vendues sans surcoût de marque.",
+              },
+              {
+                q: "Combien de temps pour recevoir ma commande ?",
+                a: "Compte 2-5 jours pour le contrôle qualité à l'entrepôt après ta commande, puis 10-20 jours ouvrés de livraison. Tu reçois un numéro de suivi dès que le colis part. La plupart des colis arrivent en 12-15 jours.",
+              },
+              {
+                q: "Je paye quand ?",
+                a: "Tu payes via PayPal juste après avoir validé ton panier. C'est ce qui me permet de commander ta pièce à l'agent. Tu restes protégé 180 jours par la protection acheteur PayPal : si le colis arrive défectueux ou n'arrive pas, tu ouvres un litige et tu es remboursé.",
+              },
+              {
+                q: "Et la douane ?",
+                a: "Tous les colis sont expédiés en ligne tax-free (pas de frais de douane à prévoir dans 98% des cas). Si exceptionnellement il y avait des frais, je m'en occupe avec toi.",
+              },
+              {
+                q: "Comment ça taille ?",
+                a: "Globalement TTS (true to size) : prends ta taille habituelle. Entre deux tailles, prends la plus grande. Si tu hésites sur un modèle précis, envoie moi un Snap @tofh2b avec la pièce et ta taille habituelle, je te donne la réponse en 5min.",
+              },
+              {
+                q: "Si je change d'avis ?",
+                a: "Tu peux annuler sans frais tant que je n'ai pas encore transmis ta commande à l'agent (généralement dans les 2h). Une fois la pièce commandée, ce n'est plus possible car j'ai déjà payé le fournisseur. Si la pièce ne correspond pas à ce qui était annoncé à la réception, on trouve une solution : échange ou remboursement selon le cas.",
+              },
+              {
+                q: "Pourquoi je ne peux pas « valider » les photos QC moi-même avant envoi ?",
+                a: "C'est un choix qui me permet de garder des prix bas. Si les clients pouvaient annuler après QC, je devrais absorber les pièces refusées et augmenter tous les prix de 10-15€. Je préfère vérifier MOI-MÊME chaque pièce comme si c'était pour moi, et refuser systématiquement ce qui ne va pas. Si quelque chose m'échappe et que le colis arrive avec un défaut, tu es protégé par PayPal et on arrange ça.",
+              },
+            ].map((item, i) => (
+              <details
+                key={i}
+                className="group rounded-2xl bg-white border border-dark/5 p-4 sm:p-5 open:shadow-md transition-shadow"
+              >
+                <summary className="cursor-pointer list-none flex items-start justify-between gap-4 font-semibold text-sm sm:text-base text-dark">
+                  {item.q}
+                  <span className="text-accent text-xl leading-none mt-0.5 transition-transform group-open:rotate-40 flex-shrink-0">+</span>
+                </summary>
+                <p className="mt-3 text-dark/55 text-sm leading-relaxed">{item.a}</p>
+              </details>
+            ))}
+          </div>
+          <p className="text-center mt-8 text-sm text-dark/40">
+            Une autre question ? Snap <a href="https://t.snapchat.com/tofh2b" target="_blank" rel="noreferrer" className="text-accent font-bold hover:underline">@tofh2b</a> ou WhatsApp, réponse en ~5min.
+          </p>
         </div>
       </section>
 

@@ -23,7 +23,11 @@ export default function AnnouncementBar() {
   return (
     <div className="relative z-30 px-4 pt-3">
       <div className="mx-auto max-w-4xl">
-        <div className="relative rounded-2xl border border-dark/5 bg-white shadow-sm shadow-dark/5 px-4 py-2.5 text-center">
+        <div className="relative rounded-2xl border border-dark/5 bg-white shadow-sm shadow-dark/5 px-4 py-2.5 flex items-center justify-center gap-3">
+          <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-bold text-green-600 bg-green-500/10 rounded-full px-2.5 py-1">
+            <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+            En ligne · répond ~5min
+          </span>
           <p className="pr-8 text-xs sm:text-sm font-semibold text-dark/80 leading-snug">
             {settings.announcementText}
           </p>

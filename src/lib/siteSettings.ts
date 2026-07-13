@@ -35,17 +35,17 @@ export const defaultSettings: SiteSettings = {
   standardShippingFee: 5,
   expressShippingFee: 12,
   announcementEnabled: true,
-  announcementText: "🆕 Nouveau shop — -15% avec TOFLAUNCH pour les 5 premières commandes. Photos QC avant paiement, paiement PayPal.",
+  announcementText: "🆕 Nouveau shop — -15% avec TOFLAUNCH pour les 5 premières commandes. Vérification systématique de chaque pièce. Paiement PayPal.",
   heroBadge: '🔥 Nouveau shop',
   heroTitleStart: 'Les meilleurs',
   heroTitleHighlight: 'reps 1:1',
-  heroDescription: 'Sneakers et streetwear sélectionnés pièce par pièce. Tu reçois les photos QC de TA commande avant de payer. Paiement PayPal protection acheteur. Livraison 10-20 jours.',
-  heroSubnote: 'Sélection limitée — chaque pièce est vérifiée.',
+  heroDescription: 'Sneakers et streetwear sélectionnés pièce par pièce. Chaque pièce est vérifiée sur photo QC par moi à l\'entrepôt avant expédition. Paiement PayPal protection acheteur. Livraison suivie 10-20 jours.',
+  heroSubnote: 'Géré tout seul depuis Limoges — réponses rapide sur Snap & WhatsApp.',
   heroStatValue: '10-20j',
   heroStatLabel: 'livraison suivie',
-  heroTopBadge: 'QC AVANT PAIEMENT',
-  ctaTitle: 'Besoin d\'aide ?',
-  ctaDescription: 'On répond en 5min sur Snap ou WhatsApp — n\'hésite pas si tu cherches une pièce précise.',
+  heroTopBadge: 'VÉRIFIÉ 🔍',
+  ctaTitle: 'Une question ?',
+  ctaDescription: 'On répond en 5min sur Snap ou WhatsApp — même pour une question bête. Ça prend 2s.',
 };
 
 // Local cache for instant reads (hydrated from Supabase)

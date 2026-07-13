@@ -338,7 +338,11 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
             <div className="flex-1 p-5 space-y-4">
               <div>
                 <h3 className="font-display text-xl font-800">Tes infos</h3>
-                <p className="text-sm text-dark/40 mt-1">On te contactera sur WhatsApp pour finaliser le paiement.</p>
+                <p className="text-sm text-dark/40 mt-1">On te contacte sur Snap ou WhatsApp juste après pour le paiement PayPal. Le paiement se fait APRÈS avoir vu les photos QC de ta pièce — mais tu restes protégé 180j par PayPal dès que tu payes.</p>
+              </div>
+              <div className="rounded-xl bg-accent/10 border border-accent/20 px-4 py-2.5 text-xs font-semibold text-accent flex items-start gap-2">
+                <span>🔍</span>
+                <span>Toutes les pièces sont vérifiées sur photo QC à l'entrepôt avant expédition. Si quelque chose ne va pas, on change ou rembourse.</span>
               </div>
               <input className="w-full rounded-xl bg-bg px-4 py-3 text-sm outline-none" placeholder="Nom complet" value={form.customerName} onChange={(e) => setForm({ ...form, customerName: e.target.value })} />
               <input className="w-full rounded-xl bg-bg px-4 py-3 text-sm outline-none" placeholder="Telephone (avec indicatif)" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
@@ -386,19 +390,29 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
           <div className="flex-1 flex items-center justify-center p-8">
             <div className="text-center">
               <div className="mx-auto h-16 w-16 rounded-3xl bg-green-500/10 text-green-600 flex items-center justify-center text-3xl font-800 mb-5">✓</div>
-                <h3 className="font-display text-3xl font-800 tracking-tight text-dark">Commande réservée</h3>
-                <p className="mt-3 text-dark/45 max-w-sm mx-auto text-sm leading-relaxed">
-                  Ta commande <span className="font-bold text-dark">{createdOrderId}</span> est enregistrée.
-                  Finalise le paiement sur WhatsApp.
+                <h3 className="font-display text-3xl font-800 tracking-tight text-dark">Commande enregistrée</h3>
+                <p className="mt-3 text-dark/55 max-w-sm mx-auto text-sm leading-relaxed">
+                  C'est noté ! Je commande ta pièce dans les 2h qui suivent. Tu reçois les photos QC sous 2-5j après paiement, et le colis part juste après.
                 </p>
+                <div className="mt-4 text-dark/45 max-w-sm mx-auto text-xs leading-relaxed rounded-xl bg-bg p-3">
+                  <b>Prochaine étape :</b> je te contacte sur Snap ou WhatsApp pour finaliser le paiement PayPal (répond généralement en 5min).
+                </div>
               <div className="mt-6 space-y-3">
                 <a
                   href={whatsappCheckoutLink()}
                   target="_blank"
                   rel="noreferrer"
-                  className="block h-12 rounded-full bg-[#25D366] px-7 text-sm font-bold text-white hover:brightness-110 transition-all text-center flex items-center justify-center"
+                  className="block h-12 rounded-full bg-[#25D366] px-7 text-sm font-bold text-white hover:brightness-110 transition-all text-center flex items-center justify-center gap-2"
                 >
-                  Finaliser sur WhatsApp
+                  💬 Me contacter sur WhatsApp
+                </a>
+                <a
+                  href={settings.snapchatUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block h-12 rounded-full bg-[#FFFC00]/15 border border-[#FFFC00]/30 text-[#a39800] px-7 text-sm font-bold hover:bg-[#FFFC00]/25 transition-all text-center flex items-center justify-center gap-2"
+                >
+                  👻 M'ajouter sur Snap
                 </a>
                 <button
                   onClick={onClose}
