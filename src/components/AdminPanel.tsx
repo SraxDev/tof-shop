@@ -17,6 +17,7 @@ import {
   type DbProduct, type DbOrder, type DbDrop, type DbNote, type DbChatMessage, type DbPromoCode,
 } from '../lib/db';
 import { showToast, showActionToast } from './Toast';
+import { supabase } from '../lib/supabase';
 import { uploadQcPhoto } from '../lib/storage';
 import { playNewOrder, playCopy, playDelete } from '../lib/sounds';
 import {
@@ -1664,7 +1665,24 @@ function EstimatorTab({ products, selectedEstimateProduct, setSelectedEstimatePr
 }
 
 export default function AdminPanel() {
-  const [isAdminAuthed] = useState(() => sessionStorage.getItem('tof-admin-auth') === 'true');
+  // La garde d'accès repose sur la session Supabase Auth (plus sur un drapeau
+  // sessionStorage posé par l'ancien mot de passe en dur).
+  // null = vérification en cours, on n'affiche pas encore "non autorisé".
+  const [isAdminAuthed, setIsAdminAuthed] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (alive) setIsAdminAuthed(Boolean(data.session));
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAdminAuthed(Boolean(session));
+    });
+    return () => {
+      alive = false;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
 
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -2617,11 +2635,19 @@ export default function AdminPanel() {
     [orders],
   );
 
+  if (isAdminAuthed === null) {
+    return (
+      <div className="min-h-screen bg-dark flex items-center justify-center">
+        <div className="h-8 w-8 rounded-full border-2 border-white/15 border-t-accent animate-spin" />
+      </div>
+    );
+  }
+
   if (!isAdminAuthed) {
     return (
       <div className="p-10 text-center bg-dark min-h-screen">
         <h2 className="text-red-500 font-bold">Accès non autorisé</h2>
-        <p className="text-white/40 mt-2">Veuillez vous connecter via le panel admin.</p>
+        <p className="text-white/40 mt-2">Ta session a expiré. Recharge la page pour te reconnecter.</p>
       </div>
     );
   }

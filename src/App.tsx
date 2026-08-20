@@ -72,11 +72,24 @@ function AdminAccess() {
     });
     setBusy(false);
     if (authError) {
-      setError(
-        /invalid/i.test(authError.message)
-          ? 'Email ou mot de passe incorrect.'
-          : authError.message,
-      );
+      // On distingue les causes : "identifiants incorrects" est trompeur quand
+      // le vrai problème est un email non confirmé ou les inscriptions fermées.
+      const raw = authError.message || '';
+      const code = (authError as { code?: string }).code || '';
+      let message = raw;
+
+      if (/email not confirmed/i.test(raw) || code === 'email_not_confirmed') {
+        message =
+          "Ce compte existe mais son email n'est pas confirmé. "
+          + 'Dans Supabase → Authentication → Users, ouvre le compte et confirme-le '
+          + '(ou exécute supabase/05-confirmer-admin.sql).';
+      } else if (/invalid login credentials/i.test(raw) || code === 'invalid_credentials') {
+        message = 'Email ou mot de passe incorrect — vérifie aussi les espaces et les majuscules.';
+      } else if (/signups? not allowed|disabled/i.test(raw)) {
+        message = 'Les inscriptions sont fermées (normal). Ce compte doit être créé depuis Supabase.';
+      }
+
+      setError(message);
       return;
     }
     setPassword('');
