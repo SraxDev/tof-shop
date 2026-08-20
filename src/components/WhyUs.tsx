@@ -43,7 +43,7 @@ export default function WhyUs() {
         </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          {points.map((p, i) => (
+          {points.map((p) => (
             <div
               key={p.title}
               className="bg-white rounded-2xl p-5 sm:p-6 border border-dark/5 hover:shadow-xl hover:shadow-dark/5 hover:-translate-y-1 transition-all duration-300"

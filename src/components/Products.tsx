@@ -6,6 +6,7 @@ import { addToCart, syncCartWithProducts } from '../lib/cart';
 import { fetchProducts, fetchOrders, type DbProduct } from '../lib/db';
 import { readSiteSettings } from '../lib/siteSettings';
 import { useInView } from '../hooks/useInView';
+import { showToast } from './Toast';
 
 type Product = {
   id: string;
@@ -26,6 +27,16 @@ type Product = {
 const INITIAL_SHOW = 8;
 const LOAD_MORE_STEP = 8;
 const LIKED_KEY = 'tof-liked-v1';
+
+const sortOptions = [
+  { id: 'relevance', label: 'Pertinence' },
+  { id: 'newest', label: 'Nouveautés' },
+  { id: 'popular', label: 'Populaires' },
+  { id: 'price-asc', label: 'Prix croissant' },
+  { id: 'price-desc', label: 'Prix décroissant' },
+] as const;
+
+type SortId = (typeof sortOptions)[number]['id'];
 
 const genderFilters = ['Tout', 'Homme', 'Femme', 'Mixte'] as const;
 const categoryFilters = [
@@ -364,6 +375,7 @@ function QuickAddModal({
       imageUrl: activeImage || product.imageUrl,
     });
     setAddedId(product.id);
+    showToast(`${product.name} ajouté au panier`);
     setTimeout(() => {
       setAddedId('');
       onClose();
@@ -705,6 +717,8 @@ export default function Products() {
   const { ref, isInView: sectionInView } = useInView<HTMLElement>(0.02);
   const [activeGender, setActiveGender] = useState<(typeof genderFilters)[number]>('Tout');
   const [activeCategory, setActiveCategory] = useState<(typeof categoryFilters)[number]>('Tout');
+  const [sort, setSort] = useState<SortId>('relevance');
+  const [showFavorites, setShowFavorites] = useState(false);
   const [showCount, setShowCount] = useState(INITIAL_SHOW);
   const [searchRaw, setSearch] = useState('');
   const search = useDebounce(searchRaw, 200);
@@ -810,21 +824,38 @@ export default function Products() {
       if (p.status !== 'active') return false;
       if (!matchesGender(p.gender, activeGender)) return false;
       if (!matchesCategory(p.category, activeCategory)) return false;
+      if (showFavorites && !liked.has(p.id)) return false;
       if (q && !`${p.brand} ${p.name} ${p.category}`.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [products, activeGender, activeCategory, search]);
+  }, [products, activeGender, activeCategory, search, showFavorites, liked]);
+
+  const sortedProducts = useMemo(() => {
+    const arr = [...allFiltered];
+    switch (sort) {
+      case 'price-asc':
+        return arr.sort((a, b) => a.salePrice - b.salePrice);
+      case 'price-desc':
+        return arr.sort((a, b) => b.salePrice - a.salePrice);
+      case 'newest':
+        return arr.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+      case 'popular':
+        return arr.sort((a, b) => (b.orderCount || 0) - (a.orderCount || 0));
+      default:
+        return arr;
+    }
+  }, [allFiltered, sort]);
 
   // Reset show count on filter changes
   useEffect(() => {
     setShowCount(INITIAL_SHOW);
-  }, [activeGender, activeCategory, search]);
+  }, [activeGender, activeCategory, search, sort, showFavorites]);
 
-  const visibleProducts = useMemo(() => allFiltered.slice(0, showCount), [allFiltered, showCount]);
-  const totalFiltered = allFiltered.length;
+  const visibleProducts = useMemo(() => sortedProducts.slice(0, showCount), [sortedProducts, showCount]);
+  const totalFiltered = sortedProducts.length;
   const hasMore = showCount < totalFiltered;
 
-  const hasActiveFilters = activeGender !== 'Tout' || activeCategory !== 'Tout' || search.trim() !== '';
+  const hasActiveFilters = activeGender !== 'Tout' || activeCategory !== 'Tout' || search.trim() !== '' || showFavorites;
 
   const toggleLike = useCallback((id: string) => {
     setLiked((prev) => {
@@ -842,6 +873,8 @@ export default function Products() {
     setActiveGender('Tout');
     setActiveCategory('Tout');
     setSearch('');
+    setSort('relevance');
+    setShowFavorites(false);
   };
 
   const quickAdd = useMemo(
@@ -963,14 +996,46 @@ export default function Products() {
               “{search}”
             </span>
           )}
-          {hasActiveFilters && (
+          {liked.size > 0 && (
             <button
-              onClick={resetFilters}
-              className="ml-auto inline-flex items-center gap-1 rounded-full bg-dark/5 hover:bg-dark/10 px-3 py-1 font-semibold text-dark/60 h-7 transition-colors"
+              onClick={() => setShowFavorites((v) => !v)}
+              aria-pressed={showFavorites}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-semibold h-7 transition-colors ${
+                showFavorites
+                  ? 'bg-red-500 text-white'
+                  : 'bg-red-500/10 text-red-500 hover:bg-red-500/20'
+              }`}
             >
-              <X size={11} /> Réinitialiser
+              <Heart size={12} fill={showFavorites ? 'currentColor' : 'none'} />
+              Favoris ({liked.size})
             </button>
           )}
+
+          <div className="ml-auto flex items-center gap-2">
+            <label className="relative inline-flex items-center">
+              <span className="sr-only">Trier les produits</span>
+              <select
+                value={sort}
+                onChange={(e) => setSort(e.target.value as SortId)}
+                className="appearance-none rounded-full bg-dark/5 hover:bg-dark/10 pl-4 pr-8 py-1.5 text-xs font-semibold text-dark/70 outline-none cursor-pointer h-7 transition-colors"
+              >
+                {sortOptions.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={12} className="absolute right-2.5 text-dark/40 pointer-events-none" />
+            </label>
+            {hasActiveFilters && (
+              <button
+                onClick={resetFilters}
+                className="inline-flex items-center gap-1 rounded-full bg-dark/5 hover:bg-dark/10 px-3 py-1 font-semibold text-dark/60 h-7 transition-colors"
+              >
+                <X size={11} /> Réinitialiser
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Grid */}
@@ -1012,15 +1077,27 @@ export default function Products() {
         {!loading && totalFiltered === 0 && (
           <div className="rounded-3xl bg-white border border-dark/5 p-10 text-center">
             <div className="mx-auto h-16 w-16 rounded-2xl bg-bg flex items-center justify-center mb-4">
-              <Filter size={24} className="text-dark/25" />
+              {showFavorites ? (
+                <Heart size={24} className="text-red-400" />
+              ) : (
+                <Filter size={24} className="text-dark/25" />
+              )}
             </div>
-            <p className="text-dark/50 font-semibold mb-2">Aucun produit trouvé</p>
+            <p className="text-dark/50 font-semibold mb-2">
+              {showFavorites ? 'Aucun favori pour le moment' : 'Aucun produit trouvé'}
+            </p>
             <p className="text-dark/30 text-sm mb-5">
-              Aucun produit ne correspond à{' '}
-              {activeGender !== 'Tout' && <span className="font-semibold text-dark/60">{activeGender}</span>}
-              {activeGender !== 'Tout' && activeCategory !== 'Tout' && ' dans '}
-              {activeCategory !== 'Tout' && <span className="font-semibold text-dark/60">{activeCategory}</span>}
-              {search && ` pour “${search}”`}.
+              {showFavorites ? (
+                <>Touche le <Heart size={11} className="inline text-red-400" fill="currentColor" /> sur une pièce pour la retrouver ici.</>
+              ) : (
+                <>
+                  Aucun produit ne correspond à{' '}
+                  {activeGender !== 'Tout' && <span className="font-semibold text-dark/60">{activeGender}</span>}
+                  {activeGender !== 'Tout' && activeCategory !== 'Tout' && ' dans '}
+                  {activeCategory !== 'Tout' && <span className="font-semibold text-dark/60">{activeCategory}</span>}
+                  {search && ` pour “${search}”`}.
+                </>
+              )}
             </p>
             {hasActiveFilters && (
               <button

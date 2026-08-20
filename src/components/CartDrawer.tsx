@@ -313,8 +313,22 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
                     </button>
                   </div>
 
-                  {!isFreeShipping && shippingMode === 'standard' && (settings.freeShippingThreshold || 0) > 0 && total < (settings.freeShippingThreshold || 100) && (
-                    <p className="text-[11px] text-dark/30">Encore {formatPrice((settings.freeShippingThreshold || 100) - total)} pour la livraison standard offerte</p>
+                  {shippingMode === 'standard' && (settings.freeShippingThreshold || 0) > 0 && (
+                    <div>
+                      {isFreeShipping ? (
+                        <p className="text-[11px] font-bold text-green-600 mb-1.5">🎉 Livraison standard offerte !</p>
+                      ) : (
+                        <p className="text-[11px] text-dark/40 mb-1.5">
+                          Plus que <b className="text-accent">{formatPrice((settings.freeShippingThreshold || 100) - total)}</b> pour la livraison offerte
+                        </p>
+                      )}
+                      <div className="h-2 rounded-full bg-dark/5 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${isFreeShipping ? 'bg-green-500' : 'bg-accent'}`}
+                          style={{ width: `${Math.min(100, (total / (settings.freeShippingThreshold || 100)) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
                   )}
 
                   <div className="flex justify-between text-lg font-800 pt-2 border-t border-dark/5">
