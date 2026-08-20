@@ -321,7 +321,7 @@ export default function ChatWidget() {
   return (
     <>
       {!open && (
-        <div className="fixed bottom-24 md:bottom-6 right-4 md:right-6 z-[70] flex flex-col items-end gap-2">
+        <div className="fixed bottom-[104px] md:bottom-6 right-4 md:right-6 z-[70] flex flex-col items-end gap-2 safe-bottom">
           {showPulse && !nameSet && (
             <div className="relative mr-1 mb-1 bg-white px-4 py-2.5 rounded-2xl rounded-br-sm shadow-xl text-xs font-semibold text-dark/80 max-w-[220px] anim-fade-up border border-dark/5">
               Besoin d'aide ? On est là 👋

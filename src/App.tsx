@@ -4,7 +4,6 @@ import { hydrateSiteSettings } from './lib/siteSettings';
 import { trackVisitor } from './lib/db';
 import Navbar from './components/Navbar';
 import AnnouncementBar from './components/AnnouncementBar';
-import LaunchTimer from './components/LaunchTimer';
 import Hero from './components/Hero';
 import Products from './components/Products';
 import Footer from './components/Footer';
@@ -23,9 +22,9 @@ const CTA = lazy(() => import('./components/CTA'));
 const Contact = lazy(() => import('./components/Contact'));
 const ChatWidget = lazy(() => import('./components/ChatWidget'));
 const HowItWorks = lazy(() => import('./components/HowItWorks'));
-const OrderTracking = lazy(() => import('./components/OrderTracking'));
 const Faq = lazy(() => import('./components/Faq'));
 const SocialProof = lazy(() => import('./components/SocialProof'));
+const TrackingPage = lazy(() => import('./components/TrackingPage'));
 
 function SectionFallback() {
   return <div className="min-h-[200px] bg-bg" aria-hidden />;
@@ -108,9 +107,17 @@ function AdminAccess() {
   );
 }
 
+/** Route courante déduite du hash : '#admin', '#suivi' (ou '#suivi?order=...'), sinon la landing. */
+function getRoute(): 'admin' | 'tracking' | 'home' {
+  const hash = window.location.hash;
+  if (hash === '#admin') return 'admin';
+  if (hash === '#suivi' || hash.startsWith('#suivi?')) return 'tracking';
+  return 'home';
+}
+
 export default function App() {
   useTwemoji();
-  const [isAdminRoute, setIsAdminRoute] = useState(() => window.location.hash === '#admin');
+  const [route, setRoute] = useState<'admin' | 'tracking' | 'home'>(getRoute);
 
   useEffect(() => {
     hydrateSiteSettings();
@@ -118,21 +125,38 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const onHashChange = () => setIsAdminRoute(window.location.hash === '#admin');
+    const onHashChange = () => {
+      const next = getRoute();
+      setRoute((prev) => {
+        // Remonte en haut quand on change réellement de page
+        if (prev !== next) window.scrollTo({ top: 0, behavior: 'auto' });
+        return next;
+      });
+    };
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
 
-  if (isAdminRoute) {
+  if (route === 'admin') {
     return <AdminAccess />;
+  }
+
+  if (route === 'tracking') {
+    return (
+      <div className="font-sans antialiased bg-bg text-dark">
+        <Suspense fallback={<SectionFallback />}>
+          <TrackingPage />
+        </Suspense>
+        <ToastContainer />
+      </div>
+    );
   }
 
   return (
     <div className="font-sans antialiased bg-bg text-dark">
       <Navbar />
-      {/* 📢 Barre d'annonce rotative + ⏱️ minuteur TOFLAUNCH */}
+      {/* 📢 Barre d'annonce rotative */}
       <AnnouncementBar />
-      <LaunchTimer />
       <Hero />
       <Suspense fallback={<SectionFallback />}>
         <BrandMarquee />
@@ -146,7 +170,6 @@ export default function App() {
         <Brands />
         <Reviews />
         <WhyUs />
-        <OrderTracking />
         <Faq />
         <CTA />
         <Contact />

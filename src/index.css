@@ -17,6 +17,19 @@ html {
   -webkit-text-size-adjust: 100%;
 }
 
+:root {
+  /* Hauteur réelle de la navbar, encoche iOS incluse */
+  --nav-h: calc(68px + env(safe-area-inset-top, 0px));
+}
+@media (min-width: 640px) {
+  :root { --nav-h: calc(76px + env(safe-area-inset-top, 0px)); }
+}
+
+/* Ancres : évite que le titre passe sous la navbar fixe */
+[id] {
+  scroll-margin-top: calc(var(--nav-h) + 8px);
+}
+
 body {
   font-family: 'Space Grotesk', sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -213,8 +226,19 @@ img.emoji {
 /* Body bottom padding on mobile so sticky bar doesn't cover content */
 @media (max-width: 767px) {
   body.has-sticky-bar {
-    padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px));
   }
+}
+
+/* Évite tout débordement horizontal sur mobile */
+html, body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Empêche les mots longs de casser la mise en page */
+h1, h2, h3, p, span, a, button {
+  overflow-wrap: break-word;
 }
 
 /*

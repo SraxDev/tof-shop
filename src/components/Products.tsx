@@ -207,7 +207,7 @@ function ProductCard({
           className="absolute inset-0 z-0 cursor-pointer"
           aria-label={`Voir ${product.name}`}
         />
-        <div className="h-full w-full flex items-center justify-center transition-transform duration-500 group-hover:scale-105 relative z-[1]">
+        <div className="h-full w-full flex items-center justify-center transition-transform duration-500 group-hover:scale-105 relative z-[1] pointer-events-none">
           {img ? (
             <>
               <img
@@ -1089,7 +1089,7 @@ export default function Products() {
           </div>
 
         {/* Filtres sticky */}
-        <div className="sticky top-[68px] sm:top-[72px] z-30 -mx-5 px-5 pt-3 pb-1 bg-bg/95 backdrop-blur-xl border-b border-dark/5 mb-4">
+        <div className="sticky z-30 -mx-5 px-5 pt-3 pb-1 bg-bg/95 backdrop-blur-xl border-b border-dark/5 mb-4" style={{ top: 'var(--nav-h)' }}>
         {/* Search */}
         <div className={`relative mb-3 ${sectionInView ? 'anim-fade-up opacity-0 delay-100' : 'opacity-0'}`}>
           <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-dark/25 pointer-events-none" />
@@ -1176,7 +1176,7 @@ export default function Products() {
               <select
                 value={sort}
                 onChange={(e) => setSort(e.target.value as SortId)}
-                className="appearance-none rounded-full bg-dark/5 hover:bg-dark/10 pl-4 pr-8 py-1.5 text-xs font-semibold text-dark/70 outline-none cursor-pointer h-7 transition-colors"
+                className="appearance-none rounded-full bg-dark/5 hover:bg-dark/10 pl-4 pr-8 py-1.5 text-xs font-semibold text-dark/70 outline-none cursor-pointer h-10 sm:h-8 transition-colors"
               >
                 {sortOptions.map((o) => (
                   <option key={o.id} value={o.id}>

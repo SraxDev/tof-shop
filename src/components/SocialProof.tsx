@@ -1,6 +1,6 @@
 import { X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { fetchRecentOrders, onOnlineCountChange, type DbOrder } from '../lib/db';
+import { fetchRecentOrders, type DbOrder } from '../lib/db';
 
 type ProofItem = {
   id: string;
@@ -60,7 +60,6 @@ export default function SocialProof() {
       return false;
     }
   });
-  const [online, setOnline] = useState(0);
   const timers = useRef<number[]>([]);
 
   // Charge les vraies commandes
@@ -84,11 +83,6 @@ export default function SocialProof() {
     return () => {
       alive = false;
     };
-  }, []);
-
-  // Compteur de visiteurs en ligne (présence Supabase, déjà initialisée dans App)
-  useEffect(() => {
-    onOnlineCountChange((count) => setOnline(count));
   }, []);
 
   // Cycle d'affichage
@@ -128,8 +122,6 @@ export default function SocialProof() {
     }
   };
 
-  const showOnlineBadge = online > 1 && !dismissed;
-
   return (
     <>
       {/* Popup preuve sociale */}
@@ -141,7 +133,7 @@ export default function SocialProof() {
           role="status"
           aria-live="polite"
         >
-          <div className="relative rounded-2xl bg-white border border-dark/5 shadow-[0_18px_40px_rgba(0,0,0,0.14)] p-3.5 pr-9 flex items-start gap-3">
+          <div className="relative rounded-2xl bg-white border border-dark/5 shadow-[0_18px_40px_rgba(0,0,0,0.14)] p-3.5 pr-11 flex items-start gap-3">
             <div className="h-10 w-10 flex-shrink-0 rounded-xl bg-accent/10 flex items-center justify-center text-lg">
               🛍️
             </div>
@@ -158,7 +150,7 @@ export default function SocialProof() {
             <button
               onClick={close}
               aria-label="Masquer les notifications"
-              className="absolute top-2 right-2 h-7 w-7 rounded-full bg-dark/5 text-dark/35 hover:text-dark hover:bg-dark/10 flex items-center justify-center transition-colors"
+              className="absolute top-1.5 right-1.5 h-9 w-9 rounded-full bg-dark/5 text-dark/35 hover:text-dark hover:bg-dark/10 flex items-center justify-center transition-colors"
             >
               <X size={13} strokeWidth={2.5} />
             </button>
@@ -166,17 +158,6 @@ export default function SocialProof() {
         </div>
       )}
 
-      {/* Compteur visiteurs en ligne */}
-      {showOnlineBadge && (
-        <div className="fixed z-[60] right-4 bottom-[104px] md:bottom-6 md:right-24 anim-fade-in">
-          <div className="rounded-full bg-dark/90 backdrop-blur-xl border border-white/10 px-3.5 py-2 shadow-xl flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-green-400 animate-pulse" />
-            <span className="text-[11px] font-bold text-white/85 whitespace-nowrap">
-              {online} personnes sur le shop
-            </span>
-          </div>
-        </div>
-      )}
     </>
   );
 }

@@ -132,7 +132,7 @@ const REPLIES: Record<Intent, string[]> = {
     "Tous nos prix sont affichés en €, TVA incluse, directement sur chaque fiche produit. 💸\n\nSi un produit n'a pas de prix affiché ou que tu cherches un tarif groupé, passe par WhatsApp !",
   ],
   promo: [
-    "🎁 Le code de lancement est TOFLAUNCH (-15% sur la première commande).\n\nD'autres codes sont partagés régulièrement sur Snapchat. Pour un geste commercial sur une commande, passe directement par WhatsApp.",
+    "🎁 Les codes promo en cours sont partagés sur Snapchat @tofh2b.\n\nSi tu en as un, tu peux l'entrer directement dans le panier. Pour un geste commercial sur une grosse commande, passe par WhatsApp.",
   ],
   shipping: [
     "🚚 Délais après paiement :\n\n• Préparation + QC : 2-5 jours\n• Standard : 10-20 jours ouvrés\n• Express (en option) : 5-10 jours\n\nTu reçois un numéro de suivi dès que le colis part. 💌",

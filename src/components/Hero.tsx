@@ -126,8 +126,7 @@ export default function Hero() {
             {/* Honest opening note */}
             <div className="anim-fade-up opacity-0 delay-800 flex items-center gap-2 pt-1">
               <p className="text-xs text-dark/40 max-w-md">
-                <span className="font-bold text-dark/60">Nouveau shop</span> — pour les 5 premières commandes,
-                <span className="text-accent font-bold"> -15% avec le code TOFLAUNCH</span>.
+                <span className="font-bold text-dark/60">Géré à la main</span> — chaque pièce est vérifiée sur photo QC avant de partir.
               </p>
             </div>
           </div>

@@ -5,12 +5,12 @@ import { readSiteSettings } from '../lib/siteSettings';
 /**
  * Barre d'annonce rotative.
  * - Le texte configuré dans l'admin peut contenir plusieurs messages séparés par « | »
- *   (ex : "Livraison offerte dès 140€ | -15% avec TOFLAUNCH | Réponse en 5 min sur WhatsApp")
+ *   (ex : "Livraison offerte dès 140€ | Réponse en 5 min sur WhatsApp")
  * - À défaut, une rotation par défaut est affichée quand l'annonce est activée.
  */
 const FALLBACK_MESSAGES = [
   '🚚 Livraison suivie offerte dès 140€ d\u2019achat',
-  '🔥 -15% sur ta première commande avec le code TOFLAUNCH',
+  '💬 Une question ? Réponse en ~5 min sur WhatsApp et Snap',
   '💳 Paiement carte sécurisé via SumUp — CB, Apple Pay, Google Pay',
   '🔍 Chaque pièce vérifiée sur photo QC avant expédition',
 ];
@@ -103,7 +103,7 @@ export default function AnnouncementBar() {
                 /* ignore */
               }
             }}
-            className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-dark/5 text-dark/35 hover:text-dark/60 hover:bg-dark/10 transition-colors flex items-center justify-center"
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-dark/5 text-dark/35 hover:text-dark/60 hover:bg-dark/10 transition-colors flex items-center justify-center"
             aria-label="Fermer l'annonce"
           >
             <X size={14} strokeWidth={2.5} />

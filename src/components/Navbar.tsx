@@ -169,7 +169,7 @@ export default function Navbar() {
       </nav>
 
       {/* Spacer to push content below the fixed nav (accounts for nav height + safe area) */}
-      <div className="h-[72px] sm:h-[76px] safe-top" aria-hidden />
+      <div style={{ height: 'var(--nav-h)' }} aria-hidden />
 
       {/* Mobile menu */}
       <div
