@@ -656,7 +656,7 @@ function QuickAddModal({
                   </div>
                   <div className="flex items-center justify-between text-[11px] font-medium">
                     <span className="text-dark/30">Paiement</span>
-                    <span className="text-dark/60 font-bold">PayPal sécurisé</span>
+                    <span className="text-dark/60 font-bold">CB sécurisée via SumUp</span>
                   </div>
                 </div>
               </div>
@@ -900,7 +900,7 @@ export default function Products() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {[
-              { emoji: '🛒', title: '1. Tu choisis & réserves', text: 'Ajoute ta pièce au panier et remplis tes infos. Le paiement se fait via PayPal juste après.' },
+              { emoji: '🛒', title: '1. Tu choisis & réserves', text: 'Ajoute ta pièce au panier et remplis tes infos. Le paiement se fait par carte via SumUp juste après.' },
               { emoji: '🔍', title: '2. Je commande & vérifie', text: "Je commande la pièce et dans les 2-5j je reçois 5-6 photos QC (coutures, logo, semelle, étiquette). Je vérifie tout point par point. Si c'est pas bon, je demande un échange gratuitement." },
               { emoji: '📦', title: '3. Tu reçois', text: "La pièce validée part de l'entrepôt. Tu as le numéro de suivi, livraison suivie en 10-20j ouvrés, colis discret." },
             ].map((step, i) => (
@@ -913,7 +913,7 @@ export default function Products() {
           </div>
           <div className="mt-6 flex flex-wrap justify-center gap-2">
             <span className="rounded-full bg-green-500/10 text-green-700 px-3 py-1.5 text-xs font-bold">✓ Vérifié avant expédition</span>
-            <span className="rounded-full bg-green-500/10 text-green-700 px-3 py-1.5 text-xs font-bold">✓ PayPal protection acheteur</span>
+            <span className="rounded-full bg-green-500/10 text-green-700 px-3 py-1.5 text-xs font-bold">✓ Paiement CB sécurisé (SumUp)</span>
             <span className="rounded-full bg-green-500/10 text-green-700 px-3 py-1.5 text-xs font-bold">✓ Livraison suivie 10-20j</span>
             <span className="rounded-full bg-green-500/10 text-green-700 px-3 py-1.5 text-xs font-bold">✓ Si problème, on gère</span>
           </div>

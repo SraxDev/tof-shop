@@ -159,7 +159,7 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
       `${itemsList}\n\n` +
       `Livraison : ${shippingLabel}\n` +
       `Total : ${formatPrice(finalTotal)}\n\n` +
-      `Je suis prêt à payer, envoie-moi le lien PayPal.`
+      `Je paie par carte via SumUp, je t'envoie la confirmation ici.`
     );
     return `${baseUrl}?text=${msg}`;
   };
@@ -352,7 +352,7 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
             <div className="flex-1 p-5 space-y-4">
               <div>
                 <h3 className="font-display text-xl font-800">Tes infos</h3>
-                <p className="text-sm text-dark/40 mt-1">On te contacte sur Snap ou WhatsApp juste après pour le paiement PayPal. Le paiement se fait APRÈS avoir vu les photos QC de ta pièce — mais tu restes protégé 180j par PayPal dès que tu payes.</p>
+                <p className="text-sm text-dark/40 mt-1">Le paiement se fait par carte via SumUp juste après la confirmation de ta commande (lien de paiement sécurisé 3D Secure). Ta pièce est commandée et vérifiée sur photo QC à l'entrepôt avant expédition.</p>
               </div>
               <div className="rounded-xl bg-accent/10 border border-accent/20 px-4 py-2.5 text-xs font-semibold text-accent flex items-start gap-2">
                 <span>🔍</span>
@@ -409,9 +409,21 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
                   C'est noté ! Je commande ta pièce dans les 2h qui suivent. Tu reçois les photos QC sous 2-5j après paiement, et le colis part juste après.
                 </p>
                 <div className="mt-4 text-dark/45 max-w-sm mx-auto text-xs leading-relaxed rounded-xl bg-bg p-3">
-                  <b>Prochaine étape :</b> je te contacte sur Snap ou WhatsApp pour finaliser le paiement PayPal (répond généralement en 5min).
+                  <b>Prochaine étape :</b> paie ta commande par carte via notre lien SumUp sécurisé (CB, Apple Pay, Google Pay), puis envoie-moi la confirmation sur WhatsApp.
+                </div>
+                <div className="mt-4 mx-auto max-w-sm rounded-xl bg-dark/[0.03] border border-dark/5 px-4 py-3 flex items-center justify-between">
+                  <span className="text-xs font-bold text-dark/40 uppercase tracking-wider">À payer · {createdOrderId}</span>
+                  <span className="font-900 text-lg text-dark">{formatPrice(savedTotal)}</span>
                 </div>
               <div className="mt-6 space-y-3">
+                <a
+                  href={settings.sumupUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="h-12 rounded-full bg-accent px-7 text-sm font-bold text-white hover:brightness-110 transition-all text-center flex items-center justify-center gap-2"
+                >
+                  💳 Payer {formatPrice(savedTotal)} par carte (SumUp)
+                </a>
                 <a
                   href={whatsappCheckoutLink()}
                   target="_blank"

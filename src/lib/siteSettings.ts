@@ -3,7 +3,7 @@ import { fetchSettings, saveSettings as dbSaveSettings } from './db';
 export type SiteSettings = {
   whatsappUrl: string;
   snapchatUrl: string;
-  paypalUrl: string;
+  sumupUrl: string;
   paymentText: string;
   freeShipping: boolean;
   freeShippingThreshold: number;
@@ -28,8 +28,8 @@ export const SETTINGS_STORAGE_KEY = 'tof-site-settings-v2';
 export const defaultSettings: SiteSettings = {
   whatsappUrl: 'https://wa.me/33744596043',
   snapchatUrl: 'https://t.snapchat.com/tofh2b',
-  paypalUrl: '#',
-  paymentText: 'Paiement PayPal, finalisation sur WhatsApp.',
+  sumupUrl: '#',
+  paymentText: 'Paiement par carte sécurisé via SumUp (CB, Visa, Mastercard, Apple Pay, Google Pay).',
   freeShipping: false,
   freeShippingThreshold: 140,
   standardShippingFee: 5,
@@ -39,7 +39,7 @@ export const defaultSettings: SiteSettings = {
   heroBadge: '🔥 Nouveau shop',
   heroTitleStart: 'Les meilleurs',
   heroTitleHighlight: 'reps 1:1',
-  heroDescription: 'Sneakers et streetwear sélectionnés pièce par pièce. Chaque pièce est vérifiée sur photo QC par moi à l\'entrepôt avant expédition. Paiement PayPal protection acheteur. Livraison suivie 10-20 jours.',
+  heroDescription: 'Sneakers et streetwear sélectionnés pièce par pièce. Chaque pièce est vérifiée sur photo QC par moi à l\'entrepôt avant expédition. Paiement par carte sécurisé via SumUp. Livraison suivie 10-20 jours.',
   heroSubnote: 'Géré tout seul depuis Limoges — réponses rapide sur Snap & WhatsApp.',
   heroStatValue: '10-20j',
   heroStatLabel: 'livraison suivie',

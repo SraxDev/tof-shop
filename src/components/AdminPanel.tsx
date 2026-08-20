@@ -82,8 +82,8 @@ type Order = {
 // Taux agent ¥→€ : ~7.5 ¥ = 1 € (commission agent ~6% + change + assurance)
 const CNY_TO_EUR = 1 / 7.5; // ≈ 0.1333
 const SHIPPING_SAFETY_MULTIPLIER = 1.2;
-const PAYMENT_FEE_PCT = 0.03;
-const PAYMENT_FEE_FIXED = 0.25;
+const PAYMENT_FEE_PCT = 0.025;
+const PAYMENT_FEE_FIXED = 0;
 const RETURN_RISK_PCT = 0.03;
 const AGENT_FEE_PCT = 0.06;
 
@@ -324,7 +324,7 @@ function normalizedProduct(product: Product): Product {
 }
 
 function estimatePaymentFees(amount: number) {
-  // PayPal FR marchand : 2.9% + 0.25€ arrondi large à 3% + 0.25 (couvre aussi les futurs Stripe)
+  // SumUp lien de paiement FR : 2,5% par transaction, sans frais fixe
   return amount * PAYMENT_FEE_PCT + PAYMENT_FEE_FIXED;
 }
 
@@ -1450,7 +1450,7 @@ function EstimatorTab({ products, selectedEstimateProduct, setSelectedEstimatePr
         <div className="rounded-2xl bg-bg p-4 text-sm space-y-2">
           <div className="flex justify-between"><span className="text-dark/50">Prix article {qty > 1 ? `×${qty}` : ''}</span><span className="font-semibold">{q.sourceCost.toFixed(2)} €</span></div>
           <div className="flex justify-between"><span className="text-dark/50">Livraison tax-free (sécurité 20%)</span><span className="font-semibold">{q.shippingWithSafety.toFixed(2)} €</span></div>
-          <div className="flex justify-between"><span className="text-dark/50">Frais PayPal 3%+0.25€</span><span className="font-semibold">{q.paymentFees.toFixed(2)} €</span></div>
+          <div className="flex justify-between"><span className="text-dark/50">Frais SumUp 2,5%</span><span className="font-semibold">{q.paymentFees.toFixed(2)} €</span></div>
           <div className="flex justify-between"><span className="text-dark/50">Provision retours/pertes 3%</span><span className="font-semibold">{q.riskProvision.toFixed(2)} €</span></div>
           <div className="border-t border-dark/10 pt-2 flex justify-between">
             <span className="text-dark/70 font-bold">Coût total</span><span className="font-bold">{q.totalCost.toFixed(2)} €</span>
@@ -1542,8 +1542,8 @@ function EstimatorTab({ products, selectedEstimateProduct, setSelectedEstimatePr
             </div>
             <div className="rounded-2xl bg-white/5 p-3">
               <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Frais paiement</div>
-              <div className="text-lg font-800 mt-1">3% + 0.25€</div>
-              <div className="text-[11px] text-white/40">PayPal/Stripe</div>
+              <div className="text-lg font-800 mt-1">2,5%</div>
+              <div className="text-[11px] text-white/40">SumUp lien de paiement</div>
             </div>
             <div className="rounded-2xl bg-white/5 p-3">
               <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Risques</div>
@@ -1646,7 +1646,7 @@ export default function AdminPanel() {
     'Salut ! Comment puis-je t\'aider ?',
     'Je regarde ça et je reviens vers toi rapidement.',
     'Tu peux commander directement depuis le shop, le lien est dans la bio !',
-    'Le paiement se fait via PayPal, lien disponible après validation du panier.',
+    'Le paiement se fait par carte via SumUp, lien de paiement sécurisé disponible après validation du panier.',
     'Les délais de livraison sont de 10-20 jours en standard, 5-10 jours en express.',
     'Je t\'envoie les photos QC très vite !',
     'C\'est noté, je m\'en occupe.',
@@ -2393,7 +2393,7 @@ export default function AdminPanel() {
     }
 
     if (type === 'payment') {
-      return `Salut ${order.customerName}, ta commande ${rootOrderId(order.id)} est bien réservée.\n\n${itemsText}\n\nTotal : ${totalAmount}\n\nPaiement PayPal : ${siteSettingsRef.current.paypalUrl}\n\nEnvoie une capture ici quand c'est fait et je lance la commande.`;
+      return `Salut ${order.customerName}, ta commande ${rootOrderId(order.id)} est bien réservée.\n\n${itemsText}\n\nTotal : ${totalAmount}\n\nPaiement par carte (SumUp) : ${siteSettingsRef.current.sumupUrl}\n\nEnvoie une capture ici quand c'est fait et je lance la commande.`;
     }
     if (type === 'paid') {
       return `Paiement reçu pour ta commande ${rootOrderId(order.id)}, merci.\nJe lance la commande et je te tiens au courant pour le QC / suivi.`;
@@ -3392,11 +3392,11 @@ export default function AdminPanel() {
                       className="mt-1 w-full rounded-xl bg-bg px-4 py-3 text-sm text-dark outline-none"
                     />
                   </label>
-                  <label className="block text-xs text-dark/35">Lien PayPal
+                  <label className="block text-xs text-dark/35">Lien de paiement SumUp
                     <input
-                      value={siteSettings.paypalUrl}
-                      onChange={(e) => setSiteSettings({ ...siteSettings, paypalUrl: e.target.value })}
-                      placeholder="https://paypal.me/tonpseudo"
+                      value={siteSettings.sumupUrl}
+                      onChange={(e) => setSiteSettings({ ...siteSettings, sumupUrl: e.target.value })}
+                      placeholder="https://pay.sumup.com/b2c/..."
                       className="mt-1 w-full rounded-xl bg-bg px-4 py-3 text-sm text-dark outline-none"
                     />
                   </label>
@@ -3417,12 +3417,12 @@ export default function AdminPanel() {
               <div className="space-y-3 text-sm text-white/45 leading-relaxed">
                 <p>WhatsApp alimente les boutons contact, CTA et la barre mobile.</p>
                 <p>Snap alimente les boutons Snapchat du site.</p>
-                <p>PayPal est garde ici pour tes messages de paiement et ton organisation.</p>
+                <p>SumUp sert pour le paiement par carte : le lien est proposé au client après sa commande et utilisé dans tes messages de paiement.</p>
               </div>
               <div className="mt-5 space-y-2 text-xs">
                 <a href={siteSettings.whatsappUrl} className="block rounded-xl bg-[#25D366]/10 px-4 py-3 font-bold text-[#25D366]">Tester WhatsApp →</a>
                 <a href={siteSettings.snapchatUrl} className="block rounded-xl bg-[#FFFC00]/10 px-4 py-3 font-bold text-[#FFFC00]">Tester Snap →</a>
-                <a href={siteSettings.paypalUrl} className="block rounded-xl bg-white/5 px-4 py-3 font-bold text-white/55">Tester PayPal →</a>
+                <a href={siteSettings.sumupUrl} className="block rounded-xl bg-white/5 px-4 py-3 font-bold text-white/55">Tester SumUp →</a>
               </div>
             </div>
           </div>
