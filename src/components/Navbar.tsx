@@ -6,7 +6,8 @@ import CartDrawer from './CartDrawer';
 const NAV_LINKS: Array<{ label: string; href: string }> = [
   { label: 'Shop', href: '#shop' },
   { label: 'Drop', href: '#drop' },
-  { label: 'Marques', href: '#marques' },
+  { label: 'Suivi', href: '#suivi' },
+  { label: 'FAQ', href: '#faq' },
   { label: 'À propos', href: '#apropos' },
   { label: 'Contact', href: '#contact' },
 ];
@@ -20,7 +21,9 @@ export default function Navbar() {
   const [progress, setProgress] = useState(0);
   const [open, setOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
+  const [cartStep, setCartStep] = useState<'cart' | 'checkout'>('cart');
   const [count, setCount] = useState(() => cartCount(readCart()));
+  const [bump, setBump] = useState(false);
   const [activeAnchor, setActiveAnchor] = useState<string>('shop');
   const rafRef = useRef<number | null>(null);
 
@@ -61,7 +64,16 @@ export default function Navbar() {
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onScroll, { passive: true });
 
-    const syncCart = () => setCount(cartCount(readCart()));
+    const syncCart = () => {
+      const next = cartCount(readCart());
+      setCount((prev) => {
+        if (next > prev) {
+          setBump(true);
+          window.setTimeout(() => setBump(false), 450);
+        }
+        return next;
+      });
+    };
     window.addEventListener('tof-cart-updated', syncCart);
     window.addEventListener('storage', syncCart);
 
@@ -72,6 +84,18 @@ export default function Navbar() {
       window.removeEventListener('storage', syncCart);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
+  }, []);
+
+  // Ouverture automatique du tiroir panier (ajout au panier, « Acheter maintenant »…)
+  useEffect(() => {
+    const onOpenCart = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { step?: 'cart' | 'checkout' } | undefined;
+      setCartStep(detail?.step === 'checkout' ? 'checkout' : 'cart');
+      setOpen(false);
+      setCartOpen(true);
+    };
+    window.addEventListener('tof-open-cart', onOpenCart);
+    return () => window.removeEventListener('tof-open-cart', onOpenCart);
   }, []);
 
   const closeMenu = useCallback(() => setOpen(false), []);
@@ -117,13 +141,17 @@ export default function Navbar() {
 
           <div className="flex items-center gap-1">
             <button
-              onClick={() => setCartOpen(true)}
+              onClick={() => { setCartStep('cart'); setCartOpen(true); }}
               aria-label="Ouvrir le panier"
               className="relative h-11 w-11 rounded-full flex items-center justify-center text-dark/70 hover:text-accent hover:bg-dark/5 transition-all"
             >
               <ShoppingBag size={20} strokeWidth={2.5} />
               {count > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 min-h-[18px] min-w-[18px] px-1 bg-accent rounded-full text-[9px] font-bold text-white flex items-center justify-center shadow-sm">
+                <span
+                  className={`absolute -top-0.5 -right-0.5 min-h-[18px] min-w-[18px] px-1 bg-accent rounded-full text-[9px] font-bold text-white flex items-center justify-center shadow-sm transition-transform ${
+                    bump ? 'anim-cart-bump' : ''
+                  }`}
+                >
                   {count > 99 ? '99+' : count}
                 </span>
               )}
@@ -201,7 +229,7 @@ export default function Navbar() {
         </div>
       </div>
 
-      <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} />
+      <CartDrawer open={cartOpen} initialStep={cartStep} onClose={() => setCartOpen(false)} />
     </>
   );
 }

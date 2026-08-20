@@ -72,7 +72,7 @@ const RULES: Rule[] = [
   { intent: 'shipping', keywords: ['livraison', 'delai', 'délai', 'combien de temps', 'expédition', 'expedition', 'recevoir', 'reçois', 'jours', 'semaine', 'quand', 'arrive', 'arrivera', 'envoi', 'reçu', 'recu', 'envoie', 'envoyé', 'envoyee'], weight: 1 },
   { intent: 'tracking', keywords: ['track', 'suivi', 'colis', 'suivre', 'numero', 'numéro', 'tracking'] },
   { intent: 'free_shipping', keywords: ['gratuit', 'offert', 'livraison gratuite', 'frais de port', 'port gratuit', 'free shipping'] },
-  { intent: 'payment', keywords: ['paiement', 'payer', 'paypal', 'sumup', 'virement', 'carte', 'cb', 'apple pay', 'google pay', 'revolut', 'moyen de paiement', 'régler', 'regler'] },
+  { intent: 'payment', keywords: ['paiement', 'payer', 'sumup', 'paypal', 'virement', 'carte', 'cb', 'apple pay', 'google pay', 'revolut', 'moyen de paiement', 'régler', 'regler'] },
   { intent: 'trust', keywords: ['sécurisé', 'securise', 'confiance', 'arnaque', 'fiable', 'legit', 'vrai ou faux', 'scam', 'sérieux', 'serieux', 'contrefaçon', 'contrefacon', 'fiable', 'pourquoi vous', 'vous êtes fiable'] },
   { intent: 'returns', keywords: ['retour', 'rembours', 'échange', 'echange', 'problème', 'probleme', 'cassé', 'casse', 'abîmé', 'abime', 'erreur', 'tromper', 'trompé', 'mauvaise taille'] },
   { intent: 'sizing', keywords: ['taille', 'size', 'guide', 'mesure', 'pointure', 'grand', 'petit', 'taille bien', 'chausse', 'taille grand', 'taille petit', 'quelle taille', 'quelle taille prendre', 'cm'] },
@@ -138,7 +138,7 @@ const REPLIES: Record<Intent, string[]> = {
     "🚚 Délais après paiement :\n\n• Préparation + QC : 2-5 jours\n• Standard : 10-20 jours ouvrés\n• Express (en option) : 5-10 jours\n\nTu reçois un numéro de suivi dès que le colis part. 💌",
   ],
   tracking: [
-    "Oui, toutes les expéditions sont suivies. 📍 Le numéro de tracking t'est envoyé sur WhatsApp dès que le colis est pris en charge. Si tu as déjà commandé, envoie-nous ton numéro de commande (commence par TOF-).",
+    "Oui, toutes les expéditions sont suivies. 📍\n\nTu peux consulter l'avancement de ta commande en direct : va dans la section « Suivi » du site, tape ton numéro TOF-XXXX et tu vois tout (reçue → payée → QC → expédiée + numéro de tracking copiable).\n\nLe tracking t'est aussi envoyé sur WhatsApp dès que le colis part.",
   ],
   free_shipping: [
     "🎉 La livraison standard est offerte à partir du seuil affiché dans le panier (ou en ce moment sur tout le site avec le code de lancement).",
@@ -153,7 +153,7 @@ const REPLIES: Record<Intent, string[]> = {
     "Un souci ? Contacte-nous dans les 14 jours avec ton numéro TOF-XXXX :\n\n• Mauvaise taille / article : échange ou remboursement\n• Article défectueux : remboursement immédiat\n• Erreur de notre part : on prend tout en charge",
   ],
   sizing: [
-    "📐 En général :\n\n• Sapes (S/M/L) : prends ta taille habituelle\n• Sneakers : chaussent normalement (TTS)\n• Entre deux tailles → prends la plus grande\n\nSi tu hésites sur un modèle précis, dis-nous lequel, on peut te donner les mesures exactes en cm.",
+    "📐 En général :\n\n• Sapes (S/M/L) : prends ta taille habituelle\n• Sneakers : chaussent normalement (TTS)\n• Entre deux tailles → prends la plus grande\n\nUn guide des tailles détaillé (EU/US/UK/cm pour les sneakers, mensurations pour les sapes) est dispo dans chaque fiche produit, bouton « Guide des tailles ».\n\nSi tu hésites sur un modèle précis, dis-nous lequel, on te donne les mesures exactes en cm.",
   ],
   contact_whatsapp: [
     "Le plus rapide pour nous joindre, c'est WhatsApp. 💬\n\nClique directement sur le bouton vert \"💬 WhatsApp\" dans le menu — ça ouvre directement la conversation.",

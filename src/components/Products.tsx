@@ -1,8 +1,10 @@
-import { Heart, Search, ShoppingBag, X, ChevronDown, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
+import { Heart, Search, ShoppingBag, X, ChevronDown, ChevronLeft, ChevronRight, Filter, Minus, Plus, Zap, Ruler } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDebounce } from '../hooks/useDebounce';
 import AppleEmoji from './AppleEmoji';
-import { addToCart, syncCartWithProducts } from '../lib/cart';
+import { addToCart, openCart, syncCartWithProducts } from '../lib/cart';
+import { clearRecentlyViewed, pushRecentlyViewed, readRecentlyViewed } from '../lib/recentlyViewed';
+import SizeGuide from './SizeGuide';
 import { fetchProducts, fetchOrders, type DbProduct } from '../lib/db';
 import { readSiteSettings } from '../lib/siteSettings';
 import { useInView } from '../hooks/useInView';
@@ -140,6 +142,11 @@ function formatPrice(value: number) {
   return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(value);
 }
 
+function discountPercent(product: Product) {
+  if (!product.oldPrice || product.oldPrice <= product.salePrice) return 0;
+  return Math.round(((product.oldPrice - product.salePrice) / product.oldPrice) * 100);
+}
+
 function parseSplit(str?: string) {
   return (str || '').split(',').map((s) => s.trim()).filter(Boolean);
 }
@@ -177,7 +184,10 @@ function ProductCard({
   const { ref, isInView } = useInView<HTMLDivElement>({ threshold: 0.1, rootMargin: '0px 0px 40px 0px' });
   const images = getProductImages(product);
   const img = images[0];
+  const secondImg = images[1];
   const badge = getBadge(product);
+  const discount = discountPercent(product);
+  const sold = product.orderCount || 0;
   const [hover, setHover] = useState(false);
   const eager = index < 8;
 
@@ -199,26 +209,51 @@ function ProductCard({
         />
         <div className="h-full w-full flex items-center justify-center transition-transform duration-500 group-hover:scale-105 relative z-[1]">
           {img ? (
-            <img
-              src={img}
-              alt={product.name}
-              loading={eager ? 'eager' : 'lazy'}
-              decoding="async"
-              fetchPriority={eager ? 'high' : 'auto'}
-              width={400}
-              height={533}
-              className="max-h-full max-w-full w-auto h-auto object-contain"
-              draggable={false}
-            />
+            <>
+              <img
+                src={img}
+                alt={product.name}
+                loading={eager ? 'eager' : 'lazy'}
+                decoding="async"
+                fetchPriority={eager ? 'high' : 'auto'}
+                width={400}
+                height={533}
+                className={`max-h-full max-w-full w-auto h-auto object-contain transition-opacity duration-300 ${
+                  hover && secondImg ? 'opacity-0' : 'opacity-100'
+                }`}
+                draggable={false}
+              />
+              {/* 2ᵉ image révélée au survol */}
+              {secondImg && (
+                <img
+                  src={secondImg}
+                  alt=""
+                  aria-hidden
+                  loading="lazy"
+                  decoding="async"
+                  className={`absolute inset-0 m-auto max-h-full max-w-full w-auto h-auto object-contain transition-opacity duration-300 ${
+                    hover ? 'opacity-100' : 'opacity-0'
+                  }`}
+                  draggable={false}
+                />
+              )}
+            </>
           ) : (
             <AppleEmoji emoji={emojiForCategory(product.category)} size={48} />
           )}
         </div>
-        {badge && (
-          <span className={`absolute top-3 left-3 ${badge.color} text-white text-[10px] font-bold px-2.5 py-1 rounded-full z-10`}>
-            {badge.text}
-          </span>
-        )}
+        <div className="absolute top-3 left-3 z-10 flex flex-col items-start gap-1.5">
+          {badge && (
+            <span className={`${badge.color} text-white text-[10px] font-bold px-2.5 py-1 rounded-full`}>
+              {badge.text}
+            </span>
+          )}
+          {discount > 0 && (
+            <span className="bg-red-500 text-white text-[10px] font-900 px-2.5 py-1 rounded-full shadow-sm shadow-red-500/25">
+              -{discount}%
+            </span>
+          )}
+        </div>
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -249,12 +284,18 @@ function ProductCard({
       <button onClick={() => onOpen(product)} className="pt-3 px-1 text-left w-full block min-h-[60px]">
         <span className="text-[10px] font-bold text-accent uppercase tracking-wider">{product.brand}</span>
         <h3 className="text-sm font-medium text-dark/80 mt-0.5 leading-snug line-clamp-2">{product.name}</h3>
-        <div className="mt-1 flex items-baseline gap-1.5">
+        <div className="mt-1 flex items-baseline gap-1.5 flex-wrap">
           <span className="text-sm font-800 text-dark">{formatPrice(product.salePrice)}</span>
           {product.oldPrice && product.oldPrice > product.salePrice && (
             <span className="text-xs text-dark/30 line-through">{formatPrice(product.oldPrice)}</span>
           )}
+          {discount > 0 && (
+            <span className="text-[10px] font-bold text-red-500">-{discount}%</span>
+          )}
         </div>
+        {sold > 0 && (
+          <p className="mt-1 text-[10px] font-bold text-dark/35">🔥 {sold} vendu{sold > 1 ? 's' : ''}</p>
+        )}
       </button>
     </div>
   );
@@ -288,6 +329,7 @@ function QuickAddModal({
   const [selectedColor, setSelectedColor] = useState('');
   const [activeImage, setActiveImage] = useState('');
   const [showSizeGuide, setShowSizeGuide] = useState(false);
+  const [quantity, setQuantity] = useState(1);
   const [addedId, setAddedId] = useState('');
   const [dragStartY, setDragStartY] = useState<number | null>(null);
   const [dragOffset, setDragOffset] = useState(0);
@@ -302,6 +344,8 @@ function QuickAddModal({
     setSelectedColor(colors[0] || '');
     setActiveImage(images[0] || '');
     setShowSizeGuide(false);
+    setQuantity(1);
+    pushRecentlyViewed(product.id);
   }, [product.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Image swipe on mobile
@@ -361,8 +405,7 @@ function QuickAddModal({
     return true;
   };
 
-  const handleAddToCart = () => {
-    if (!canAdd()) return;
+  const pushToCart = () => {
     addToCart({
       productId: product.id,
       brand: product.brand,
@@ -371,15 +414,30 @@ function QuickAddModal({
       salePrice: product.salePrice,
       size: selectedSize || 'Unique',
       color: selectedColor || 'Unique',
-      quantity: 1,
+      quantity,
       imageUrl: activeImage || product.imageUrl,
     });
+  };
+
+  const handleAddToCart = () => {
+    if (!canAdd()) return;
+    pushToCart();
     setAddedId(product.id);
     showToast(`${product.name} ajouté au panier`);
     setTimeout(() => {
       setAddedId('');
       onClose();
-    }, 700);
+      // 🧲 le tiroir panier s'ouvre automatiquement
+      openCart('cart');
+    }, 550);
+  };
+
+  /** ⚡ Acheter maintenant : ajoute au panier et saute direct au checkout. */
+  const handleBuyNow = () => {
+    if (!canAdd()) return;
+    pushToCart();
+    onClose();
+    openCart('checkout');
   };
 
   return (
@@ -515,8 +573,9 @@ function QuickAddModal({
 
                 <div className="grid grid-cols-1 gap-2 mt-6">
                   {[
-                    { icon: '📦', text: 'Livraison suivie', sub: '7-15 jours' },
-                    { icon: '🛡️', text: 'Paiement Sécurisé', sub: 'via WhatsApp' },
+                    { icon: '📦', text: 'Livraison suivie', sub: '10-20 jours' },
+                    { icon: '💳', text: 'Paiement CB sécurisé', sub: 'SumUp · 3D Secure' },
+                    { icon: '🔍', text: 'Photos QC vérifiées', sub: 'avant expédition' },
                   ].map((item) => (
                     <div key={item.text} className="flex items-center gap-3 p-3 rounded-2xl bg-bg/70 border border-dark/[0.03]">
                       <span className="text-lg">{item.icon}</span>
@@ -535,22 +594,12 @@ function QuickAddModal({
                     <div className="flex justify-between items-center mb-3">
                       <label className="text-[11px] font-bold uppercase tracking-widest text-dark/40">Taille</label>
                       <button
-                        onClick={() => setShowSizeGuide(!showSizeGuide)}
-                        className="text-[10px] font-bold text-accent underline underline-offset-4 decoration-accent/30 hover:decoration-accent h-8"
+                        onClick={() => setShowSizeGuide(true)}
+                        className="inline-flex items-center gap-1.5 text-[10px] font-bold text-accent underline underline-offset-4 decoration-accent/30 hover:decoration-accent h-8"
                       >
-                        Guide des tailles
+                        <Ruler size={12} /> Guide des tailles
                       </button>
                     </div>
-
-                    {showSizeGuide && (
-                      <div className="mb-4 p-4 bg-bg rounded-2xl border border-dark/5 anim-fade-in text-[11px] leading-relaxed">
-                        <p className="font-bold text-dark/60 mb-2 uppercase tracking-tighter">Correspondances</p>
-                        <div className="space-y-1 text-dark/50">
-                          <p>• <span className="font-semibold text-dark/70">S/M/L</span> : Prenez votre taille habituelle.</p>
-                          <p>• <span className="font-semibold text-dark/70">Sneakers</span> : Taille normalement (TTS).</p>
-                        </div>
-                      </div>
-                    )}
 
                     <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
                       {sizes.map((s) => (
@@ -591,6 +640,37 @@ function QuickAddModal({
                     </div>
                   </div>
                 )}
+
+                {/* 🔢 Sélecteur de quantité */}
+                <div className="mt-6">
+                  <label className="text-[11px] font-bold uppercase tracking-widest text-dark/40 block mb-3">Quantité</label>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-1.5 rounded-2xl bg-bg border border-dark/5 p-1.5">
+                      <button
+                        onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                        disabled={quantity <= 1}
+                        aria-label="Diminuer la quantité"
+                        className="h-10 w-10 rounded-xl bg-white border border-dark/10 flex items-center justify-center text-dark/50 hover:text-dark disabled:opacity-30 active:scale-90 transition-all"
+                      >
+                        <Minus size={15} strokeWidth={2.5} />
+                      </button>
+                      <span className="w-10 text-center text-base font-900 tabular-nums">{quantity}</span>
+                      <button
+                        onClick={() => setQuantity((q) => Math.min(10, q + 1))}
+                        disabled={quantity >= 10}
+                        aria-label="Augmenter la quantité"
+                        className="h-10 w-10 rounded-xl bg-white border border-dark/10 flex items-center justify-center text-dark/50 hover:text-dark disabled:opacity-30 active:scale-90 transition-all"
+                      >
+                        <Plus size={15} strokeWidth={2.5} />
+                      </button>
+                    </div>
+                    {quantity > 1 && (
+                      <span className="text-sm font-800 text-dark">
+                        = {formatPrice(product.salePrice * quantity)}
+                      </span>
+                    )}
+                  </div>
+                </div>
 
                 {!canAdd() && (sizes.length > 0 || colors.length > 0) && (
                   <div className="mt-6 p-3 rounded-xl bg-accent/5 border border-accent/10">
@@ -663,16 +743,28 @@ function QuickAddModal({
             </div>
 
             {/* Sticky CTA desktop */}
-            <div className="hidden sm:block p-5 sm:p-6 border-t border-dark/5 bg-white/95 backdrop-blur z-20 flex-shrink-0">
+            <div className="hidden sm:block p-5 sm:p-6 border-t border-dark/5 bg-white/95 backdrop-blur z-20 flex-shrink-0 space-y-2.5">
+              <button
+                onClick={handleBuyNow}
+                disabled={!canAdd()}
+                className={`w-full h-14 rounded-2xl text-sm font-900 text-white transition-all duration-300 flex items-center justify-center gap-2 shadow-xl ${
+                  !canAdd()
+                    ? 'bg-dark/10 text-dark/20 cursor-not-allowed shadow-none'
+                    : 'bg-accent hover:brightness-110 hover:scale-[1.01] active:scale-[0.99] shadow-accent/25'
+                }`}
+              >
+                <Zap size={18} strokeWidth={2.5} fill="currentColor" />
+                <span>ACHETER MAINTENANT — {formatPrice(product.salePrice * quantity)}</span>
+              </button>
               <button
                 onClick={handleAddToCart}
                 disabled={!canAdd()}
-                className={`w-full h-14 rounded-2xl text-sm font-900 text-white transition-all duration-300 flex items-center justify-center gap-2 shadow-xl ${
+                className={`w-full h-12 rounded-2xl text-sm font-900 transition-all duration-300 flex items-center justify-center gap-2 border-2 ${
                   addedId
-                    ? 'bg-green-500 shadow-green-200'
+                    ? 'bg-green-500 border-green-500 text-white'
                     : !canAdd()
-                      ? 'bg-dark/10 text-dark/20 cursor-not-allowed shadow-none'
-                      : 'bg-dark hover:bg-accent hover:scale-[1.01] active:scale-[0.99] shadow-dark/20'
+                      ? 'bg-transparent border-dark/10 text-dark/20 cursor-not-allowed'
+                      : 'bg-white border-dark text-dark hover:bg-dark hover:text-white active:scale-[0.99]'
                 }`}
               >
                 {addedId ? (
@@ -682,8 +774,8 @@ function QuickAddModal({
                   </>
                 ) : (
                   <>
-                    <ShoppingBag size={18} strokeWidth={2.5} />
-                    <span>AJOUTER AU PANIER — {formatPrice(product.salePrice)}</span>
+                    <ShoppingBag size={16} strokeWidth={2.5} />
+                    <span>Ajouter au panier</span>
                   </>
                 )}
               </button>
@@ -691,22 +783,116 @@ function QuickAddModal({
           </div>
         </div>
 
+        {showSizeGuide && <SizeGuide category={product.category} onClose={() => setShowSizeGuide(false)} />}
+
         {/* Mobile sticky CTA */}
-        <div className="sm:hidden p-4 pt-3 border-t border-dark/5 bg-white/95 backdrop-blur-xl z-30 flex-shrink-0 safe-bottom">
+        <div className="sm:hidden p-4 pt-3 border-t border-dark/5 bg-white/95 backdrop-blur-xl z-30 flex-shrink-0 safe-bottom space-y-2">
+          <button
+            onClick={handleBuyNow}
+            disabled={!canAdd()}
+            className={`w-full h-14 rounded-2xl text-[13px] font-900 text-white transition-all duration-300 flex items-center justify-center gap-2 shadow-lg ${
+              !canAdd()
+                ? 'bg-dark/10 text-dark/20 cursor-not-allowed shadow-none'
+                : 'bg-accent active:scale-[0.98] shadow-accent/25'
+            }`}
+          >
+            <Zap size={16} strokeWidth={2.5} fill="currentColor" />
+            ACHETER MAINTENANT — {formatPrice(product.salePrice * quantity)}
+          </button>
           <button
             onClick={handleAddToCart}
             disabled={!canAdd()}
-            className={`w-full h-14 rounded-2xl text-[13px] font-900 text-white transition-all duration-300 flex items-center justify-center gap-2 shadow-lg ${
+            className={`w-full h-12 rounded-2xl text-[13px] font-900 transition-all duration-300 flex items-center justify-center gap-2 border-2 ${
               addedId
-                ? 'bg-green-500 shadow-green-200'
+                ? 'bg-green-500 border-green-500 text-white'
                 : !canAdd()
-                  ? 'bg-dark/10 text-dark/20 cursor-not-allowed shadow-none'
-                  : 'bg-dark active:scale-[0.98] shadow-dark/20'
+                  ? 'bg-transparent border-dark/10 text-dark/20 cursor-not-allowed'
+                  : 'bg-white border-dark text-dark active:scale-[0.98]'
             }`}
           >
-            {addedId ? '✓ AJOUTÉ !' : `AJOUTER — ${formatPrice(product.salePrice)}`}
+            {addedId ? '✓ AJOUTÉ !' : 'Ajouter au panier'}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── 👀 Rail « Récemment vus » ──────────────────────────────
+function RecentlyViewedRail({
+  products,
+  onOpen,
+}: {
+  products: Product[];
+  onOpen: (p: Product) => void;
+}) {
+  const [ids, setIds] = useState<string[]>(readRecentlyViewed);
+
+  useEffect(() => {
+    const sync = () => setIds(readRecentlyViewed());
+    window.addEventListener('tof-recently-viewed-updated', sync);
+    window.addEventListener('storage', sync);
+    return () => {
+      window.removeEventListener('tof-recently-viewed-updated', sync);
+      window.removeEventListener('storage', sync);
+    };
+  }, []);
+
+  const items = useMemo(
+    () =>
+      ids
+        .map((id) => products.find((p) => p.id === id && p.status === 'active'))
+        .filter((p): p is Product => Boolean(p))
+        .slice(0, 10),
+    [ids, products],
+  );
+
+  if (items.length < 2) return null;
+
+  return (
+    <div className="mt-12 pt-8 border-t border-dark/5">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-display text-xl sm:text-2xl font-800 tracking-tight text-dark flex items-center gap-2">
+          👀 récemment vus
+        </h3>
+        <button
+          onClick={() => {
+            clearRecentlyViewed();
+            setIds([]);
+          }}
+          className="text-[11px] font-bold text-dark/30 hover:text-dark/60 transition-colors h-8 px-2"
+        >
+          Effacer
+        </button>
+      </div>
+      <div className="flex gap-3 overflow-x-auto no-scrollbar snap-x-mandatory -mx-1 px-1 pb-2">
+        {items.map((p) => {
+          const rvImg = getProductImages(p)[0];
+          return (
+            <button
+              key={p.id}
+              onClick={() => onOpen(p)}
+              className="group flex-shrink-0 w-[132px] sm:w-[150px] snap-start text-left"
+            >
+              <div className="aspect-square rounded-2xl bg-white border border-dark/5 overflow-hidden flex items-center justify-center p-3 group-hover:border-accent/25 group-hover:shadow-md transition-all">
+                {rvImg ? (
+                  <img
+                    src={rvImg}
+                    alt={p.name}
+                    loading="lazy"
+                    decoding="async"
+                    className="max-h-full max-w-full w-auto h-auto object-contain group-hover:scale-105 transition-transform"
+                  />
+                ) : (
+                  <AppleEmoji emoji={emojiForCategory(p.category)} size={32} />
+                )}
+              </div>
+              <p className="text-[9px] font-bold text-accent uppercase tracking-wider mt-2 truncate">{p.brand}</p>
+              <p className="text-[11px] font-semibold text-dark/70 truncate leading-snug">{p.name}</p>
+              <p className="text-[11px] font-800 text-dark mt-0.5">{formatPrice(p.salePrice)}</p>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -891,35 +1077,6 @@ export default function Products() {
 
   return (
     <>
-      {/* Comment ça marche */}
-      <section className="py-14 sm:py-16 bg-bg border-t border-dark/5">
-        <div className="mx-auto max-w-6xl px-5">
-          <div className="text-center mb-8 sm:mb-10">
-            <h2 className="font-display text-3xl sm:text-4xl font-800 tracking-tight text-dark">Comment ça marche ?</h2>
-            <p className="mt-2 text-dark/50 text-sm sm:text-base">Pas de stock, pas de surprise — on vérifie chaque pièce avant que tu payes.</p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {[
-              { emoji: '🛒', title: '1. Tu choisis & réserves', text: 'Ajoute ta pièce au panier et remplis tes infos. Le paiement se fait par carte via SumUp juste après.' },
-              { emoji: '🔍', title: '2. Je commande & vérifie', text: "Je commande la pièce et dans les 2-5j je reçois 5-6 photos QC (coutures, logo, semelle, étiquette). Je vérifie tout point par point. Si c'est pas bon, je demande un échange gratuitement." },
-              { emoji: '📦', title: '3. Tu reçois', text: "La pièce validée part de l'entrepôt. Tu as le numéro de suivi, livraison suivie en 10-20j ouvrés, colis discret." },
-            ].map((step, i) => (
-              <div key={i} className="rounded-2xl bg-white border border-dark/5 p-5 sm:p-6">
-                <div className="text-3xl mb-3">{step.emoji}</div>
-                <h3 className="font-bold text-dark text-base sm:text-lg">{step.title}</h3>
-                <p className="text-dark/55 text-sm mt-1.5 leading-relaxed">{step.text}</p>
-              </div>
-            ))}
-          </div>
-          <div className="mt-6 flex flex-wrap justify-center gap-2">
-            <span className="rounded-full bg-green-500/10 text-green-700 px-3 py-1.5 text-xs font-bold">✓ Vérifié avant expédition</span>
-            <span className="rounded-full bg-green-500/10 text-green-700 px-3 py-1.5 text-xs font-bold">✓ Paiement CB sécurisé (SumUp)</span>
-            <span className="rounded-full bg-green-500/10 text-green-700 px-3 py-1.5 text-xs font-bold">✓ Livraison suivie 10-20j</span>
-            <span className="rounded-full bg-green-500/10 text-green-700 px-3 py-1.5 text-xs font-bold">✓ Si problème, on gère</span>
-          </div>
-        </div>
-      </section>
-
       <section id="shop" className="py-14 sm:py-20 lg:py-28 bg-bg" ref={ref}>
         <div className="mx-auto max-w-6xl px-5">
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5 mb-8">
@@ -931,6 +1088,8 @@ export default function Products() {
             </div>
           </div>
 
+        {/* Filtres sticky */}
+        <div className="sticky top-[68px] sm:top-[72px] z-30 -mx-5 px-5 pt-3 pb-1 bg-bg/95 backdrop-blur-xl border-b border-dark/5 mb-4">
         {/* Search */}
         <div className={`relative mb-3 ${sectionInView ? 'anim-fade-up opacity-0 delay-100' : 'opacity-0'}`}>
           <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-dark/25 pointer-events-none" />
@@ -1038,6 +1197,9 @@ export default function Products() {
           </div>
         </div>
 
+        </div>
+        {/* /Filtres sticky */}
+
         {/* Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5">
           {loading ? (
@@ -1109,6 +1271,8 @@ export default function Products() {
             )}
           </div>
         )}
+        {/* 👀 Récemment vus */}
+        {!loading && <RecentlyViewedRail products={products} onOpen={openQuickAdd} />}
       </div>
 
       {quickAdd && (

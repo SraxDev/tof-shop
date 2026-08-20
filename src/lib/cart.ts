@@ -39,6 +39,14 @@ export function addToCart(item: CartItem) {
   saveCart(cart);
 }
 
+/**
+ * Ouvre le tiroir panier depuis n'importe quel composant.
+ * `step` permet de sauter directement au checkout (bouton « Acheter maintenant »).
+ */
+export function openCart(step: 'cart' | 'checkout' = 'cart') {
+  window.dispatchEvent(new CustomEvent('tof-open-cart', { detail: { step } }));
+}
+
 export function removeFromCart(productId: string, size: string, color: string) {
   const cart = readCart().filter(
     (i) => !(i.productId === productId && i.size === size && i.color === color)

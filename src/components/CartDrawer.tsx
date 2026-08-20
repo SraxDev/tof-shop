@@ -10,10 +10,116 @@ function formatPrice(value: number) {
 
 // Shipping values come from settings now
 
-export default function CartDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+type FormErrors = Partial<Record<'customerName' | 'phone' | 'address' | 'city' | 'zip' | 'snapOrWhatsapp', string>>;
+
+const STEP_LABELS = [
+  { id: 'cart', label: 'Panier' },
+  { id: 'checkout', label: 'Infos' },
+  { id: 'done', label: 'Paiement' },
+] as const;
+
+function CheckoutStepper({ step }: { step: 'cart' | 'checkout' | 'done' }) {
+  const activeIndex = STEP_LABELS.findIndex((s) => s.id === step);
+  return (
+    <div className="flex items-center gap-1.5 px-5 py-3 border-b border-dark/5 bg-white">
+      {STEP_LABELS.map((s, i) => {
+        const done = i < activeIndex;
+        const active = i === activeIndex;
+        return (
+          <div key={s.id} className="flex items-center gap-1.5 flex-1 last:flex-none">
+            <div className="flex items-center gap-2">
+              <span
+                className={`h-6 w-6 rounded-full text-[10px] font-900 flex items-center justify-center transition-colors ${
+                  done
+                    ? 'bg-green-500 text-white'
+                    : active
+                      ? 'bg-dark text-white'
+                      : 'bg-dark/8 text-dark/30'
+                }`}
+              >
+                {done ? '✓' : i + 1}
+              </span>
+              <span
+                className={`text-[11px] font-bold whitespace-nowrap ${
+                  active ? 'text-dark' : done ? 'text-green-600' : 'text-dark/30'
+                }`}
+              >
+                {s.label}
+              </span>
+            </div>
+            {i < STEP_LABELS.length - 1 && (
+              <span className={`flex-1 h-[2px] rounded-full ${done ? 'bg-green-500' : 'bg-dark/8'}`} />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function validateForm(form: {
+  customerName: string;
+  phone: string;
+  address: string;
+  city: string;
+  zip: string;
+  snapOrWhatsapp: string;
+}): FormErrors {
+  const errors: FormErrors = {};
+  if (form.customerName.trim().length < 2) errors.customerName = 'Indique ton nom complet.';
+  const phoneDigits = form.phone.replace(/[^0-9]/g, '');
+  if (phoneDigits.length < 9) errors.phone = 'Numéro invalide (ex : 06 12 34 56 78).';
+  if (form.address.trim().length < 5) errors.address = 'Adresse trop courte (numéro + rue).';
+  if (form.city.trim().length < 2) errors.city = 'Indique ta ville.';
+  if (!/^[0-9A-Za-z\s-]{4,10}$/.test(form.zip.trim())) errors.zip = 'Code postal invalide.';
+  if (form.snapOrWhatsapp.trim().length < 3) errors.snapOrWhatsapp = 'Snap ou WhatsApp pour te tenir au courant.';
+  return errors;
+}
+
+function inputCls(hasError: boolean) {
+  return `w-full rounded-xl px-4 py-3 text-sm outline-none border transition-colors ${
+    hasError
+      ? 'bg-red-500/5 border-red-400 focus:border-red-500'
+      : 'bg-bg border-transparent focus:border-accent/40'
+  }`;
+}
+
+function Field({
+  label,
+  error,
+  children,
+}: {
+  label: string;
+  error?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label className="block text-[11px] font-bold uppercase tracking-wider text-dark/35 mb-1.5">{label}</label>
+      {children}
+      {error && (
+        <p className="mt-1 text-[11px] font-semibold text-red-500 flex items-center gap-1">
+          <span aria-hidden>⚠</span> {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+export default function CartDrawer({
+  open,
+  onClose,
+  initialStep = 'cart',
+}: {
+  open: boolean;
+  onClose: () => void;
+  initialStep?: 'cart' | 'checkout';
+}) {
   const [cart, setCart] = useState<CartItem[]>(readCart);
   const [settings, setSettings] = useState(readSiteSettings);
   const [step, setStep] = useState<'cart' | 'checkout' | 'done'>('cart');
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [submitting, setSubmitting] = useState(false);
   const [shippingMode, setShippingMode] = useState<'standard' | 'express'>('standard');
   const [createdOrderId, setCreatedOrderId] = useState('');
   const [promoInput, setPromoInput] = useState('');
@@ -59,8 +165,11 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
 
   useEffect(() => {
     if (open) {
-      setCart(readCart());
-      setStep('cart');
+      const items = readCart();
+      setCart(items);
+      setStep(initialStep === 'checkout' && items.length > 0 ? 'checkout' : 'cart');
+      setErrors({});
+      setSubmitting(false);
       setShippingMode('standard');
       setSavedCart([]);
       setSavedTotal(0);
@@ -69,7 +178,7 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
       setPromoInput('');
       setPromoError('');
     }
-  }, [open]);
+  }, [open, initialStep]);
 
   const subtotal = cartTotal(cart);
   const count = cartCount(cart);
@@ -99,8 +208,36 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
     setPromoError('');
   };
 
+  const updateField = (key: keyof typeof form, value: string) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+    setErrors((prev) => {
+      if (!prev[key as keyof FormErrors]) return prev;
+      const next = { ...prev };
+      delete next[key as keyof FormErrors];
+      return next;
+    });
+  };
+
+  const hasErrors = Object.keys(errors).length > 0;
+
+  const goToCheckout = () => {
+    if (cart.length === 0) return;
+    setErrors({});
+    setStep('checkout');
+  };
+
   const placeOrder = async () => {
-    if (!form.customerName || !form.phone || !form.address) return;
+    const found = validateForm(form);
+    setErrors(found);
+    if (Object.keys(found).length > 0) {
+      const firstKey = Object.keys(found)[0];
+      const el = document.querySelector(`[data-field="${firstKey}"]`) as HTMLElement | null;
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      (el as HTMLInputElement | null)?.focus?.();
+      return;
+    }
+    if (submitting) return;
+    setSubmitting(true);
 
     const orderId = `TOF-${Math.floor(1000 + Math.random() * 9000)}`;
 
@@ -142,8 +279,10 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
     setSavedCart([...cart]);
     setSavedTotal(grandTotal);
     setCreatedOrderId(orderId);
+    try { localStorage.setItem('tof-last-order-id', orderId); } catch { /* ignore */ }
     clearCart();
     setAppliedPromo(null);
+    setSubmitting(false);
     setStep('done');
   };
 
@@ -181,6 +320,9 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
             <X size={18} strokeWidth={2.5} />
           </button>
         </div>
+
+        {/* Stepper 3 étapes */}
+        <CheckoutStepper step={step} />
 
         {step === 'cart' && (
           <div className="flex-1 flex flex-col">
@@ -336,10 +478,10 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
                     <span>{formatPrice(grandTotal)}</span>
                   </div>
                   <button
-                    onClick={() => setStep('checkout')}
+                    onClick={goToCheckout}
                     className="w-full h-12 rounded-full bg-dark px-7 text-sm font-bold text-white hover:bg-accent transition-colors active:scale-[0.98]"
                   >
-                    Passer la commande
+                    Passer la commande →
                   </button>
                 </div>
               </>
@@ -358,14 +500,93 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
                 <span>🔍</span>
                 <span>Toutes les pièces sont vérifiées sur photo QC à l'entrepôt avant expédition. Si quelque chose ne va pas, on change ou rembourse.</span>
               </div>
-              <input className="w-full rounded-xl bg-bg px-4 py-3 text-sm outline-none" placeholder="Nom complet" value={form.customerName} onChange={(e) => setForm({ ...form, customerName: e.target.value })} />
-              <input className="w-full rounded-xl bg-bg px-4 py-3 text-sm outline-none" placeholder="Telephone (avec indicatif)" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-              <input className="w-full rounded-xl bg-bg px-4 py-3 text-sm outline-none" placeholder="Snap ou WhatsApp" value={form.snapOrWhatsapp} onChange={(e) => setForm({ ...form, snapOrWhatsapp: e.target.value })} />
-              <input className="w-full rounded-xl bg-bg px-4 py-3 text-sm outline-none" placeholder="Adresse" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+              <Field label="Nom complet" error={errors.customerName}>
+                <input
+                  data-field="customerName"
+                  name="name"
+                  autoComplete="name"
+                  className={inputCls(!!errors.customerName)}
+                  placeholder="Prénom et nom"
+                  value={form.customerName}
+                  onChange={(e) => updateField('customerName', e.target.value)}
+                />
+              </Field>
+
+              <Field label="Téléphone" error={errors.phone}>
+                <input
+                  data-field="phone"
+                  name="tel"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  className={inputCls(!!errors.phone)}
+                  placeholder="06 12 34 56 78"
+                  value={form.phone}
+                  onChange={(e) => updateField('phone', e.target.value)}
+                />
+              </Field>
+
+              <Field label="Snap ou WhatsApp" error={errors.snapOrWhatsapp}>
+                <input
+                  data-field="snapOrWhatsapp"
+                  name="username"
+                  autoComplete="username"
+                  className={inputCls(!!errors.snapOrWhatsapp)}
+                  placeholder="@pseudo ou numéro WhatsApp"
+                  value={form.snapOrWhatsapp}
+                  onChange={(e) => updateField('snapOrWhatsapp', e.target.value)}
+                />
+              </Field>
+
+              <Field label="Adresse de livraison" error={errors.address}>
+                <input
+                  data-field="address"
+                  name="street-address"
+                  autoComplete="street-address"
+                  className={inputCls(!!errors.address)}
+                  placeholder="12 rue des Lilas, appartement 3"
+                  value={form.address}
+                  onChange={(e) => updateField('address', e.target.value)}
+                />
+              </Field>
+
               <div className="grid grid-cols-2 gap-3">
-                <input className="rounded-xl bg-bg px-4 py-3 text-sm outline-none" placeholder="Ville" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
-                <input className="rounded-xl bg-bg px-4 py-3 text-sm outline-none" placeholder="Code postal" value={form.zip} onChange={(e) => setForm({ ...form, zip: e.target.value })} />
+                <Field label="Ville" error={errors.city}>
+                  <input
+                    data-field="city"
+                    name="city"
+                    autoComplete="address-level2"
+                    className={inputCls(!!errors.city)}
+                    placeholder="Limoges"
+                    value={form.city}
+                    onChange={(e) => updateField('city', e.target.value)}
+                  />
+                </Field>
+                <Field label="Code postal" error={errors.zip}>
+                  <input
+                    data-field="zip"
+                    name="postal-code"
+                    inputMode="numeric"
+                    autoComplete="postal-code"
+                    className={inputCls(!!errors.zip)}
+                    placeholder="87000"
+                    value={form.zip}
+                    onChange={(e) => updateField('zip', e.target.value)}
+                  />
+                </Field>
               </div>
+
+              <Field label="Pays">
+                <input
+                  data-field="country"
+                  name="country"
+                  autoComplete="country-name"
+                  className={inputCls(false)}
+                  placeholder="France"
+                  value={form.country}
+                  onChange={(e) => setForm({ ...form, country: e.target.value })}
+                />
+              </Field>
 
               <div className="rounded-2xl bg-bg p-4 space-y-2 text-sm">
                 <div className="font-bold text-dark/60">Récapitulatif</div>
@@ -387,11 +608,17 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
             </div>
 
             <div className="sticky bottom-0 bg-white border-t border-dark/5 p-5 space-y-3">
+              {hasErrors && (
+                <p className="text-xs font-semibold text-red-500 text-center">
+                  Corrige les champs en rouge pour continuer.
+                </p>
+              )}
               <button
                 onClick={placeOrder}
-                className="w-full h-12 rounded-full bg-dark px-7 text-sm font-bold text-white hover:bg-accent transition-colors active:scale-[0.98]"
+                disabled={submitting}
+                className="w-full h-12 rounded-full bg-dark px-7 text-sm font-bold text-white hover:bg-accent disabled:bg-dark/20 transition-colors active:scale-[0.98]"
               >
-                Confirmer la commande
+                {submitting ? 'Enregistrement…' : `Confirmer la commande · ${formatPrice(grandTotal)}`}
               </button>
               <button onClick={() => setStep('cart')} className="w-full text-center text-sm text-dark/40 font-semibold py-3 min-h-[44px]">
                 Retour au panier
@@ -439,6 +666,13 @@ export default function CartDrawer({ open, onClose }: { open: boolean; onClose: 
                   className="block h-12 rounded-full bg-[#FFFC00]/15 border border-[#FFFC00]/30 text-[#a39800] px-7 text-sm font-bold hover:bg-[#FFFC00]/25 transition-all text-center flex items-center justify-center gap-2"
                 >
                   👻 M'ajouter sur Snap
+                </a>
+                <a
+                  href={`#suivi?order=${createdOrderId}`}
+                  onClick={onClose}
+                  className="block h-12 rounded-full bg-dark px-7 text-sm font-bold text-white hover:bg-accent transition-colors text-center flex items-center justify-center gap-2"
+                >
+                  📦 Suivre ma commande
                 </a>
                 <button
                   onClick={onClose}

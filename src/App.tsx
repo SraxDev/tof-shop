@@ -3,6 +3,8 @@ import { useTwemoji } from './hooks/useTwemoji';
 import { hydrateSiteSettings } from './lib/siteSettings';
 import { trackVisitor } from './lib/db';
 import Navbar from './components/Navbar';
+import AnnouncementBar from './components/AnnouncementBar';
+import LaunchTimer from './components/LaunchTimer';
 import Hero from './components/Hero';
 import Products from './components/Products';
 import Footer from './components/Footer';
@@ -20,6 +22,10 @@ const WhyUs = lazy(() => import('./components/WhyUs'));
 const CTA = lazy(() => import('./components/CTA'));
 const Contact = lazy(() => import('./components/Contact'));
 const ChatWidget = lazy(() => import('./components/ChatWidget'));
+const HowItWorks = lazy(() => import('./components/HowItWorks'));
+const OrderTracking = lazy(() => import('./components/OrderTracking'));
+const Faq = lazy(() => import('./components/Faq'));
+const SocialProof = lazy(() => import('./components/SocialProof'));
 
 function SectionFallback() {
   return <div className="min-h-[200px] bg-bg" aria-hidden />;
@@ -124,9 +130,15 @@ export default function App() {
   return (
     <div className="font-sans antialiased bg-bg text-dark">
       <Navbar />
+      {/* 📢 Barre d'annonce rotative + ⏱️ minuteur TOFLAUNCH */}
+      <AnnouncementBar />
+      <LaunchTimer />
       <Hero />
       <Suspense fallback={<SectionFallback />}>
         <BrandMarquee />
+      </Suspense>
+      <Suspense fallback={<SectionFallback />}>
+        <HowItWorks />
       </Suspense>
       <Products />
       <Suspense fallback={<SectionFallback />}>
@@ -134,6 +146,8 @@ export default function App() {
         <Brands />
         <Reviews />
         <WhyUs />
+        <OrderTracking />
+        <Faq />
         <CTA />
         <Contact />
       </Suspense>
@@ -142,6 +156,7 @@ export default function App() {
       <MobileStickyBar />
       <Suspense fallback={null}>
         <ChatWidget />
+        <SocialProof />
       </Suspense>
 
       <ToastContainer />

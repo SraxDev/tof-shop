@@ -1192,8 +1192,8 @@ type OrderCardProps = {
   copiedPayment: boolean;
   onFieldChange: (id: string, field: string, value: string) => void;
   onCopyOrder: (order: Order) => void;
-  onCopyClientMessage: (order: Order, type: 'payment' | 'paid' | 'tracking' | 'delay') => void;
-  whatsappLink: (order: Order, type: 'payment' | 'paid' | 'tracking' | 'delay') => string;
+  onCopyClientMessage: (order: Order, type: 'payment' | 'paid' | 'tracking' | 'delay' | 'reminder') => void;
+  whatsappLink: (order: Order, type: 'payment' | 'paid' | 'tracking' | 'delay' | 'reminder') => string;
 };
 
 const OrderCard = memo(function OrderCard({ order, product, margin, copied, copiedPayment, onFieldChange, onCopyOrder, onCopyClientMessage, whatsappLink }: OrderCardProps) {
@@ -1324,6 +1324,9 @@ const OrderCard = memo(function OrderCard({ order, product, margin, copied, copi
         </a>
         <a href={whatsappLink(order, 'payment')} target="_blank" rel="noreferrer" className="rounded-full bg-[#25D366]/10 px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-[#1cae54] hover:bg-[#25D366]/20 transition-colors">
           WA paiement
+        </a>
+        <a href={whatsappLink(order, 'reminder')} target="_blank" rel="noreferrer" className="rounded-full bg-accent/10 px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-accent hover:bg-accent/20 transition-colors">
+          WA relance
         </a>
         <a href={whatsappLink(order, 'paid')} target="_blank" rel="noreferrer" className="rounded-full bg-[#25D366]/10 px-3 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-semibold text-[#1cae54] hover:bg-[#25D366]/20 transition-colors">
           WA paye
@@ -2379,7 +2382,7 @@ export default function AdminPanel() {
     playCopy();
   }, [orderText]);
 
-  const clientMessage = useCallback((order: Order, type: 'payment' | 'paid' | 'tracking' | 'delay') => {
+  const clientMessage = useCallback((order: Order, type: 'payment' | 'paid' | 'tracking' | 'delay' | 'reminder') => {
     let itemsText = '';
     let totalAmount = '';
 
@@ -2398,13 +2401,16 @@ export default function AdminPanel() {
     if (type === 'paid') {
       return `Paiement reçu pour ta commande ${rootOrderId(order.id)}, merci.\nJe lance la commande et je te tiens au courant pour le QC / suivi.`;
     }
+    if (type === 'reminder') {
+      return `Hello ${order.customerName} 👋\n\nPetit rappel pour ta commande ${rootOrderId(order.id)} (${totalAmount}) : je n'ai pas encore reçu le paiement, donc je n'ai pas encore lancé la commande.\n\n${itemsText}\n\n💳 Payer par carte (SumUp, 3D Secure) : ${siteSettingsRef.current.sumupUrl}\n\nDès que c'est réglé, envoie-moi une capture ici et je commande ta pièce dans la foulée. Si tu veux annuler ou changer un article, dis-le moi, aucun souci.`;
+    }
     if (type === 'tracking') {
       return `Ta commande ${rootOrderId(order.id)} est expédiée.\nTracking : ${order.tracking || '[COLLE LE TRACKING ICI]'}\n\nDélai estimé : 7-20 jours selon la ligne.`;
     }
     return `Petit update pour ta commande ${rootOrderId(order.id)} : il y a un léger délai côté traitement/livraison. Je suis dessus et je t'envoie les nouvelles infos dès que je les ai.`;
   }, [getProduct]);
 
-  const copyClientMessage = useCallback(async (order: Order, type: 'payment' | 'paid' | 'tracking' | 'delay') => {
+  const copyClientMessage = useCallback(async (order: Order, type: 'payment' | 'paid' | 'tracking' | 'delay' | 'reminder') => {
     await navigator.clipboard.writeText(clientMessage(order, type));
     setCopiedId(`${order.id}-${type}`);
     setTimeout(() => setCopiedId(null), 1800);
@@ -2412,7 +2418,7 @@ export default function AdminPanel() {
     playCopy();
   }, [clientMessage]);
 
-  const whatsappLink = useCallback((order: Order, type: 'payment' | 'paid' | 'tracking' | 'delay') => {
+  const whatsappLink = useCallback((order: Order, type: 'payment' | 'paid' | 'tracking' | 'delay' | 'reminder') => {
     let phone = order.phone.replace(/[^0-9+]/g, '');
     if (phone.startsWith('0') && phone.length === 10) {
       phone = '33' + phone.slice(1);
@@ -3246,8 +3252,8 @@ export default function AdminPanel() {
                 <div className="rounded-2xl bg-bg p-4">
                   <div className="flex items-center justify-between gap-3 mb-3">
                     <div>
-                      <h4 className="font-bold text-sm">Barre d'annonce</h4>
-                      <p className="text-xs text-dark/35">Message tout en haut du site.</p>
+                      <h4 className="font-bold text-sm">Barre d'annonce rotative</h4>
+                      <p className="text-xs text-dark/35">Sépare plusieurs messages par « | » : ils défilent automatiquement.</p>
                     </div>
                     <label className="flex items-center gap-2 text-xs font-bold text-dark/45">
                       <input
@@ -3261,8 +3267,12 @@ export default function AdminPanel() {
                   <input
                     value={siteSettings.announcementText}
                     onChange={(e) => setSiteSettings({ ...siteSettings, announcementText: e.target.value })}
+                    placeholder="Livraison offerte dès 140€ | -15% avec TOFLAUNCH | Paiement CB sécurisé SumUp"
                     className="w-full rounded-xl bg-white px-4 py-3 text-sm text-dark outline-none border border-dark/5"
                   />
+                  <p className="mt-2 text-[11px] text-dark/30">
+                    Laisse vide pour afficher la rotation par défaut (livraison offerte, code TOFLAUNCH, paiement SumUp, contrôle QC).
+                  </p>
                 </div>
 
                 <div className="rounded-2xl bg-bg p-4">

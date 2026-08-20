@@ -63,7 +63,7 @@ export default function Footer() {
         <div className="border-t border-white/5 mt-10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-white/20">
           <div className="flex items-center gap-3 flex-wrap justify-center">
             <span className="text-white/15">Paiement :</span>
-            {['SumUp', 'Visa', 'Mastercard', 'Apple Pay', 'Google Pay'].map((p) => (
+            {['SumUp', 'CB', 'Visa', 'Mastercard', 'Apple Pay', 'Google Pay', '3D Secure'].map((p) => (
               <div
                 key={p}
                 className="h-6 px-2.5 bg-white/5 rounded-md flex items-center justify-center text-[9px] font-bold text-white/30 tracking-wide border border-white/5"

@@ -111,6 +111,28 @@ export async function insertOrder(order: DbOrder) {
   window.dispatchEvent(new CustomEvent('tof-orders-updated'));
 }
 
+/** Recherche publique d'une commande par son numéro (TOF-XXXX), insensible à la casse. */
+export async function fetchOrderById(orderId: string): Promise<DbOrder | null> {
+  const clean = orderId.trim().toUpperCase();
+  if (!clean) return null;
+  const withPrefix = clean.startsWith('TOF-') ? clean : `TOF-${clean.replace(/^TOF/i, '').replace(/^-/, '')}`;
+  const { data } = await supabase.from('orders').select('*').eq('id', withPrefix).maybeSingle();
+  if (data) return data as DbOrder;
+  // Fallback : certaines commandes ont un suffixe (TOF-1234-2)
+  const { data: like } = await supabase.from('orders').select('*').ilike('id', `${withPrefix}%`).limit(1);
+  return ((like as DbOrder[]) || [])[0] || null;
+}
+
+/** Dernières commandes (utilisé par la preuve sociale côté public). */
+export async function fetchRecentOrders(limit = 20): Promise<DbOrder[]> {
+  const { data } = await supabase
+    .from('orders')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  return (data as DbOrder[]) || [];
+}
+
 export async function updateOrder(id: string, fields: Partial<DbOrder>) {
   await supabase.from('orders').update(fields).eq('id', id);
   window.dispatchEvent(new CustomEvent('tof-orders-updated'));
