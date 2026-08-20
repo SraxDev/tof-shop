@@ -1,6 +1,6 @@
 import { Check, Copy, Loader2, Package, Search, Truck } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { fetchOrderById, type DbOrder } from '../lib/db';
+import { fetchOrderById, type TrackedOrder } from '../lib/db';
 import { readSiteSettings } from '../lib/siteSettings';
 import { showToast } from './Toast';
 
@@ -14,7 +14,7 @@ const STEPS: Array<{ id: StepId; title: string; desc: string; emoji: string }> =
   { id: 'delivered', title: 'Livré', desc: 'Colis remis. Un souci ? Écris-moi, on gère.', emoji: '🎉' },
 ];
 
-function currentStepIndex(order: DbOrder): number {
+function currentStepIndex(order: TrackedOrder): number {
   const status = (order.status || '').toLowerCase();
   const payment = (order.payment_status || '').toLowerCase();
   if (status === 'done' || status === 'delivered') return 4;
@@ -24,7 +24,7 @@ function currentStepIndex(order: DbOrder): number {
   return 0;
 }
 
-function parseItems(order: DbOrder) {
+function parseItems(order: TrackedOrder) {
   try {
     const raw = order.items_json ? JSON.parse(order.items_json) : [];
     return Array.isArray(raw) ? raw : [];
@@ -45,7 +45,7 @@ function formatDate(value?: string) {
 export default function OrderTracking() {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
-  const [order, setOrder] = useState<DbOrder | null>(null);
+  const [order, setOrder] = useState<TrackedOrder | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [copied, setCopied] = useState(false);
   const [settings, setSettings] = useState(readSiteSettings);
@@ -90,6 +90,10 @@ export default function OrderTracking() {
 
   const stepIndex = useMemo(() => (order ? currentStepIndex(order) : -1), [order]);
   const items = useMemo(() => (order ? parseItems(order) : []), [order]);
+  const qcPhotos = useMemo(
+    () => (order?.qc_photos || '').split(',').map((u) => u.trim()).filter(Boolean),
+    [order],
+  );
 
   const copyTracking = async () => {
     if (!order?.tracking) return;
@@ -160,9 +164,10 @@ export default function OrderTracking() {
               <div className="flex flex-wrap items-center justify-between gap-2 pb-4 border-b border-dark/5">
                 <div>
                   <p className="font-display text-2xl font-800 text-dark">{order.id}</p>
-                  {order.created_at && (
-                    <p className="text-xs text-dark/35 mt-0.5">Commandée le {formatDate(order.created_at)}</p>
-                  )}
+                  <p className="text-xs text-dark/35 mt-0.5">
+                    {order.created_at && <>Commandée le {formatDate(order.created_at)}</>}
+                    {order.city_hint && <> · livraison {order.city_hint}</>}
+                  </p>
                 </div>
                 <span
                   className={`rounded-full px-3 py-1.5 text-[11px] font-bold ${
@@ -235,6 +240,31 @@ export default function OrderTracking() {
                 <div className="mt-2 rounded-2xl bg-bg border border-dark/5 p-4 flex items-center gap-3 text-xs text-dark/45">
                   <Package size={16} className="text-dark/25 flex-shrink-0" />
                   Le numéro de suivi apparaîtra ici dès l'expédition du colis.
+                </div>
+              )}
+
+              {/* Photos QC : preuve que l'article a été contrôlé avant envoi */}
+              {qcPhotos.length > 0 && (
+                <div className="mt-4 rounded-2xl bg-bg p-4">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-dark/35 mb-1">
+                    📸 Photos de ton article
+                  </p>
+                  <p className="text-[11px] text-dark/40 mb-3">
+                    Prises avant l'expédition — c'est bien ton colis.
+                  </p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {qcPhotos.map((url) => (
+                      <a
+                        key={url}
+                        href={url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block aspect-square rounded-xl overflow-hidden border border-dark/10 hover:border-accent/40 transition-colors"
+                      >
+                        <img src={url} alt="Photo de contrôle qualité" loading="lazy" className="h-full w-full object-cover" />
+                      </a>
+                    ))}
+                  </div>
                 </div>
               )}
 

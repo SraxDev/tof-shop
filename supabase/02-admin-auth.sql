@@ -1,0 +1,51 @@
+-- ============================================================================
+--  tof-shop — Compte administrateur
+-- ============================================================================
+--  Le mot de passe admin était stocké dans VITE_ADMIN_PASSWORD, donc compilé
+--  dans le bundle JavaScript : n'importe qui pouvait le lire dans le code
+--  source du site. On le remplace par un vrai compte Supabase Auth.
+--
+--  ⚠️  CE FICHIER N'EST PAS À EXÉCUTER EN SQL.
+--      La création du compte se fait dans l'interface Supabase.
+-- ============================================================================
+--
+--  ÉTAPE 1 — Créer ton compte admin
+--  ---------------------------------
+--   1. Supabase → Authentication → Users → « Add user » → « Create new user »
+--   2. Email    : ton email (ex. tof@exemple.com)
+--      Password : un mot de passe SOLIDE et DIFFÉRENT de l'ancien
+--                 (l'ancien a fuité dans l'historique Git, considère-le mort)
+--   3. Coche « Auto Confirm User » ✅  (sinon tu devras valider par email)
+--   4. Create user
+--
+--  ÉTAPE 2 — Fermer les inscriptions publiques
+--  --------------------------------------------
+--   Supabase → Authentication → Providers → Email
+--     • « Enable Sign Up »  →  DÉSACTIVÉ  ⛔
+--
+--   Sans ça, n'importe qui pourrait créer un compte et devenir authenticated,
+--   donc obtenir les droits admin définis dans 01-securite-rls.sql.
+--   C'est l'étape la plus importante de ce fichier.
+--
+--  ÉTAPE 3 — Nettoyer les variables d'environnement
+--  -------------------------------------------------
+--   Dans ton .env local ET dans Vercel → Settings → Environment Variables,
+--   SUPPRIME la ligne :
+--
+--       VITE_ADMIN_PASSWORD=...
+--
+--   Elle ne sert plus à rien et ne fait qu'exposer un secret.
+--   Garde uniquement VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY
+--   (ces deux-là sont publiques par nature, c'est normal et sans risque
+--    une fois le RLS activé).
+--
+--  ÉTAPE 4 — Se connecter
+--  -----------------------
+--   Va sur ton site → #admin → email + mot de passe.
+--   La session est conservée automatiquement entre les visites.
+--
+-- ============================================================================
+--  MOT DE PASSE OUBLIÉ ?
+--  Supabase → Authentication → Users → clic sur ton user → « Send recovery ».
+--  Ou supprime l'utilisateur et recrée-le (étape 1).
+-- ============================================================================

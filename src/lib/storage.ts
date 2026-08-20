@@ -34,7 +34,7 @@ function extFromMime(mime: string): string {
  * Construit un chemin de fichier unique et ordonnable dans le bucket :
  *   <prefix>/YYYY-MM/<timestamp>-<random>.<ext>
  */
-function buildObjectPath(prefix: 'products' | 'drops', mime: string): string {
+function buildObjectPath(prefix: 'products' | 'drops' | 'qc', mime: string): string {
   const now = new Date();
   const monthFolder =
     `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -113,6 +113,48 @@ export async function uploadProductImage(
     height: compressed.height,
     size: compressed.blob.size,
     hasAlpha: compressed.hasAlpha,
+  };
+}
+
+/**
+ * Upload d'une photo de contrôle qualité (QC) rattachée à une commande.
+ * Résolution un peu plus haute que les vignettes produit : le client doit
+ * pouvoir zoomer sur les coutures / étiquettes.
+ */
+export async function uploadQcPhoto(
+  file: File,
+  maxSize = 1100,
+  quality = 0.78,
+): Promise<UploadedImage> {
+  const compressed = await compressImageToBlob(file, maxSize, quality);
+
+  if (!storageAvailable()) {
+    const dataUrl = await blobToDataUrl(compressed.blob);
+    return {
+      url: dataUrl, path: '',
+      width: compressed.width, height: compressed.height,
+      size: compressed.blob.size, hasAlpha: compressed.hasAlpha,
+    };
+  }
+
+  const path = buildObjectPath('qc', compressed.blob.type);
+  const { error } = await supabase.storage
+    .from(BUCKET)
+    .upload(path, compressed.blob, {
+      contentType: compressed.blob.type,
+      cacheControl: '31536000',
+      upsert: false,
+    });
+
+  if (error) {
+    console.error('[storage] QC upload failed', error);
+    throw error;
+  }
+
+  return {
+    url: publicUrl(path), path,
+    width: compressed.width, height: compressed.height,
+    size: compressed.blob.size, hasAlpha: compressed.hasAlpha,
   };
 }
 

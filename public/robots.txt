@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+
+# Le panel admin n'a rien à faire dans les résultats de recherche
+Disallow: /#admin
+
+Sitemap: https://tof-shop.vercel.app/sitemap.xml

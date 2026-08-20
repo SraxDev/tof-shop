@@ -2,7 +2,7 @@ import { createPortal } from 'react-dom';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Copy, ExternalLink, Package, Pencil, Plus, RotateCcw, Save, Search, Send,
-  Trash2, Truck, X, ArrowUpDown, Flame, ArrowLeft, Calculator,
+  Trash2, Truck, X, ArrowUpDown, Flame, ArrowLeft, Calculator, Bell, BellOff,
 } from 'lucide-react';
 import { defaultDrop, type FeaturedDropConfig } from './FeaturedDrop';
 import { defaultSettings, readSiteSettings, saveSiteSettings, hydrateSiteSettings, type SiteSettings } from '../lib/siteSettings';
@@ -17,7 +17,12 @@ import {
   type DbProduct, type DbOrder, type DbDrop, type DbNote, type DbChatMessage, type DbPromoCode,
 } from '../lib/db';
 import { showToast, showActionToast } from './Toast';
+import { uploadQcPhoto } from '../lib/storage';
 import { playNewOrder, playCopy, playDelete } from '../lib/sounds';
+import {
+  notify, requestNotifications, notificationsEnabled, setNotificationsEnabled,
+  currentPermission, notificationsSupported,
+} from '../lib/notifications';
 import ImageUploader from './ImageUploader';
 import { uploadProductImage, uploadDropImage, pathFromStorageUrl, isStorageUrl, deleteProductImages } from '../lib/storage';
 import { extractSourceUrl, isShortlink } from '../lib/resolveSourceUrl';
@@ -72,6 +77,8 @@ type Order = {
   paymentStatus?: 'pending' | 'paid' | 'cancelled';
   tracking?: string;
   items?: OrderItem[];
+  createdAt?: string;
+  qcPhotos?: string;
 };
 
 // Legacy keys kept for reference
@@ -241,6 +248,8 @@ function dbToOrder(d: DbOrder): Order {
     address: d.address, city: d.city, zip: d.zip, country: d.country,
     snapOrWhatsapp: d.snap_or_whatsapp, status: d.status as OrderStatus,
     paymentStatus: d.payment_status as Order['paymentStatus'], tracking: d.tracking || undefined,
+    createdAt: d.created_at,
+    qcPhotos: d.qc_photos || undefined,
     items,
   };
 }
@@ -512,7 +521,9 @@ const ProductListItem = memo(function ProductListItem({ product, ordersCount, on
           {product.sizes && (
             <>
               <span className="hidden sm:inline opacity-40">·</span>
-              <span className="hidden sm:inline truncate max-w-[180px]">{product.sizes}</span>
+              <span className="hidden sm:inline truncate max-w-[180px]">
+                {product.sizes.split(',').map((e) => e.split(':')[0].trim()).filter(Boolean).join(', ')}
+              </span>
             </>
           )}
         </div>
@@ -1195,6 +1206,92 @@ type OrderCardProps = {
   whatsappLink: (order: Order, type: 'payment' | 'paid' | 'tracking' | 'delay' | 'reminder') => string;
 };
 
+/**
+ * Photos de contrôle qualité : l'admin photographie l'article avant expédition,
+ * le client les voit sur la page #suivi. C'est LE point qui rassure sur ce
+ * type de boutique.
+ */
+function QcPhotos({
+  order,
+  onFieldChange,
+}: {
+  order: Order;
+  onFieldChange: (id: string, field: string, value: string) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const photos = (order.qcPhotos || '').split(',').map((u) => u.trim()).filter(Boolean);
+
+  const addPhotos = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setBusy(true);
+    try {
+      const uploaded: string[] = [];
+      for (const file of Array.from(files).slice(0, 6)) {
+        const res = await uploadQcPhoto(file);
+        uploaded.push(res.url);
+      }
+      onFieldChange(order.id, 'qc_photos', [...photos, ...uploaded].join(', '));
+    } catch {
+      alert("L'upload a échoué. Vérifie ta connexion et réessaie.");
+    } finally {
+      setBusy(false);
+      if (inputRef.current) inputRef.current.value = '';
+    }
+  };
+
+  const removePhoto = (url: string) => {
+    onFieldChange(order.id, 'qc_photos', photos.filter((p) => p !== url).join(', '));
+  };
+
+  return (
+    <div className="mt-4 rounded-2xl bg-bg p-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <div className="text-xs font-bold uppercase tracking-wider text-dark/45">
+            📸 Photos QC {photos.length > 0 && `(${photos.length})`}
+          </div>
+          <p className="text-[11px] text-dark/35 mt-0.5">
+            Visibles par le client sur la page de suivi.
+          </p>
+        </div>
+        <button
+          onClick={() => inputRef.current?.click()}
+          disabled={busy}
+          className="rounded-full bg-dark px-4 py-2 text-xs font-bold text-white hover:bg-accent transition-colors disabled:opacity-50"
+        >
+          {busy ? 'Envoi…' : 'Ajouter'}
+        </button>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          hidden
+          onChange={(e) => void addPhotos(e.target.files)}
+        />
+      </div>
+
+      {photos.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {photos.map((url) => (
+            <div key={url} className="relative group/qc">
+              <img src={url} alt="Photo QC" className="h-20 w-20 rounded-xl object-cover border border-dark/10" />
+              <button
+                onClick={() => removePhoto(url)}
+                className="absolute -top-1.5 -right-1.5 h-6 w-6 rounded-full bg-red-500 text-white grid place-items-center shadow-md"
+                aria-label="Supprimer la photo"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const OrderCard = memo(function OrderCard({ order, product, margin, copied, copiedPayment, onFieldChange, onCopyOrder, onCopyClientMessage, whatsappLink }: OrderCardProps) {
   return (
     <div className="rounded-3xl bg-white text-dark p-5 shadow-xl shadow-black/10">
@@ -1305,6 +1402,8 @@ const OrderCard = memo(function OrderCard({ order, product, margin, copied, copi
           Envoyer tracking
         </a>
       </div>
+
+      <QcPhotos order={order} onFieldChange={onFieldChange} />
 
       <div className="flex flex-wrap gap-2 mt-5">
         <button
@@ -1578,6 +1677,7 @@ export default function AdminPanel() {
   const [editingNoteText, setEditingNoteText] = useState('');
   const [noteSort, setNoteSort] = useState<'priority' | 'date'>('priority');
   const [onlineCount, setOnlineCount] = useState(0);
+  const [notifOn, setNotifOn] = useState(false);
   const [chatMessages, setChatMessages] = useState<DbChatMessage[]>([]);
   const [activeConvo, setActiveConvo] = useState<string | null>(null);
   const [chatReply, setChatReply] = useState('');
@@ -1849,11 +1949,34 @@ export default function AdminPanel() {
   }, [products, selectedEstimateProduct, newOrder.productId]);
 
   useEffect(() => {
+    setNotifOn(notificationsEnabled());
+  }, []);
+
+  const toggleNotifications = useCallback(async () => {
+    if (notifOn) {
+      setNotificationsEnabled(false);
+      setNotifOn(false);
+      showToast('Notifications désactivées');
+      return;
+    }
+    const result = await requestNotifications();
+    if (result === 'granted') {
+      setNotifOn(true);
+      showToast('Notifications activées ✓');
+    } else if (result === 'denied') {
+      showToast('Notifications bloquées dans les réglages du navigateur');
+    } else if (result === 'unsupported') {
+      showToast('Ce navigateur ne gère pas les notifications');
+    }
+  }, [notifOn]);
+
+  useEffect(() => {
     const unsubOrders = subscribeToOrders(
       () => {
         fetchOrders().then((data) => setOrders(data.map(dbToOrder)));
         showToast('Nouvelle commande reçue !');
         playNewOrder();
+        notify('🛒 Nouvelle commande', 'Une commande vient de tomber sur tof. — ouvre le panel pour la traiter.', 'order');
       },
       () => {
         fetchOrders().then((data) => setOrders(data.map(dbToOrder)));
@@ -1865,6 +1988,7 @@ export default function AdminPanel() {
     const unsubChat = subscribeToChatMessages(() => {
       fetchConversations().then(setChatMessages);
       showToast('Nouveau message chat !');
+      notify('💬 Nouveau message', 'Un client vient de t\'écrire dans le chat.', 'chat');
     });
     return () => {
       unsubOrders();
@@ -2080,9 +2204,13 @@ export default function AdminPanel() {
 
 
   const saveOrderField = useCallback(async (id: string, field: string, value: string) => {
-    const dbField: Record<string, string> = { status: 'status', paymentStatus: 'payment_status', tracking: 'tracking' };
+    const dbField: Record<string, string> = {
+      status: 'status', paymentStatus: 'payment_status', tracking: 'tracking', qc_photos: 'qc_photos',
+    };
+    // Clé côté état React (camelCase) ≠ clé côté base (snake_case)
+    const stateField: Record<string, string> = { qc_photos: 'qcPhotos' };
     await updateOrder(id, { [dbField[field] || field]: value });
-    setOrders((prev) => prev.map((o) => o.id === id ? { ...o, [field]: value } : o));
+    setOrders((prev) => prev.map((o) => o.id === id ? { ...o, [stateField[field] || field]: value } : o));
   }, []);
 
   const saveDrop = async () => {
@@ -2466,6 +2594,24 @@ export default function AdminPanel() {
   }, [filterMenuOpen, sortMenuOpen]);
 
   // Nombre de commandes nécessitant une action (pour le badge sur l'onglet)
+  // Commandes créées mais jamais payées (paniers abandonnés)
+  const unpaidOrders = useMemo(
+    () => orders.filter((o) => (o.paymentStatus || 'pending') === 'pending' && o.status !== 'done'),
+    [orders],
+  );
+
+  const unpaidTotal = useMemo(
+    () =>
+      unpaidOrders.reduce((sum, o) => {
+        if (o.items && o.items.length > 0) {
+          return sum + o.items.reduce((s2, i) => s2 + i.price * i.quantity, 0);
+        }
+        const p = getProduct(o.productId);
+        return sum + p.salePrice * o.quantity;
+      }, 0),
+    [unpaidOrders, getProduct],
+  );
+
   const ordersNeedingAction = useMemo(
     () => orders.filter((o) => o.status === 'new' || o.status === 'to_order').length,
     [orders],
@@ -2544,8 +2690,31 @@ export default function AdminPanel() {
 
         {activeTab === 'dashboard' && (
           <div className="space-y-5">
+            {notificationsSupported() && currentPermission() === 'default' && (
+              <button
+                onClick={() => void toggleNotifications()}
+                className="w-full flex items-center gap-3 rounded-2xl bg-accent/10 border border-accent/25 px-4 py-3 text-left hover:bg-accent/15 transition-colors"
+              >
+                <Bell size={18} className="text-accent flex-shrink-0" />
+                <span className="text-sm text-white/70">
+                  <span className="font-bold text-white">Active les notifications</span> — sois prévenu dès qu'une commande tombe, même onglet fermé.
+                </span>
+              </button>
+            )}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
-              <div className="rounded-3xl bg-gradient-to-br from-green-500 to-emerald-600 text-white p-5">
+              <div className="rounded-3xl bg-gradient-to-br from-green-500 to-emerald-600 text-white p-5 relative">
+                {notificationsSupported() && (
+                  <button
+                    onClick={() => void toggleNotifications()}
+                    title={notifOn ? 'Notifications activées — cliquer pour couper' : 'Être prévenu des nouvelles commandes'}
+                    className={`absolute top-4 right-4 h-9 w-9 rounded-full grid place-items-center transition-colors ${
+                      notifOn ? 'bg-white/25 text-white' : 'bg-black/15 text-white/60 hover:bg-black/25'
+                    }`}
+                    aria-label={notifOn ? 'Désactiver les notifications' : 'Activer les notifications'}
+                  >
+                    {notifOn ? <Bell size={16} /> : <BellOff size={16} />}
+                  </button>
+                )}
                 <div className="text-xs font-bold uppercase tracking-wider text-white/60">En ligne</div>
                 <div className="mt-3 text-3xl font-display font-800 tracking-tight flex items-center gap-2">
                   <span className="h-3 w-3 bg-white rounded-full animate-pulse" />
@@ -2718,6 +2887,58 @@ export default function AdminPanel() {
         {activeTab === 'orders' && (
           <div className="grid lg:grid-cols-3 gap-5">
             <div className="lg:col-span-2 space-y-4">
+              {/* 💸 Paniers abandonnés : commandes créées mais jamais payées */}
+              {unpaidOrders.length > 0 && (
+                <div className="rounded-3xl bg-accent/10 border border-accent/25 p-4 sm:p-5">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div>
+                      <h3 className="font-bold text-white flex items-center gap-2">
+                        💸 {unpaidOrders.length} paiement{unpaidOrders.length > 1 ? 's' : ''} en attente
+                      </h3>
+                      <p className="text-xs text-white/45 mt-1">
+                        Commandes enregistrées mais non réglées — {euro(unpaidTotal)} à récupérer.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-4 space-y-2">
+                    {unpaidOrders.map((order) => {
+                      const hours = order.createdAt
+                        ? Math.floor((Date.now() - new Date(order.createdAt).getTime()) / 3600000)
+                        : null;
+                      return (
+                        <div key={order.id} className="flex items-center justify-between gap-3 rounded-2xl bg-dark/30 px-4 py-3 flex-wrap">
+                          <div className="min-w-0">
+                            <div className="text-sm font-bold text-white truncate">
+                              {rootOrderId(order.id)} · {order.customerName}
+                            </div>
+                            <div className="text-[11px] text-white/40">
+                              {hours !== null && (hours < 24 ? `il y a ${hours}h` : `il y a ${Math.floor(hours / 24)}j`)}
+                              {hours !== null && hours >= 24 && ' · à relancer'}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <a
+                              href={whatsappLink(order, 'reminder')}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="rounded-full bg-[#25D366] px-4 py-2 text-xs font-bold text-white hover:brightness-110 transition-all"
+                            >
+                              Relancer
+                            </a>
+                            <button
+                              onClick={() => saveOrderField(order.id, 'paymentStatus', 'paid')}
+                              className="rounded-full bg-white/10 px-4 py-2 text-xs font-bold text-white/70 hover:bg-white/20 transition-colors"
+                            >
+                              Payée ✓
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {orders.map((order) => {
                 const product = getProduct(order.productId);
                 const margin = estimateNetMargin(product, order.quantity);

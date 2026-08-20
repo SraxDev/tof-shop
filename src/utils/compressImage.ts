@@ -73,6 +73,21 @@ function hasTransparency(ctx: CanvasRenderingContext2D, w: number, h: number): b
   }
 }
 
+/** Le navigateur sait-il encoder en WebP via canvas.toBlob ? (tous depuis ~2020) */
+let webpSupport: boolean | null = null;
+function supportsWebp(): boolean {
+  if (webpSupport !== null) return webpSupport;
+  try {
+    const c = document.createElement('canvas');
+    c.width = 1;
+    c.height = 1;
+    webpSupport = c.toDataURL('image/webp').startsWith('data:image/webp');
+  } catch {
+    webpSupport = false;
+  }
+  return webpSupport;
+}
+
 export function compressImageToBlob(
   file: File,
   maxSize = 1000,
@@ -119,7 +134,17 @@ export function compressImageToBlob(
         const sourceHasAlpha = canvasHasAlpha || mimeAllowsAlpha;
 
         let mime: string;
-        if (sourceHasAlpha) {
+        if (supportsWebp()) {
+          // 🚀 WebP : ~70-80% plus léger que PNG/JPEG à qualité équivalente,
+          // et gère la transparence (donc OK pour les images détourées).
+          mime = 'image/webp';
+          if (!sourceHasAlpha) {
+            ctx.globalCompositeOperation = 'destination-over';
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, width, height);
+            ctx.globalCompositeOperation = 'source-over';
+          }
+        } else if (sourceHasAlpha) {
           mime = 'image/png';
         } else {
           // JPEG + fond blanc seulement quand aucune transparence
@@ -142,6 +167,10 @@ export function compressImageToBlob(
           (blob) => {
             if (!blob) {
               reject(new Error('Compression impossible'));
+              return;
+            }
+            if (mime === 'image/webp') {
+              resolve({ blob, width, height, hasAlpha: sourceHasAlpha });
               return;
             }
             if (mime === 'image/png' && sourceHasAlpha) {
@@ -176,7 +205,7 @@ export function compressImageToBlob(
             resolve({ blob, width, height, hasAlpha: false });
           },
           mime,
-          mime === 'image/jpeg' ? quality : undefined,
+          mime === 'image/jpeg' || mime === 'image/webp' ? quality : undefined,
         );
       };
       img.src = String(reader.result);

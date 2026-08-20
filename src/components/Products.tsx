@@ -1,4 +1,4 @@
-import { Heart, Search, ShoppingBag, X, ChevronDown, ChevronLeft, ChevronRight, Filter, Minus, Plus, Zap, Ruler } from 'lucide-react';
+import { Heart, Search, ShoppingBag, X, ChevronDown, ChevronLeft, ChevronRight, Filter, Minus, Plus, Zap, Ruler, Share2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDebounce } from '../hooks/useDebounce';
 import AppleEmoji from './AppleEmoji';
@@ -149,6 +149,18 @@ function discountPercent(product: Product) {
 
 function parseSplit(str?: string) {
   return (str || '').split(',').map((s) => s.trim()).filter(Boolean);
+}
+
+// Une taille peut porter un suffixe de stock : "41:0" = rupture, "41" ou "41:3" = dispo.
+export type SizeOption = { label: string; inStock: boolean };
+
+function parseSizes(str?: string): SizeOption[] {
+  return parseSplit(str).map((raw) => {
+    const [label, stock] = raw.split(':').map((x) => x.trim());
+    if (stock === undefined || stock === '') return { label, inStock: true };
+    const n = Number(stock);
+    return { label, inStock: Number.isNaN(n) ? true : n > 0 };
+  });
 }
 
 function needsSize(product: Product) {
@@ -336,11 +348,12 @@ function QuickAddModal({
   const touchPanelRef = useRef<HTMLDivElement>(null);
 
   const images = useMemo(() => getProductImages(product), [product]);
-  const sizes = useMemo(() => parseSplit(product.sizes), [product]);
+  const sizes = useMemo(() => parseSizes(product.sizes), [product]);
+  const availableSizes = useMemo(() => sizes.filter((s) => s.inStock), [sizes]);
   const colors = useMemo(() => parseSplit(product.colors), [product]);
 
   useEffect(() => {
-    setSelectedSize(sizes[0] || '');
+    setSelectedSize(availableSizes[0]?.label || '');
     setSelectedColor(colors[0] || '');
     setActiveImage(images[0] || '');
     setShowSizeGuide(false);
@@ -462,6 +475,32 @@ function QuickAddModal({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
+        {/* Partager (mobile-first : Web Share API, sinon copie du lien) */}
+        <button
+          onClick={async () => {
+            const url = `${window.location.origin}${window.location.pathname}#produit/${product.id}`;
+            const shareData = {
+              title: `${product.brand} ${product.name}`,
+              text: `${product.brand} ${product.name} — ${formatPrice(product.salePrice)} sur tof.`,
+              url,
+            };
+            try {
+              if (navigator.share) {
+                await navigator.share(shareData);
+                return;
+              }
+              await navigator.clipboard.writeText(url);
+              showToast('Lien copié ✓');
+            } catch {
+              /* partage annulé */
+            }
+          }}
+          className="absolute top-4 sm:top-6 right-16 sm:right-20 z-50 h-10 w-10 rounded-full bg-white/90 backdrop-blur border border-dark/5 flex items-center justify-center text-dark/60 hover:text-accent hover:scale-110 transition-all shadow-sm"
+          aria-label="Partager ce produit"
+        >
+          <Share2 size={17} />
+        </button>
+
         {/* Close desktop */}
         <button
           onClick={onClose}
@@ -601,18 +640,33 @@ function QuickAddModal({
                       </button>
                     </div>
 
+                    {availableSizes.length === 0 && (
+                      <p className="mb-3 rounded-xl bg-dark/5 px-3 py-2 text-[11px] font-bold text-dark/45 text-center">
+                        Toutes les tailles sont épuisées — écris-nous pour une commande sur mesure.
+                      </p>
+                    )}
+
                     <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
                       {sizes.map((s) => (
                         <button
-                          key={s}
-                          onClick={() => setSelectedSize(s)}
-                          className={`h-12 min-w-[44px] rounded-xl text-sm font-bold border-2 transition-all duration-200 ${
-                            selectedSize === s
-                              ? 'bg-dark text-white border-dark'
-                              : 'bg-white text-dark/80 border-dark/10 hover:border-dark/30'
+                          key={s.label}
+                          onClick={() => s.inStock && setSelectedSize(s.label)}
+                          disabled={!s.inStock}
+                          title={s.inStock ? undefined : 'Épuisée'}
+                          className={`relative h-12 min-w-[44px] rounded-xl text-sm font-bold border-2 transition-all duration-200 ${
+                            !s.inStock
+                              ? 'bg-dark/[0.03] text-dark/25 border-dark/5 cursor-not-allowed overflow-hidden'
+                              : selectedSize === s.label
+                                ? 'bg-dark text-white border-dark'
+                                : 'bg-white text-dark/80 border-dark/10 hover:border-dark/30'
                           }`}
                         >
-                          {s}
+                          {s.label}
+                          {!s.inStock && (
+                            <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                              <span className="block w-[130%] h-px bg-dark/15 rotate-[-38deg]" />
+                            </span>
+                          )}
                         </button>
                       ))}
                     </div>
@@ -984,6 +1038,31 @@ export default function Products() {
     return () => window.removeEventListener('tof-open-product', handler);
   }, [openProductById]);
 
+  // 🔗 Ouvre la fiche si l'URL contient #produit/<id> (lien partagé, retour arrière)
+  useEffect(() => {
+    if (loading || products.length === 0) return;
+
+    const syncFromHash = () => {
+      const m = window.location.hash.match(/^#produit\/(.+)$/);
+      if (m) {
+        const id = decodeURIComponent(m[1]);
+        if (products.some((p) => p.id === id && p.status === 'active')) {
+          setQuickAddId(id);
+          return;
+        }
+      }
+      setQuickAddId((prev) => (prev && !m ? null : prev));
+    };
+
+    syncFromHash();
+    window.addEventListener('hashchange', syncFromHash);
+    window.addEventListener('popstate', syncFromHash);
+    return () => {
+      window.removeEventListener('hashchange', syncFromHash);
+      window.removeEventListener('popstate', syncFromHash);
+    };
+  }, [loading, products]);
+
   // Auto-open product preview from admin "Aperçu" button
   useEffect(() => {
     if (loading || products.length === 0) return;
@@ -1053,6 +1132,20 @@ export default function Products() {
 
   const openQuickAdd = useCallback((p: Product) => {
     setQuickAddId(p.id);
+    // URL partageable : #produit/<id> (permet d'envoyer une pièce précise sur Snap/WhatsApp)
+    try {
+      const target = `#produit/${p.id}`;
+      if (window.location.hash !== target) window.history.pushState(null, '', target);
+    } catch { /* ignore */ }
+  }, []);
+
+  const closeQuickAdd = useCallback(() => {
+    setQuickAddId(null);
+    try {
+      if (window.location.hash.startsWith('#produit/')) {
+        window.history.pushState(null, '', `${window.location.pathname}${window.location.search}#shop`);
+      }
+    } catch { /* ignore */ }
   }, []);
 
   const resetFilters = () => {
@@ -1280,7 +1373,7 @@ export default function Products() {
           product={quickAdd}
           settings={settings}
           relatedProducts={relatedProducts}
-          onClose={() => setQuickAddId(null)}
+          onClose={closeQuickAdd}
         />
       )}
     </section>

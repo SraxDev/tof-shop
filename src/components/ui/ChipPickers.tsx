@@ -30,6 +30,17 @@ function joinList(arr: string[]): string {
   return arr.join(', ');
 }
 
+// Une entrée de taille peut porter un stock : "41" (dispo) ou "41:0" (épuisée).
+function sizeLabel(entry: string): string {
+  return entry.split(':')[0].trim();
+}
+function isSoldOut(entry: string): boolean {
+  const [, stock] = entry.split(':');
+  if (stock === undefined || stock.trim() === '') return false;
+  const n = Number(stock.trim());
+  return !Number.isNaN(n) && n <= 0;
+}
+
 /**
  * Guess the right preset of sizes based on the selected admin category name.
  */
@@ -48,23 +59,29 @@ type ChipProps = {
   active: boolean;
   onClick: () => void;
   theme: Theme;
+  soldOut?: boolean;
 };
 
-function Chip({ label, active, onClick, theme }: ChipProps) {
+function Chip({ label, active, onClick, theme, soldOut = false }: ChipProps) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
         'h-9 min-w-[40px] px-3 rounded-xl border-2 text-xs font-bold transition-all active:scale-95 select-none',
-        theme === 'dark'
-          ? active
-            ? 'bg-accent text-white border-accent shadow-lg shadow-accent/20'
-            : 'bg-white/5 text-white/70 border-white/10 hover:border-white/30 hover:text-white'
-          : active
-            ? 'bg-dark text-white border-dark shadow-md shadow-dark/20'
-            : 'bg-white text-dark/70 border-dark/10 hover:border-dark/30 hover:text-dark',
+        soldOut
+          ? theme === 'dark'
+            ? 'bg-white/5 text-white/30 border-white/15 border-dashed line-through'
+            : 'bg-bg text-dark/30 border-dark/15 border-dashed line-through'
+          : theme === 'dark'
+            ? active
+              ? 'bg-accent text-white border-accent shadow-lg shadow-accent/20'
+              : 'bg-white/5 text-white/70 border-white/10 hover:border-white/30 hover:text-white'
+            : active
+              ? 'bg-dark text-white border-dark shadow-md shadow-dark/20'
+              : 'bg-white text-dark/70 border-dark/10 hover:border-dark/30 hover:text-dark',
       )}
+      title={soldOut ? 'Épuisée — clique pour retirer' : active ? 'Disponible — clique pour marquer épuisée' : 'Clique pour proposer cette taille'}
     >
       {label}
     </button>
@@ -87,16 +104,23 @@ export function SizePicker({
   const [customOpen, setCustomOpen] = useState(false);
   const [custom, setCustom] = useState('');
 
+  // 3 états : non proposée → disponible → épuisée → non proposée
   const toggle = (s: string) => {
-    const set = new Set(selected);
-    set.has(s) ? set.delete(s) : set.add(s);
-    onChange(joinList(Array.from(set)));
+    const idx = selected.findIndex((e) => sizeLabel(e) === s);
+    if (idx === -1) {
+      onChange(joinList([...selected, s]));
+      return;
+    }
+    const next = [...selected];
+    if (isSoldOut(next[idx])) next.splice(idx, 1);
+    else next[idx] = `${s}:0`;
+    onChange(joinList(next));
   };
 
   const addCustom = () => {
     const v = custom.trim();
     if (!v) return;
-    if (!selected.includes(v)) onChange(joinList([...selected, v]));
+    if (!selected.some((e) => sizeLabel(e) === v)) onChange(joinList([...selected, v]));
     setCustom('');
     setCustomOpen(false);
   };
@@ -123,12 +147,24 @@ export function SizePicker({
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap gap-1.5">
-        {preset.map((s) => (
-          <Chip key={s} label={s} active={selected.includes(s)} onClick={() => toggle(s)} theme={theme} />
-        ))}
+        {preset.map((s) => {
+          const entry = selected.find((e) => sizeLabel(e) === s);
+          return (
+            <Chip
+              key={s}
+              label={s}
+              active={!!entry}
+              soldOut={!!entry && isSoldOut(entry)}
+              onClick={() => toggle(s)}
+              theme={theme}
+            />
+          );
+        })}
         {selected
-          .filter((s) => !preset.includes(s))
-          .map((s) => (
+          .filter((e) => !preset.includes(sizeLabel(e)))
+          .map((entry) => {
+            const s = sizeLabel(entry);
+            return (
             <button
               key={s}
               type="button"
@@ -140,10 +176,11 @@ export function SizePicker({
                   : 'bg-dark text-white border-dark pr-2',
               )}
             >
-              {s}
+              {s}{isSoldOut(entry) ? ' · épuisée' : ''}
               <X size={10} />
             </button>
-          ))}
+            );
+          })}
         <button
           type="button"
           onClick={() => setCustomOpen((v) => !v)}
@@ -158,6 +195,9 @@ export function SizePicker({
           <Plus size={14} />
         </button>
       </div>
+      <p className={cn('text-[10px] leading-relaxed', theme === 'dark' ? 'text-white/35' : 'text-dark/40')}>
+        1 clic = taille proposée · 2 clics = <span className="line-through">épuisée</span> (barrée sur le site, non sélectionnable) · 3 clics = retirée.
+      </p>
       {customOpen && (
         <div className="flex gap-2">
           <input

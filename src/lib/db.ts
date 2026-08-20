@@ -48,6 +48,7 @@ export type DbOrder = {
   payment_status: string;
   tracking: string | null;
   items_json?: string;
+  qc_photos?: string | null;
   created_at?: string;
 };
 
@@ -111,26 +112,57 @@ export async function insertOrder(order: DbOrder) {
   window.dispatchEvent(new CustomEvent('tof-orders-updated'));
 }
 
-/** Recherche publique d'une commande par son numéro (TOF-XXXX), insensible à la casse. */
-export async function fetchOrderById(orderId: string): Promise<DbOrder | null> {
+/**
+ * Suivi public d'une commande via la fonction RPC `track_order`.
+ * Ne renvoie QUE le statut : aucune donnée personnelle n'est exposée.
+ * (voir supabase/01-securite-rls.sql)
+ */
+export type TrackedOrder = {
+  id: string;
+  status: string;
+  payment_status: string;
+  tracking: string | null;
+  created_at?: string;
+  items_json?: string;
+  city_hint?: string | null;
+  qc_photos?: string | null;
+};
+
+export async function fetchOrderById(orderId: string): Promise<TrackedOrder | null> {
   const clean = orderId.trim().toUpperCase();
   if (!clean) return null;
-  const withPrefix = clean.startsWith('TOF-') ? clean : `TOF-${clean.replace(/^TOF/i, '').replace(/^-/, '')}`;
-  const { data } = await supabase.from('orders').select('*').eq('id', withPrefix).maybeSingle();
-  if (data) return data as DbOrder;
-  // Fallback : certaines commandes ont un suffixe (TOF-1234-2)
-  const { data: like } = await supabase.from('orders').select('*').ilike('id', `${withPrefix}%`).limit(1);
-  return ((like as DbOrder[]) || [])[0] || null;
+  const withPrefix = clean.startsWith('TOF-')
+    ? clean
+    : `TOF-${clean.replace(/^TOF/i, '').replace(/^-/, '')}`;
+
+  const { data, error } = await supabase.rpc('track_order', { order_id: withPrefix });
+  if (error) {
+    console.error('track_order failed:', error.message);
+    return null;
+  }
+  const rows = (data as TrackedOrder[]) || [];
+  return rows[0] || null;
 }
 
-/** Dernières commandes (utilisé par la preuve sociale côté public). */
-export async function fetchRecentOrders(limit = 20): Promise<DbOrder[]> {
-  const { data } = await supabase
-    .from('orders')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(limit);
-  return (data as DbOrder[]) || [];
+/**
+ * Dernières commandes anonymisées pour la preuve sociale (prénom + ville).
+ * Passe par la RPC `recent_orders_public` : ni téléphone ni adresse.
+ */
+export type PublicRecentOrder = {
+  first_name: string;
+  city: string | null;
+  items_json?: string;
+  created_at?: string;
+};
+
+export async function fetchRecentOrders(limit = 20): Promise<PublicRecentOrder[]> {
+  const { data, error } = await supabase.rpc('recent_orders_public', { max_rows: limit });
+  if (error) {
+    // La fonction n'existe pas tant que supabase/01-securite-rls.sql n'a pas été exécuté.
+    if (import.meta.env.DEV) console.warn('recent_orders_public indisponible — exécute supabase/01-securite-rls.sql');
+    return [];
+  }
+  return (data as PublicRecentOrder[]) || [];
 }
 
 export async function updateOrder(id: string, fields: Partial<DbOrder>) {
@@ -177,19 +209,30 @@ export async function deletePromoCode(id: string) {
 }
 
 export async function validatePromoCode(code: string): Promise<DbPromoCode | null> {
-  const { data } = await supabase.from('promo_codes').select('*').eq('code', code.toUpperCase()).eq('active', true).single();
-  if (!data) return null;
-  const promo = data as DbPromoCode;
-  if (promo.max_uses > 0 && promo.uses >= promo.max_uses) return null;
-  if (promo.expires_at && new Date(promo.expires_at) < new Date()) return null;
-  return promo;
+  // Passe par la RPC : la table promo_codes n'est plus lisible publiquement,
+  // impossible de lister tous les codes de réduction.
+  const { data, error } = await supabase.rpc('validate_promo', { code_input: code });
+  if (error) {
+    console.error('validate_promo failed:', error.message);
+    return null;
+  }
+  const rows = (data as Array<{ id: string; code: string; discount_percent: number }>) || [];
+  const found = rows[0];
+  if (!found) return null;
+  return {
+    id: found.id,
+    code: found.code,
+    discount_percent: found.discount_percent,
+    active: true,
+    uses: 0,
+    max_uses: 0,
+    expires_at: null,
+  } as DbPromoCode;
 }
 
 export async function incrementPromoUse(id: string) {
-  const { data } = await supabase.from('promo_codes').select('uses').eq('id', id).single();
-  if (data) {
-    await supabase.from('promo_codes').update({ uses: (data.uses || 0) + 1 }).eq('id', id);
-  }
+  const { error } = await supabase.rpc('consume_promo', { promo_id: id });
+  if (error) console.error('consume_promo failed:', error.message);
 }
 
 // ─── Chat ────────────────────────────────────────────────
@@ -209,7 +252,12 @@ export async function fetchConversations(): Promise<DbChatMessage[]> {
 }
 
 export async function fetchConversationMessages(conversationId: string): Promise<DbChatMessage[]> {
-  const { data } = await supabase.from('chat_messages').select('*').eq('conversation_id', conversationId).order('created_at', { ascending: true });
+  // RPC : le visiteur ne peut lire que la conversation dont il connaît l'id.
+  const { data, error } = await supabase.rpc('get_conversation', { conv_id: conversationId });
+  if (error) {
+    console.error('get_conversation failed:', error.message);
+    return [];
+  }
   return (data as DbChatMessage[]) || [];
 }
 

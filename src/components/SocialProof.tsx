@@ -1,6 +1,6 @@
 import { X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { fetchRecentOrders, type DbOrder } from '../lib/db';
+import { fetchRecentOrders, type PublicRecentOrder } from '../lib/db';
 
 type ProofItem = {
   id: string;
@@ -21,7 +21,7 @@ function firstName(full: string) {
   return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
 }
 
-function productLabel(order: DbOrder): string {
+function productLabel(order: PublicRecentOrder): string {
   try {
     const items = order.items_json ? JSON.parse(order.items_json) : [];
     if (Array.isArray(items) && items.length > 0) {
@@ -69,10 +69,10 @@ export default function SocialProof() {
       .then((orders) => {
         if (!alive) return;
         const mapped = orders
-          .filter((o) => o.customer_name)
-          .map<ProofItem>((o) => ({
-            id: o.id,
-            name: firstName(o.customer_name),
+          .filter((o) => o.first_name)
+          .map<ProofItem>((o, i) => ({
+            id: `${o.created_at || ''}-${i}`,
+            name: firstName(o.first_name),
             city: (o.city || '').trim(),
             product: productLabel(o),
             minutesAgo: minutesSince(o.created_at),
