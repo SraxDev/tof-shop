@@ -230,8 +230,14 @@ img.emoji {
   }
 }
 
-/* Évite tout débordement horizontal sur mobile */
-html, body {
+/* Évite tout débordement horizontal sur mobile.
+ *
+ * ⚠️ `overflow-x: hidden` doit rester sur <body> UNIQUEMENT.
+ * Appliqué à <html>, il transforme la racine en conteneur de défilement
+ * et casse le scroll vertical de toute la page sur desktop
+ * (window.scrollY reste bloqué à 0).
+ */
+body {
   max-width: 100%;
   overflow-x: hidden;
 }
