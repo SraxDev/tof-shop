@@ -113,7 +113,7 @@ export default function Hero() {
                 <span className="text-green-500">✓</span> Vérifié avant envoi
               </div>
               <div className="flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-2 text-[11px] font-semibold text-dark/50 border border-dark/5">
-                <span className="text-green-500">✓</span> PayPal protection acheteur
+                <span className="text-green-500">✓</span> Paiement CB sécurisé SumUp
               </div>
               <div className="flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-2 text-[11px] font-semibold text-dark/50 border border-dark/5">
                 <span className="text-green-500">✓</span> Livraison suivie 10-20j

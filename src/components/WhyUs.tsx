@@ -10,9 +10,9 @@ export default function WhyUs() {
     {
       emoji: '💳',
       title: 'Paiement sécurisé',
-      desc: 'Paiement via PayPal, protection acheteur 180 jours. Zéro risque à commander.',
-      stat: '180j',
-      statLabel: 'protection',
+      desc: 'Paiement par carte via SumUp, vérification 3D Secure. Zéro risque à commander.',
+      stat: '3DS',
+      statLabel: 'sécurisé',
     },
     {
       emoji: '📦',

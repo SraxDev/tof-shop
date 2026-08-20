@@ -31,7 +31,7 @@ export default function Footer() {
             <p className="text-[11px] font-bold text-white/20 uppercase tracking-widest mb-3">Garanties</p>
             <ul className="space-y-1.5 text-sm">
               <li>✓ Chaque pièce vérifiée par moi</li>
-              <li>✓ Paiement PayPal protection acheteur</li>
+              <li>✓ Paiement carte sécurisé via SumUp</li>
               <li>✓ Livraison suivie 10-20j, colis discret</li>
               <li>✓ Si problème, on arrange ça</li>
             </ul>
@@ -63,7 +63,7 @@ export default function Footer() {
         <div className="border-t border-white/5 mt-10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-white/20">
           <div className="flex items-center gap-3 flex-wrap justify-center">
             <span className="text-white/15">Paiement :</span>
-            {['PayPal'].map((p) => (
+            {['SumUp', 'Visa', 'Mastercard', 'Apple Pay', 'Google Pay'].map((p) => (
               <div
                 key={p}
                 className="h-6 px-2.5 bg-white/5 rounded-md flex items-center justify-center text-[9px] font-bold text-white/30 tracking-wide border border-white/5"

@@ -72,7 +72,7 @@ const RULES: Rule[] = [
   { intent: 'shipping', keywords: ['livraison', 'delai', 'délai', 'combien de temps', 'expédition', 'expedition', 'recevoir', 'reçois', 'jours', 'semaine', 'quand', 'arrive', 'arrivera', 'envoi', 'reçu', 'recu', 'envoie', 'envoyé', 'envoyee'], weight: 1 },
   { intent: 'tracking', keywords: ['track', 'suivi', 'colis', 'suivre', 'numero', 'numéro', 'tracking'] },
   { intent: 'free_shipping', keywords: ['gratuit', 'offert', 'livraison gratuite', 'frais de port', 'port gratuit', 'free shipping'] },
-  { intent: 'payment', keywords: ['paiement', 'payer', 'paypal', 'virement', 'carte', 'cb', 'apple pay', 'revolut', 'moyen de paiement', 'régler', 'regler'] },
+  { intent: 'payment', keywords: ['paiement', 'payer', 'paypal', 'sumup', 'virement', 'carte', 'cb', 'apple pay', 'google pay', 'revolut', 'moyen de paiement', 'régler', 'regler'] },
   { intent: 'trust', keywords: ['sécurisé', 'securise', 'confiance', 'arnaque', 'fiable', 'legit', 'vrai ou faux', 'scam', 'sérieux', 'serieux', 'contrefaçon', 'contrefacon', 'fiable', 'pourquoi vous', 'vous êtes fiable'] },
   { intent: 'returns', keywords: ['retour', 'rembours', 'échange', 'echange', 'problème', 'probleme', 'cassé', 'casse', 'abîmé', 'abime', 'erreur', 'tromper', 'trompé', 'mauvaise taille'] },
   { intent: 'sizing', keywords: ['taille', 'size', 'guide', 'mesure', 'pointure', 'grand', 'petit', 'taille bien', 'chausse', 'taille grand', 'taille petit', 'quelle taille', 'quelle taille prendre', 'cm'] },
@@ -126,7 +126,7 @@ const REPLIES: Record<Intent, string[]> = {
     "Salut toi ! C'est ton assistant tof. Dis-moi ce que tu cherches et je te guide.",
   ],
   order_howto: [
-    "C'est simple : 🛍️\n\n1. Ajoute tes pièces au panier\n2. Remplis tes infos\n3. On te contacte sur WhatsApp pour le paiement PayPal sécurisé\n4. Tu reçois le tracking dès l'expédition\n\nTu peux commencer tout de suite depuis le shop.",
+    "C'est simple : 🛍️\n\n1. Ajoute tes pièces au panier\n2. Remplis tes infos\n3. Tu paies par carte via notre lien SumUp sécurisé\n4. Tu reçois le tracking dès l'expédition\n\nTu peux commencer tout de suite depuis le shop.",
   ],
   prices: [
     "Tous nos prix sont affichés en €, TVA incluse, directement sur chaque fiche produit. 💸\n\nSi un produit n'a pas de prix affiché ou que tu cherches un tarif groupé, passe par WhatsApp !",
@@ -144,10 +144,10 @@ const REPLIES: Record<Intent, string[]> = {
     "🎉 La livraison standard est offerte à partir du seuil affiché dans le panier (ou en ce moment sur tout le site avec le code de lancement).",
   ],
   payment: [
-    "💳 Paiement 100% sécurisé via PayPal (protection acheteur).\n\n1. Tu valides ton panier\n2. On t'envoie la demande PayPal sur WhatsApp\n3. Tu payes en 2 clics\n4. On lance la préparation\n\nSi tu préfères un autre moyen (Revolut, virement), dis-le nous.",
+    "💳 Paiement 100% sécurisé par carte via SumUp (CB, Visa, Mastercard, Apple Pay, Google Pay, 3D Secure).\n\n1. Tu valides ton panier\n2. Tu paies via le lien SumUp affiché après ta commande\n3. Tu nous confirmes sur WhatsApp\n4. On lance la préparation\n\nSi tu préfères un autre moyen (Revolut, virement), dis-le nous.",
   ],
   trust: [
-    "On comprend les doutes, c'est normal. On est transparents :\n\n✅ Photos QC (contrôle qualité) envoyées avant envoi\n✅ Paiement PayPal avec protection acheteur\n✅ Retours acceptés sous 14 jours\n✅ Support 7j/7 réactif sur WhatsApp\n\nZéro mauvaise surprise. ❤️",
+    "On comprend les doutes, c'est normal. On est transparents :\n\n✅ Photos QC (contrôle qualité) envoyées avant envoi\n✅ Paiement carte sécurisé via SumUp (3D Secure)\n✅ Retours acceptés sous 14 jours\n✅ Support 7j/7 réactif sur WhatsApp\n\nZéro mauvaise surprise. ❤️",
   ],
   returns: [
     "Un souci ? Contacte-nous dans les 14 jours avec ton numéro TOF-XXXX :\n\n• Mauvaise taille / article : échange ou remboursement\n• Article défectueux : remboursement immédiat\n• Erreur de notre part : on prend tout en charge",
