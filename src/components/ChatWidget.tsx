@@ -2,7 +2,7 @@ import { MessageCircle, Send, X, Minimize2, RefreshCw } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { sendChatMessage, fetchConversationMessages, subscribeToChatMessages, type DbChatMessage } from '../lib/db';
 import { readSiteSettings } from '../lib/siteSettings';
-import { botReply, createBotState, type BotState } from '../lib/bot';
+import { botReply, createBotState, serializeBotState, deserializeBotState, type BotState } from '../lib/bot';
 import {
   searchProducts, formatProductList, listBrands,
   extractOrderId, trackOrderSummary, availableSizes, soldOutSizes, getCatalog, formatPrice,
@@ -13,6 +13,27 @@ const CHAT_ID_KEY = 'tof-chat-id-v2';
 const CHAT_NAME_KEY = 'tof-chat-name';
 const CHAT_OPEN_KEY = 'tof-chat-open';
 const CHAT_WELCOMED_KEY = 'tof-chat-welcomed-v2';
+/** Mémoire du bot : survit au rechargement pour qu'il ne se répète pas. */
+const CHAT_BOTSTATE_KEY = 'tof-chat-botstate-v1';
+
+/** Relit la mémoire du bot, en la rejetant si elle concerne une autre conversation. */
+function readBotState(conversationId: string): BotState | null {
+  try {
+    const raw = localStorage.getItem(CHAT_BOTSTATE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { conversationId?: string };
+    if (parsed?.conversationId !== conversationId) return null;
+    return deserializeBotState(parsed);
+  } catch {
+    return null;
+  }
+}
+
+function persistBotState(state: BotState, conversationId: string) {
+  try {
+    localStorage.setItem(CHAT_BOTSTATE_KEY, JSON.stringify(serializeBotState(state, conversationId)));
+  } catch { /* quota plein ou navigation privée : la mémoire est un confort, pas un prérequis */ }
+}
 /** Préfixe des messages internes destinés à l'admin, jamais affichés au client. */
 const ESCALATION_TAG = '⚠️ À REPRENDRE';
 
@@ -289,7 +310,12 @@ export default function ChatWidget() {
         // créera une conversation propre côté admin, au lieu de réalimenter
         // celle qui vient d'être supprimée.
         const fresh = `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-        try { localStorage.setItem(CHAT_ID_KEY, fresh); } catch { /* ignore */ }
+        try {
+          localStorage.setItem(CHAT_ID_KEY, fresh);
+          // La conversation a été supprimée : on oublie aussi ce que le bot
+          // en avait retenu, sinon il reprendrait avec un souvenir fantôme.
+          localStorage.removeItem(CHAT_BOTSTATE_KEY);
+        } catch { /* ignore */ }
         setConversationId(fresh);
         hadMessagesRef.current = false;
         botStateRef.current = createBotState();
@@ -305,15 +331,19 @@ export default function ChatWidget() {
           const hasNewFromSupport = data.slice(-newCount).some((m) => m.sender !== 'client');
           if (hasNewFromSupport) setUnread((u) => u + newCount);
         }
-        // Rejouer l'état du bot à partir des messages existants pour éviter les répétitions
-        const state = botStateRef.current;
-        state.covered = new Set();
-        state.turn = 0;
-        for (const m of data) {
-          if (m.sender === 'bot') {
-            // Approximation : on ne ré-évalue pas, on incrémente juste turn
-            state.turn += 1;
-          }
+        // Restaure la mémoire du bot (sujets déjà traités, prénom, humeur…).
+        // Avant, on repartait d'un Set vide : après un simple F5 le bot
+        // resservait sa réponse complète comme s'il ne t'avait jamais parlé.
+        const restored = readBotState(conversationId);
+        if (restored) {
+          botStateRef.current = restored;
+          if (name && !restored.userName) botStateRef.current.userName = name;
+        } else {
+          // Pas de mémoire exploitable : on se cale au moins sur le nombre
+          // d'échanges déjà visibles, pour ne pas re-saluer le visiteur.
+          const state = botStateRef.current;
+          state.turn = data.filter((m) => m.sender === 'bot').length;
+          state.clientTurns = data.filter((m) => m.sender === 'client').length;
         }
         return data;
       });
@@ -408,6 +438,10 @@ export default function ChatWidget() {
 
     const decision = botReply(queue, botStateRef.current);
     const joined = queue.join(' ');
+
+    // botReply() vient de muter l'état (sujets couverts, tour, humeur) :
+    // on le persiste pour que le bot s'en souvienne après un rechargement.
+    persistBotState(botStateRef.current, conversationId);
 
     setTyping(true);
 
@@ -532,6 +566,7 @@ export default function ChatWidget() {
     if (!confirm('Effacer la conversation sur cet appareil ?')) return;
     try {
       localStorage.removeItem(CHAT_ID_KEY);
+      localStorage.removeItem(CHAT_BOTSTATE_KEY);
       localStorage.removeItem(CHAT_NAME_KEY);
       sessionStorage.removeItem(CHAT_OPEN_KEY);
       sessionStorage.removeItem(CHAT_WELCOMED_KEY);

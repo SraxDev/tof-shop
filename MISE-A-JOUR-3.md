@@ -307,6 +307,26 @@ moyen**, calculé sur les 20 dernières conversations.
 **Testé dans un vrai navigateur** : affichage, filtres, recherche, encadré d'escalade et
 tri par priorité vérifiés sur un jeu de 4 conversations, sans aucune erreur JavaScript.
 
+## 15. Bot : il se souvient après un rechargement
+
+Un défaut connu qu'on avait laissé de côté : le bot perdait la mémoire dès que
+le visiteur rechargeait la page. Il resservait alors sa réponse complète,
+mot pour mot, comme si vous ne vous étiez jamais parlé.
+
+La cause : la liste des sujets déjà abordés était vidée à chaque chargement.
+
+Désormais la mémoire du bot est conservée (sujets traités, prénom, humeur,
+nombre d'échanges). Concrètement, si le client repose une question déjà traitée,
+le bot répond « **Pour rappel :** … » au lieu de recopier sa tartine.
+
+La mémoire est effacée automatiquement dans deux cas : quand le visiteur clique
+sur « Recommencer », et quand tu supprimes la conversation depuis l'admin
+(sinon le bot repartirait avec un souvenir fantôme).
+
+**Testé dans un vrai navigateur** : question posée, rechargement de page,
+même question reposée → le bot enchaîne par « Pour rappel » et garde le prénom.
+Aucune erreur JavaScript.
+
 ## 9. Référencement & partage
 
 - `public/og-image.jpg` (1200×630, 30 Ko) : l'aperçu qui s'affiche quand on colle ton lien sur WhatsApp, Insta ou Snap

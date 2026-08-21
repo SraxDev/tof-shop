@@ -382,6 +382,62 @@ export function botReply(
   };
 }
 
+/**
+ * Mémoire du bot entre deux chargements de page.
+ *
+ * `covered` est un Set et `BotState` n'est pas sérialisable tel quel : sans
+ * ça, le visiteur qui recharge la page voit le bot lui resservir la même
+ * réponse complète, comme s'ils ne s'étaient jamais parlé.
+ */
+export type SerializedBotState = {
+  conversationId: string;
+  covered: Intent[];
+  lastIntent?: Intent;
+  userName?: string;
+  lastProduct?: { brand: string; name: string };
+  turn: number;
+  confusion: number;
+  mood?: Mood;
+  escalated?: boolean;
+  lastTopic?: string;
+  clientTurns?: number;
+};
+
+export function serializeBotState(state: BotState, conversationId: string): SerializedBotState {
+  return {
+    conversationId,
+    covered: Array.from(state.covered),
+    lastIntent: state.lastIntent,
+    userName: state.userName,
+    lastProduct: state.lastProduct,
+    turn: state.turn,
+    confusion: state.confusion,
+    mood: state.mood,
+    escalated: state.escalated,
+    lastTopic: state.lastTopic,
+    clientTurns: state.clientTurns,
+  };
+}
+
+/** Reconstruit un état complet ; tolère un stockage corrompu ou d'une version antérieure. */
+export function deserializeBotState(raw: unknown): BotState | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const d = raw as Partial<SerializedBotState>;
+  const base = createBotState();
+  if (!Array.isArray(d.covered)) return null;
+  base.covered = new Set(d.covered.filter((i): i is Intent => typeof i === 'string'));
+  base.lastIntent = d.lastIntent;
+  base.userName = d.userName;
+  base.lastProduct = d.lastProduct;
+  base.turn = typeof d.turn === 'number' ? d.turn : 0;
+  base.confusion = typeof d.confusion === 'number' ? d.confusion : 0;
+  base.mood = d.mood || 'neutral';
+  base.escalated = Boolean(d.escalated);
+  base.lastTopic = d.lastTopic;
+  base.clientTurns = typeof d.clientTurns === 'number' ? d.clientTurns : 0;
+  return base;
+}
+
 export function createBotState(): BotState {
   return {
     covered: new Set<Intent>(),
