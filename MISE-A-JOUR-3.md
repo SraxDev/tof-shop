@@ -239,6 +239,74 @@ client**, visible pour toi dans l'admin. Tu vois d'un coup d'œil les
 conversations à rattraper — et les questions qui reviennent te disent quoi
 ajouter au bot.
 
+## 14. Panel admin : onglet Chat complet
+
+L'onglet Chat servait à lire et répondre. Il sert maintenant à **savoir qui traiter en premier**.
+
+### Repérer l'urgent d'un coup d'œil
+
+La 4ᵉ tuile est devenue **« Bot bloqué »** : le nombre de conversations où l'assistant
+a séché. Elle passe en rouge dès qu'il y en a une. C'est ta pile à traiter.
+
+Dans la liste, chaque conversation peut porter deux badges :
+
+| Badge | Sens |
+|---|---|
+| ⚠️ **Bot bloqué** | Le bot n'a pas su répondre, le client attend une vraie réponse |
+| ⏱ **12 min** / **3 h** | Depuis combien de temps le client attend (orange, puis rouge après 1 h) |
+
+Le tri suit cette logique : d'abord les conversations où le bot a bloqué, puis celles
+sans réponse **en commençant par celui qui attend depuis le plus longtemps**, puis le reste.
+Plus besoin de scroller pour trouver qui est en train de s'impatienter.
+
+### Recherche et filtres
+
+Une barre de recherche cherche à la fois dans **les noms et le contenu des messages** —
+pratique pour retrouver « le gars qui demandait une taille 43 ». À côté, trois filtres :
+**Tout**, **À répondre**, **⚠️ Bot bloqué**, chacun avec son compteur.
+
+### Le marqueur du bot devient une vraie alerte
+
+Le message interne `⚠️ À REPRENDRE` (invisible côté client) s'affichait comme un message
+de bot normal. Il apparaît maintenant comme un **encadré rouge centré**, avec la question
+exacte à laquelle le bot n'a pas su répondre et la mention « visible par toi seul ».
+Un clic sur ✕ le marque comme traité. Dans la liste, l'aperçu affiche
+« Question sans réponse du bot » au lieu du texte technique.
+
+### Fiche client dans la conversation
+
+Si le nom du client correspond à des commandes, elles s'affichent **en bandeau au-dessus
+des messages** : numéro, statut, présence d'un suivi. Tu réponds « ta commande est expédiée »
+sans changer d'onglet.
+
+Conséquence directe : le bouton **WhatsApp** récupère le **numéro réel** du client depuis
+sa commande (converti au format international) et ouvre la bonne discussion. Avant, il
+ouvrait WhatsApp sans destinataire. S'il n'y a pas de numéro connu, le bouton affiche
+« WhatsApp ? ».
+
+### Réponses rapides personnalisées
+
+Les réponses toutes faites insèrent le prénom du client : « Salut ! » devient
+« Salut Marie ! » automatiquement.
+
+### Export et délai de réponse
+
+Un bouton **⬇** exporte la conversation en `.txt` (horodatée, avec les noms) — utile pour
+garder une trace d'un litige. Et la tuile « À répondre » affiche ton **délai de réponse
+moyen**, calculé sur les 20 dernières conversations.
+
+### Deux bugs corrigés au passage
+
+- **Conversations marquées « à répondre » à tort.** Le calcul comparait les identifiants
+  de messages entre eux (`m-admin-123` contre `m-456`), ce qui est faux dès que l'admin
+  répond. Une conversation déjà traitée restait en attente indéfiniment. Le calcul se base
+  désormais sur l'ordre réel des messages : le compteur « À répondre » est enfin juste.
+- **Compteurs faussés par les filtres.** Les tuiles se seraient mises à compter la liste
+  filtrée au lieu du total réel.
+
+**Testé dans un vrai navigateur** : affichage, filtres, recherche, encadré d'escalade et
+tri par priorité vérifiés sur un jeu de 4 conversations, sans aucune erreur JavaScript.
+
 ## 9. Référencement & partage
 
 - `public/og-image.jpg` (1200×630, 30 Ko) : l'aperçu qui s'affiche quand on colle ton lien sur WhatsApp, Insta ou Snap

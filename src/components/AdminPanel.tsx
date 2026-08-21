@@ -2,7 +2,7 @@ import { createPortal } from 'react-dom';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Copy, ExternalLink, Package, Pencil, Plus, RotateCcw, Save, Search, Send,
-  Trash2, Truck, X, ArrowUpDown, Flame, ArrowLeft, Calculator, Bell, BellOff,
+  Trash2, Truck, X, ArrowUpDown, Flame, ArrowLeft, Calculator, Bell, BellOff, Download,
 } from 'lucide-react';
 import { defaultDrop, type FeaturedDropConfig } from './FeaturedDrop';
 import { defaultSettings, readSiteSettings, saveSiteSettings, hydrateSiteSettings, type SiteSettings } from '../lib/siteSettings';
@@ -1293,6 +1293,22 @@ function QcPhotos({
   );
 }
 
+/** Marqueur interne posé par le bot quand il n'a pas su répondre. */
+const ESCALATION_TAG = '⚠️ À REPRENDRE';
+
+type ConvoData = {
+  name: string;
+  messages: DbChatMessage[];
+  lastMsg: DbChatMessage;
+  hasUnread: boolean;
+  /** Le bot a séché : question à reprendre à la main. */
+  needsHelp: boolean;
+  /** Minutes d'attente depuis le dernier message client sans réponse. */
+  waitingMinutes: number;
+  /** Nombre de messages envoyés par le client. */
+  clientCount: number;
+};
+
 const OrderCard = memo(function OrderCard({ order, product, margin, copied, copiedPayment, onFieldChange, onCopyOrder, onCopyClientMessage, whatsappLink }: OrderCardProps) {
   return (
     <div className="rounded-3xl bg-white text-dark p-5 shadow-xl shadow-black/10">
@@ -1695,6 +1711,8 @@ export default function AdminPanel() {
   const [editingNoteText, setEditingNoteText] = useState('');
   const [noteSort, setNoteSort] = useState<'priority' | 'date'>('priority');
   const [onlineCount, setOnlineCount] = useState(0);
+  const [chatSearch, setChatSearch] = useState('');
+  const [chatFilter, setChatFilter] = useState<'all' | 'unread' | 'needsHelp'>('all');
   const [notifOn, setNotifOn] = useState(false);
   const [chatMessages, setChatMessages] = useState<DbChatMessage[]>([]);
   const [activeConvo, setActiveConvo] = useState<string | null>(null);
@@ -1704,7 +1722,7 @@ export default function AdminPanel() {
 
   // ── Conversations chat (dérivées de chatMessages) ──
   const convoMap = useMemo(() => {
-    const convos = new Map<string, { name: string; messages: DbChatMessage[]; lastMsg: DbChatMessage; hasUnread: boolean }>();
+    const convos = new Map<string, ConvoData>();
     chatMessages.forEach((m) => {
       const existing = convos.get(m.conversation_id);
       if (existing) {
@@ -1722,18 +1740,88 @@ export default function AdminPanel() {
           messages: [m],
           lastMsg: m,
           hasUnread: m.sender === 'client',
+          needsHelp: false,
+          waitingMinutes: 0,
+          clientCount: 0,
         });
       }
     });
+
+    // Enrichissement : signaux utiles pour prioriser les réponses
+    convos.forEach((c) => {
+      // "À répondre" = le dernier message client n'a aucune réponse admin après lui.
+      const lastClientIdx = c.messages.map((m) => m.sender).lastIndexOf('client');
+      c.hasUnread = lastClientIdx >= 0
+        && !c.messages.some((m, i) => i > lastClientIdx && m.sender === 'admin');
+
+      // Le bot a laissé un marqueur "à reprendre" → question sans réponse
+      c.needsHelp = c.messages.some((m) => m.message.startsWith(ESCALATION_TAG));
+
+      c.clientCount = c.messages.filter((m) => m.sender === 'client').length;
+
+      // Depuis combien de temps le client attend-il une réponse humaine ?
+      if (c.hasUnread) {
+        const lastClient = [...c.messages].reverse().find((m) => m.sender === 'client');
+        if (lastClient?.created_at) {
+          c.waitingMinutes = Math.max(
+            0,
+            Math.round((Date.now() - new Date(lastClient.created_at).getTime()) / 60000),
+          );
+        }
+      }
+    });
+
     return convos;
   }, [chatMessages]);
 
   const convoList = useMemo(() => {
-    const list = Array.from(convoMap.entries()).sort(
-      (a, b) => (b[1].lastMsg.created_at || '').localeCompare(a[1].lastMsg.created_at || ''),
-    );
-    return list.sort((a, b) => Number(b[1].hasUnread) - Number(a[1].hasUnread));
+    let list = Array.from(convoMap.entries());
+
+    // Recherche : nom du client ou contenu des messages
+    const q = chatSearch.trim().toLowerCase();
+    if (q) {
+      list = list.filter(([, c]) =>
+        c.name.toLowerCase().includes(q)
+        || c.messages.some((m) => m.message.toLowerCase().includes(q)));
+    }
+
+    if (chatFilter === 'unread') list = list.filter(([, c]) => c.hasUnread);
+    if (chatFilter === 'needsHelp') list = list.filter(([, c]) => c.needsHelp);
+
+    // Tri par priorité : d'abord ceux que le bot n'a pas su traiter, puis
+    // les non-répondus (le plus ancien en attente en premier), puis le reste.
+    list.sort((a, b) => {
+      const [, x] = a; const [, y] = b;
+      if (x.needsHelp !== y.needsHelp) return Number(y.needsHelp) - Number(x.needsHelp);
+      if (x.hasUnread !== y.hasUnread) return Number(y.hasUnread) - Number(x.hasUnread);
+      if (x.hasUnread && y.hasUnread) return y.waitingMinutes - x.waitingMinutes;
+      return (y.lastMsg.created_at || '').localeCompare(x.lastMsg.created_at || '');
+    });
+    return list;
+  }, [convoMap, chatSearch, chatFilter]);
+
+  /** Délai de première réponse humaine, sur les 20 dernières conversations. */
+  const avgResponseMinutes = useMemo(() => {
+    const deltas: number[] = [];
+    Array.from(convoMap.values()).slice(0, 20).forEach((c) => {
+      for (let i = 0; i < c.messages.length - 1; i += 1) {
+        const cur = c.messages[i];
+        const nxt = c.messages.find((m, j) => j > i && m.sender === 'admin');
+        if (cur.sender === 'client' && nxt?.created_at && cur.created_at) {
+          const d = (new Date(nxt.created_at).getTime() - new Date(cur.created_at).getTime()) / 60000;
+          if (d >= 0 && d < 60 * 24) deltas.push(d);
+          break;
+        }
+      }
+    });
+    if (!deltas.length) return null;
+    return Math.round(deltas.reduce((a, b) => a + b, 0) / deltas.length);
   }, [convoMap]);
+
+  const needsHelpTotal = useMemo(
+    () => Array.from(convoMap.values()).filter((c) => c.needsHelp).length,
+    [convoMap],
+  );
 
   // Auto-sélection de la première conversation non-lue à l'arrivée
   useEffect(() => {
@@ -1762,6 +1850,13 @@ export default function AdminPanel() {
   }
 
   // Messages rapides admin
+  /** Personnalise une réponse rapide avec le prénom du client si on le connaît. */
+  const personalize = useCallback((text: string, name?: string) => {
+    const first = (name || '').trim().split(/\s+/)[0];
+    if (!first || first.toLowerCase() === 'anonyme') return text;
+    return text.replace(/^Salut !/, `Salut ${first} !`);
+  }, []);
+
   const quickReplies = useMemo(() => [
     'Salut ! Comment puis-je t\'aider ?',
     'Je regarde ça et je reviens vers toi rapidement.',
@@ -1792,7 +1887,28 @@ export default function AdminPanel() {
 
   const activeMessages = activeConvo ? convoMap.get(activeConvo)?.messages || [] : [];
   const activeConvoData = activeConvo ? convoMap.get(activeConvo) : null;
-  const unreadTotal = convoList.filter(([, c]) => c.hasUnread).length;
+
+  /** Commandes rattachées au client de la conversation active (rapprochement par nom). */
+  const activeConvoOrders = useMemo(() => {
+    const name = activeConvoData?.name?.trim().toLowerCase();
+    if (!name || name === 'anonyme') return [];
+    return orders
+      .filter((o) => o.customerName?.trim().toLowerCase() === name)
+      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+  }, [orders, activeConvoData]);
+
+  /** Numéro connu du client, pour ouvrir WhatsApp directement sur la bonne discussion. */
+  const activeConvoPhone = useMemo(() => {
+    const raw = activeConvoOrders.find((o) => o.phone?.trim())?.phone || '';
+    const digits = raw.replace(/[^\d+]/g, '');
+    if (!digits) return '';
+    if (digits.startsWith('+')) return digits.slice(1);
+    if (digits.startsWith('00')) return digits.slice(2);
+    if (digits.startsWith('0')) return `33${digits.slice(1)}`;
+    return digits;
+  }, [activeConvoOrders]);
+
+  const unreadTotal = Array.from(convoMap.values()).filter((c) => c.hasUnread).length;
   const todayMsgCount = useMemo(() => chatMessages.filter((m) => {
     if (!m.created_at) return false;
     return new Date(m.created_at).toDateString() === new Date().toDateString();
@@ -3654,23 +3770,78 @@ export default function AdminPanel() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
                 <div className="rounded-2xl bg-white/5 border border-white/10 p-3 sm:p-4">
                   <div className="text-[10px] uppercase tracking-widest text-white/35 font-bold">Total</div>
-                  <div className="text-xl sm:text-2xl font-800 mt-1">{convoList.length}</div>
-                  <div className="text-[10px] text-white/30">conversations</div>
+                  <div className="text-xl sm:text-2xl font-800 mt-1">{convoMap.size}</div>
+                  <div className="text-[10px] text-white/30">
+                    {convoList.length !== convoMap.size ? `${convoList.length} affichée${convoList.length > 1 ? 's' : ''}` : 'conversations'}
+                  </div>
                 </div>
                 <div className="rounded-2xl bg-accent/15 border border-accent/30 p-3 sm:p-4">
                   <div className="text-[10px] uppercase tracking-widest text-accent font-bold">À répondre</div>
                   <div className="text-xl sm:text-2xl font-800 mt-1 text-accent">{unreadTotal}</div>
-                  <div className="text-[10px] text-accent/60">en attente</div>
+                  <div className="text-[10px] text-accent/60">
+                    {avgResponseMinutes !== null
+                      ? `réponse ~${avgResponseMinutes < 60 ? `${avgResponseMinutes} min` : `${Math.round(avgResponseMinutes / 60)} h`}`
+                      : 'en attente'}
+                  </div>
                 </div>
                 <div className="rounded-2xl bg-white/5 border border-white/10 p-3 sm:p-4">
                   <div className="text-[10px] uppercase tracking-widest text-white/35 font-bold">En ligne</div>
                   <div className="text-xl sm:text-2xl font-800 mt-1">{onlineCount}</div>
                   <div className="text-[10px] text-white/30">visiteurs</div>
                 </div>
-                <div className="rounded-2xl bg-white/5 border border-white/10 p-3 sm:p-4">
-                  <div className="text-[10px] uppercase tracking-widest text-white/35 font-bold">Msg aujourd'hui</div>
-                  <div className="text-xl sm:text-2xl font-800 mt-1">{todayMsgCount}</div>
-                  <div className="text-[10px] text-white/30">messages</div>
+                <div className={`rounded-2xl p-3 sm:p-4 border ${
+                  needsHelpTotal > 0 ? 'bg-red-500/15 border-red-500/30' : 'bg-white/5 border-white/10'
+                }`}>
+                  <div className={`text-[10px] uppercase tracking-widest font-bold ${
+                    needsHelpTotal > 0 ? 'text-red-300' : 'text-white/35'
+                  }`}>Bot bloqué</div>
+                  <div className={`text-xl sm:text-2xl font-800 mt-1 ${needsHelpTotal > 0 ? 'text-red-300' : ''}`}>
+                    {needsHelpTotal}
+                  </div>
+                  <div className={`text-[10px] ${needsHelpTotal > 0 ? 'text-red-300/60' : 'text-white/30'}`}>
+                    {needsHelpTotal > 0 ? 'à reprendre' : `${todayMsgCount} msg aujourd'hui`}
+                  </div>
+                </div>
+              </div>
+
+              {/* Recherche + filtres */}
+              <div className="flex flex-col sm:flex-row gap-2">
+                <div className="relative flex-1">
+                  <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/25" />
+                  <input
+                    value={chatSearch}
+                    onChange={(e) => setChatSearch(e.target.value)}
+                    placeholder="Rechercher un client ou un message..."
+                    className="w-full h-11 rounded-xl bg-white/5 border border-white/10 pl-10 pr-9 text-sm text-white placeholder:text-white/25 outline-none focus:border-accent/40"
+                  />
+                  {chatSearch && (
+                    <button
+                      onClick={() => setChatSearch('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white"
+                      aria-label="Effacer"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+                <div className="flex gap-1.5">
+                  {([
+                    { id: 'all' as const, label: `Tout (${convoMap.size})` },
+                    { id: 'unread' as const, label: `À répondre (${unreadTotal})` },
+                    { id: 'needsHelp' as const, label: `⚠️ Bot bloqué (${needsHelpTotal})` },
+                  ]).map((f) => (
+                    <button
+                      key={f.id}
+                      onClick={() => setChatFilter(f.id)}
+                      className={`h-11 px-3.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors ${
+                        chatFilter === f.id
+                          ? 'bg-accent text-white'
+                          : 'bg-white/5 text-white/50 hover:bg-white/10 hover:text-white'
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -3687,8 +3858,22 @@ export default function AdminPanel() {
                   <div className="divide-y divide-dark/5 max-h-[560px] overflow-y-auto">
                     {convoList.length === 0 && (
                       <div className="p-8 text-center text-sm text-dark/30">
-                        Aucune conversation pour l'instant.<br />
-                        <span className="text-xs">Les visiteurs qui utilisent le chat apparaîtront ici.</span>
+                        {chatSearch || chatFilter !== 'all' ? (
+                          <>
+                            Aucun résultat.<br />
+                            <button
+                              onClick={() => { setChatSearch(''); setChatFilter('all'); }}
+                              className="text-xs font-bold text-accent hover:underline mt-1"
+                            >
+                              Réinitialiser la recherche
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            Aucune conversation pour l'instant.<br />
+                            <span className="text-xs">Les visiteurs qui utilisent le chat apparaîtront ici.</span>
+                          </>
+                        )}
                       </div>
                     )}
                     {convoList.map(([id, convo]) => {
@@ -3721,13 +3906,31 @@ export default function AdminPanel() {
                               <div className="flex items-center gap-1.5 mt-0.5">
                                 <span className={`text-xs truncate ${convo.hasUnread && isClientLast ? 'text-dark font-semibold' : 'text-dark/40'}`}>
                                   {convo.lastMsg.sender === 'admin' ? 'Toi : ' : convo.lastMsg.sender === 'bot' ? 'Bot : ' : ''}
-                                  {convo.lastMsg.message}
+                                  {convo.lastMsg.message.startsWith(ESCALATION_TAG)
+                                    ? 'Question sans réponse du bot'
+                                    : convo.lastMsg.message}
                                 </span>
                               </div>
-                              <div className="flex items-center gap-1 mt-1">
+                              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                                 <span className="text-[9px] font-bold text-dark/25 uppercase">
                                   {convo.messages.length} msg
                                 </span>
+                                {convo.needsHelp && (
+                                  <span className="text-[9px] font-black text-red-600 bg-red-500/10 px-1.5 py-0.5 rounded-full uppercase">
+                                    ⚠️ Bot bloqué
+                                  </span>
+                                )}
+                                {convo.hasUnread && convo.waitingMinutes >= 5 && (
+                                  <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase ${
+                                    convo.waitingMinutes >= 60
+                                      ? 'text-red-600 bg-red-500/10'
+                                      : 'text-orange-600 bg-orange-500/10'
+                                  }`}>
+                                    ⏱ {convo.waitingMinutes < 60
+                                      ? `${convo.waitingMinutes} min`
+                                      : `${Math.floor(convo.waitingMinutes / 60)} h`}
+                                  </span>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -3754,19 +3957,42 @@ export default function AdminPanel() {
                             <div className="font-bold">{activeConvoData.name}</div>
                             <div className="text-[10px] text-dark/30 uppercase tracking-widest font-bold">
                               {activeConvoData.messages.length} messages · {timeAgo(activeConvoData.lastMsg.created_at)}
+                              {activeConvoOrders.length > 0 && (
+                                <span className="text-accent"> · {activeConvoOrders.length} commande{activeConvoOrders.length > 1 ? 's' : ''}</span>
+                              )}
                             </div>
                           </div>
                         </div>
                         <div className="flex items-center gap-1">
                           <a
-                            href={`https://wa.me/?text=${encodeURIComponent(`Salut ${activeConvoData.name} !`)}`}
+                            href={`https://wa.me/${activeConvoPhone}?text=${encodeURIComponent(`Salut ${activeConvoData.name} !`)}`}
                             target="_blank"
                             rel="noreferrer"
                             className="h-9 px-3 rounded-xl bg-[#25D366]/10 text-[#25D366] text-xs font-bold hover:bg-[#25D366] hover:text-white transition-colors inline-flex items-center gap-1"
-                            title="Contacter sur WhatsApp"
+                            title={activeConvoPhone ? `Contacter sur WhatsApp (+${activeConvoPhone})` : 'Contacter sur WhatsApp (numéro inconnu)'}
                           >
-                            WhatsApp
+                            WhatsApp{activeConvoPhone ? '' : ' ?'}
                           </a>
+                          <button
+                            onClick={() => {
+                              const lines = activeMessages.map((m) => {
+                                const who = m.sender === 'client' ? activeConvoData.name : m.sender === 'admin' ? 'Toi' : 'Bot';
+                                return `[${formatTime(m.created_at)}] ${who}: ${m.message}`;
+                              }).join('\n');
+                              const blob = new Blob([`Conversation avec ${activeConvoData.name}\n\n${lines}\n`], { type: 'text/plain;charset=utf-8' });
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = `chat-${activeConvoData.name.replace(/\s+/g, '-').toLowerCase()}.txt`;
+                              a.click();
+                              URL.revokeObjectURL(url);
+                              showToast('Conversation exportée ✓');
+                            }}
+                            className="h-9 w-9 rounded-xl bg-dark/5 hover:bg-dark/10 text-dark/50 flex items-center justify-center"
+                            title="Exporter la conversation (.txt)"
+                          >
+                            <Download size={14} />
+                          </button>
                           <button
                             onClick={() => {
                               const text = activeMessages.map((m) => {
@@ -3802,11 +4028,63 @@ export default function AdminPanel() {
                         </div>
                       </div>
 
+                      {/* Fiche client : commandes rattachées, pour répondre sans changer d'onglet */}
+                      {activeConvoOrders.length > 0 && (
+                        <div className="px-4 py-2.5 bg-accent/[0.04] border-b border-dark/5">
+                          <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
+                            {activeConvoOrders.slice(0, 4).map((o) => (
+                              <button
+                                key={o.id}
+                                onClick={() => { setActiveTab('orders'); showToast(`Commande ${o.id} — onglet Commandes`); }}
+                                className="shrink-0 text-left rounded-xl bg-white border border-dark/5 px-3 py-1.5 hover:border-accent/40 transition-colors"
+                                title="Ouvrir dans l'onglet Commandes"
+                              >
+                                <div className="text-[10px] font-black text-dark/70">{o.id}</div>
+                                <div className="text-[9px] font-bold text-dark/35 uppercase tracking-tight">
+                                  {statusLabels[o.status] || o.status}
+                                  {o.tracking ? ' · suivi ✓' : ''}
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#F9F9F9]">
                         {activeMessages.map((msg) => {
                           const isClient = msg.sender === 'client';
                           const isAdmin = msg.sender === 'admin';
                           const isBot = msg.sender === 'bot';
+
+                          // Marqueur interne du bot : affiché comme une alerte, pas comme un message
+                          if (msg.message.startsWith(ESCALATION_TAG)) {
+                            return (
+                              <div key={msg.id} className="group/msg flex justify-center">
+                                <div className="relative max-w-[92%] w-full rounded-xl bg-red-500/[0.07] border border-red-500/20 px-3.5 py-2.5">
+                                  <div className="text-[9px] font-black text-red-600 uppercase tracking-tighter mb-1">
+                                    ⚠️ Le bot n'a pas su répondre — visible par toi seul
+                                  </div>
+                                  <p className="text-[13px] text-dark/70 whitespace-pre-wrap">
+                                    {msg.message.replace(ESCALATION_TAG, '').replace(/^\s*[—-]\s*/, '').trim()}
+                                  </p>
+                                  <div className="text-[9px] mt-1.5 font-bold text-dark/30">
+                                    {formatTime(msg.created_at)}
+                                  </div>
+                                  <button
+                                    onClick={async () => {
+                                      await deleteChatMessage(msg.id);
+                                      setChatMessages((prev) => prev.filter((m) => m.id !== msg.id));
+                                    }}
+                                    className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-red-500 text-white text-[10px] items-center justify-center hidden group-hover/msg:flex"
+                                    title="Marquer comme traité"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          }
+
                           return (
                             <div key={msg.id} className={`group/msg flex ${isClient ? 'justify-start' : 'justify-end'}`}>
                               <div className="relative max-w-[85%]">
@@ -3858,7 +4136,7 @@ export default function AdminPanel() {
                           {quickReplies.map((q) => (
                             <button
                               key={q}
-                              onClick={() => setChatReply(q)}
+                              onClick={() => setChatReply(personalize(q, activeConvoData.name))}
                               className="flex-shrink-0 rounded-full bg-bg hover:bg-dark hover:text-white text-dark/60 text-[11px] font-bold px-3 py-1.5 h-8 transition-colors"
                             >
                               {q.length > 40 ? q.slice(0, 40) + '…' : q}
