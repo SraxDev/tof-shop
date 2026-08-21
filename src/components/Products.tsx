@@ -995,6 +995,7 @@ export default function Products() {
     };
   }, [quickAddId]);
 
+
   useEffect(() => {
     const syncS = () => setSettings(readSiteSettings());
     window.addEventListener('tof-settings-updated', syncS);
@@ -1147,6 +1148,20 @@ export default function Products() {
       }
     } catch { /* ignore */ }
   }, []);
+  // Échap ferme la fiche produit (réflexe attendu sur ordinateur)
+  useEffect(() => {
+    if (!quickAddId) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      // Ne pas fermer si l'utilisateur est en train de saisir quelque chose
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) return;
+      closeQuickAdd();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [quickAddId, closeQuickAdd]);
 
   const resetFilters = () => {
     setActiveGender('Tout');

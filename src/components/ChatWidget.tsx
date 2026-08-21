@@ -3,6 +3,10 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { sendChatMessage, fetchConversationMessages, subscribeToChatMessages, type DbChatMessage } from '../lib/db';
 import { readSiteSettings } from '../lib/siteSettings';
 import { botReply, createBotState, type BotState } from '../lib/bot';
+import {
+  searchProducts, formatProductList, listBrands,
+  extractOrderId, trackOrderSummary, availableSizes, soldOutSizes, getCatalog, formatPrice,
+} from '../lib/botKnowledge';
 
 const CHAT_ID_KEY = 'tof-chat-id-v2';
 const CHAT_NAME_KEY = 'tof-chat-name';
@@ -23,6 +27,115 @@ const quickButtons = [
   { label: '🏷️ Marques', text: 'Quelles marques vous avez ?' },
   { label: '💬 WhatsApp', text: 'Contacter WhatsApp' },
 ];
+
+/**
+ * Répond à partir des données réelles du shop quand c'est possible.
+ * Retourne null si la question ne relève pas d'une donnée concrète —
+ * dans ce cas le moteur de règles générique reprend la main.
+ */
+async function answerFromData(
+  text: string,
+  intent: string,
+): Promise<{ reply: string; suggestions?: string[] } | null> {
+  const q = text.toLowerCase();
+
+  // ── 1. Suivi de commande : "où est ma commande TOF-3148 ?" ──
+  const orderId = extractOrderId(text);
+  if (orderId) {
+    const summary = await trackOrderSummary(orderId);
+    if (summary) {
+      return { reply: summary, suggestions: ['📦 Voir la page suivi', '💬 Parler à Tof'] };
+    }
+    return {
+      reply: `Je ne trouve aucune commande au numéro ${orderId}. 🤔\n\nVérifie le format (TOF-1234) sur ton mail de confirmation. Si le doute persiste, Tof te répond directement sur WhatsApp.`,
+      suggestions: ['📦 Page suivi', '💬 WhatsApp'],
+    };
+  }
+
+  // Demande de suivi sans numéro
+  if (intent === 'tracking' && /commande|colis|suivi|track/.test(q)) {
+    return {
+      reply: "Donne-moi ton numéro de commande (format TOF-1234, il est sur ton mail de confirmation) et je te dis où en est ton colis tout de suite. 📦",
+      suggestions: ['📦 Page suivi', '💬 WhatsApp'],
+    };
+  }
+
+  // ── 2. Marques disponibles : liste réelle du catalogue ──
+  if (intent === 'brands' || /quelles? marques?|vous avez quoi|vos marques/.test(q)) {
+    const found = await searchProducts(text, 4);
+    if (found.length > 0) {
+      return {
+        reply: `Oui, on a ça en stock 🔥\n\n${formatProductList(found)}\n\nDis-moi lequel t'intéresse, ou va voir les photos dans le shop.`,
+        suggestions: ['🛒 Voir le shop', '📐 Guide des tailles', '💬 Parler à Tof'],
+      };
+    }
+    const brands = await listBrands();
+    if (brands.length > 0) {
+      return {
+        reply: `Voilà les marques dispo en ce moment :\n\n${brands.map((b) => `• ${b}`).join('\n')}\n\nTu cherches une pièce précise ? Dis-moi la marque et le type (sneakers, t-shirt, sacoche...) et je regarde.`,
+        suggestions: ['🛒 Voir le shop', '💬 Parler à Tof'],
+      };
+    }
+    return null;
+  }
+
+  // ── 3. Recherche produit / budget / dispo ──
+  const looksLikeSearch =
+    intent === 'product_search'
+    || intent === 'stock'
+    || intent === 'prices'
+    || /\b(cherche|avez|auriez|dispo|disponible|combien|prix|budget|moins de|sous)\b/.test(q);
+
+  if (looksLikeSearch) {
+    const found = await searchProducts(text, 4);
+    if (found.length > 0) {
+      const first = found[0];
+      const sizes = availableSizes(first.sizes);
+      const out = soldOutSizes(first.sizes);
+
+      let reply = `J'ai trouvé ça pour toi 👇\n\n${formatProductList(found)}`;
+      if (found.length === 1 && sizes.length > 0) {
+        reply += `\n\nTailles dispo : ${sizes.join(', ')}.`;
+        if (out.length > 0) reply += `\n(Épuisé : ${out.join(', ')})`;
+      }
+      reply += "\n\nTu veux que je te dise comment commander ?";
+      return {
+        reply,
+        suggestions: ['🛒 Commander', '📐 Guide des tailles', '💬 Parler à Tof'],
+      };
+    }
+
+    // Rien trouvé : on propose une alternative concrète plutôt qu'un "non"
+    const catalog = await getCatalog();
+    if (catalog.length > 0) {
+      const cheapest = [...catalog].sort((a, b) => a.sale_price - b.sale_price).slice(0, 3);
+      return {
+        reply: `Je n'ai pas exactement ça en ligne pour le moment. 😕\n\nMais Tof peut le sourcer sur commande — écris-lui sur WhatsApp avec une photo, il te dit le prix sous ~5 min.\n\nEn attendant, voilà ce qui part le plus :\n${formatProductList(cheapest)}`,
+        suggestions: ['💬 Demander à Tof', '🛒 Voir le shop'],
+      };
+    }
+    return null;
+  }
+
+  // ── 4. Tailles : répondre avec le vrai stock si un produit est cité ──
+  if (intent === 'sizing') {
+    const found = await searchProducts(text, 1);
+    if (found.length === 1) {
+      const p = found[0];
+      const sizes = availableSizes(p.sizes);
+      const out = soldOutSizes(p.sizes);
+      if (sizes.length > 0) {
+        let reply = `Pour ${p.brand} ${p.name} (${formatPrice(p.sale_price)}) :\n\n✅ Dispo : ${sizes.join(', ')}`;
+        if (out.length > 0) reply += `\n❌ Épuisé : ${out.join(', ')}`;
+        reply += "\n\nEn général ça taille normalement — si tu hésites entre deux, prends au-dessus. Le guide des tailles est sur la fiche produit.";
+        return { reply, suggestions: ['🛒 Commander', '💬 Parler à Tof'] };
+      }
+    }
+    return null;
+  }
+
+  return null;
+}
 
 function getConversationId(): string {
   let id: string | null = null;
@@ -72,11 +185,17 @@ export default function ChatWidget() {
   const [dragStart, setDragStart] = useState<{ y: number } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const conversationId = useMemo(getConversationId, []);
+  const [conversationId, setConversationId] = useState(getConversationId);
   const settings = useMemo(() => readSiteSettings(), []);
   const botStateRef = useRef<BotState>(createBotState());
   const pendingQueueRef = useRef<string[]>([]);
   const botReplyTimerRef = useRef<number | null>(null);
+  // Suivi du cycle de vie de la conversation (évite les messages fantômes)
+  const loadedOnceRef = useRef(false);      // un premier chargement a eu lieu
+  const hadMessagesRef = useRef(false);     // la conv a déjà contenu des messages
+  const wipedByAdminRef = useRef(false);    // l'admin l'a supprimée
+  const welcomeSentRef = useRef(false);     // accueil déjà envoyé cette session
+  const [loadedTick, setLoadedTick] = useState(0);
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
       bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -112,6 +231,24 @@ export default function ChatWidget() {
   const loadMessages = useCallback(async () => {
     try {
       const data = await fetchConversationMessages(conversationId);
+      // Conversation vidée côté admin : on repart sur une conv neuve plutôt
+      // que de ressusciter l'ancienne.
+      if (loadedOnceRef.current && hadMessagesRef.current && data.length === 0) {
+        wipedByAdminRef.current = true;
+        // On repart sur un identifiant neuf : la prochaine question du visiteur
+        // créera une conversation propre côté admin, au lieu de réalimenter
+        // celle qui vient d'être supprimée.
+        const fresh = `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        try { localStorage.setItem(CHAT_ID_KEY, fresh); } catch { /* ignore */ }
+        setConversationId(fresh);
+        hadMessagesRef.current = false;
+        botStateRef.current = createBotState();
+        botStateRef.current.userName = name || undefined;
+        setSuggestions([]);
+      }
+      if (data.length > 0) hadMessagesRef.current = true;
+      loadedOnceRef.current = true;
+      setLoadedTick((t) => t + 1);
       setMessages((prev) => {
         if (!open && data.length > prev.length) {
           const newCount = data.length - prev.length;
@@ -175,13 +312,22 @@ export default function ChatWidget() {
     await sendWelcome(trimmed, false);
   }, [name, sendWelcome]);
 
-  // Si l'utilisateur revient et qu'aucun message n'est en base, envoyer un "re-bienvenue"
+  // Le re-bienvenue ne doit partir QUE si la conversation n'a jamais existé.
+  //
+  // Avant, tout état vide déclenchait un message : au rechargement de page
+  // (les messages arrivent de façon asynchrone) et surtout après une
+  // suppression depuis l'admin — la conversation renaissait aussitôt.
   useEffect(() => {
-    if (nameSet && messages.length === 0) {
-      void sendWelcome(name || 'toi', true);
-    }
+    if (!nameSet) return;
+    if (messages.length > 0) return;
+    if (!loadedOnceRef.current) return;      // on attend le 1er chargement réel
+    if (wipedByAdminRef.current) return;     // conversation effacée par l'admin
+    if (welcomeSentRef.current) return;      // déjà envoyé dans cette session
+
+    welcomeSentRef.current = true;
+    void sendWelcome(name || 'toi', true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nameSet, messages.length]);
+  }, [nameSet, messages.length, loadedTick]);
 
   const pushBotMessage = useCallback(async (text: string, newSuggestions: string[]) => {
     const botMsg: DbChatMessage = {
@@ -211,13 +357,34 @@ export default function ChatWidget() {
     if (hasAdminReplied) return;
 
     const decision = botReply(queue, botStateRef.current);
+    const joined = queue.join(' ');
 
-    // Délai "typing" proportionnel à la longueur de la réponse
-    const typingDelay = BOT_TYPING_MIN + Math.min(1800, decision.reply.length * 12) + Math.random() * (BOT_TYPING_MAX - BOT_TYPING_MIN);
     setTyping(true);
-    window.setTimeout(() => {
-      void pushBotMessage(decision.reply, decision.suggestions);
-    }, typingDelay);
+
+    // On tente d'abord une réponse basée sur les VRAIES données (catalogue,
+    // commande, stock). Si rien ne correspond, on retombe sur la réponse
+    // générique du moteur de règles.
+    void (async () => {
+      let reply = decision.reply;
+      let suggestions = decision.suggestions;
+
+      try {
+        const smart = await answerFromData(joined, decision.intent);
+        if (smart) {
+          reply = smart.reply;
+          if (smart.suggestions) suggestions = smart.suggestions;
+        }
+      } catch { /* on garde la réponse générique */ }
+
+      const typingDelay =
+        BOT_TYPING_MIN
+        + Math.min(1800, reply.length * 12)
+        + Math.random() * (BOT_TYPING_MAX - BOT_TYPING_MIN);
+
+      window.setTimeout(() => {
+        void pushBotMessage(reply, suggestions);
+      }, typingDelay);
+    })();
   }, [hasAdminReplied, pushBotMessage]);
 
   const queueClientMessage = useCallback(async (text: string) => {

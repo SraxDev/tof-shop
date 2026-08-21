@@ -45,6 +45,8 @@ export type BotState = {
   lastProduct?: { brand: string; name: string };
   /** Tour de réponse (1 = premier message du bot après salutation). */
   turn: number;
+  /** Nombre de fois d'affilée où le bot n'a pas compris. */
+  confusion: number;
 };
 
 export type BotDecision = {
@@ -188,7 +190,8 @@ const REPLIES: Record<Intent, string[]> = {
     "Let's go ! 🚀\n\n1. Ouvre le shop\n2. Ajoute tes pièces au panier\n3. Valide la commande\n\nOn prend le relais sur WhatsApp juste après pour le paiement. Tu y es presque !",
   ],
   off_topic: [
-    "Hmm, je ne suis pas sûr de comprendre. 😅 Je peux t'aider sur : la livraison, les tailles, les commandes, le paiement, ou les marques. Si tu veux parler à l'équipe, passe par WhatsApp !",
+    "Hmm, je n'ai pas bien saisi. 😅 Reformule ou dis-moi plutôt :\n\n• une marque ou une pièce que tu cherches\n• ton numéro de commande (TOF-1234) pour le suivi\n• une question livraison / paiement / tailles",
+    "Pas sûr de suivre 😅 Tu peux me demander un produit précis (\"tu as du LV ?\"), le suivi d'une commande (\"où en est TOF-1234 ?\"), ou les délais de livraison.",
   ],
   ack_ok: [
     "Okay ! 👌",
@@ -277,6 +280,29 @@ export function botReply(
     intent = 'ack_ok';
   }
 
+  // Escalade : après 2 incompréhensions d'affilée, on arrête de tourner en
+  // rond et on oriente vers un humain. Rien de pire qu'un bot qui répète
+  // "je n'ai pas compris" pendant que le client s'en va.
+  if (intent === 'off_topic') {
+    state.confusion = (state.confusion || 0) + 1;
+  } else {
+    state.confusion = 0;
+  }
+
+  if (intent === 'off_topic' && state.confusion >= 2) {
+    state.covered.add(intent);
+    state.lastIntent = 'human';
+    state.turn += 1;
+    return {
+      reply:
+        "Là je bloque, désolé 😅 — autant te passer quelqu'un de vrai.\n\n"
+        + "Écris directement à Tof sur WhatsApp : il répond en général en moins de 5 min, 7j/7. "
+        + "Tu peux aussi laisser ta question ici, il la verra.",
+      suggestions: ['💬 Parler à Tof', '🛒 Voir le shop'],
+      intent: 'human',
+    };
+  }
+
   reply = pickReply(intent);
 
   // Petite personnalisation si on connaît le prénom
@@ -307,5 +333,6 @@ export function createBotState(): BotState {
   return {
     covered: new Set<Intent>(),
     turn: 0,
+    confusion: 0,
   };
 }

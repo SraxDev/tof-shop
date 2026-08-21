@@ -276,7 +276,9 @@ export async function deleteChatMessage(id: string) {
 export function subscribeToChatMessages(callback: () => void) {
   const channel = supabase
     .channel('chat-realtime')
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, () => {
+    // '*' couvre INSERT, UPDATE **et DELETE**. Sans DELETE, une conversation
+    // supprimée depuis l'admin restait affichée chez le visiteur.
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_messages' }, () => {
       callback();
     })
     .subscribe();
