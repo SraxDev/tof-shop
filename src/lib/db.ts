@@ -419,3 +419,30 @@ export function subscribeToProducts(callback: () => void) {
 
   return () => { supabase.removeChannel(channel); };
 }
+
+// ─── Outfits (ensembles complets) ─────────────────────────
+
+export type DbOutfit = {
+  id: string;
+  name: string;
+  description?: string | null;
+  image_url?: string | null;
+  product_ids: string;
+  price_eur?: number | null;
+  discount_pct?: number | null;
+  active: boolean;
+  created_at?: string;
+};
+
+export async function fetchOutfits(): Promise<DbOutfit[]> {
+  const { data } = await supabase.from('outfits').select('*').order('created_at', { ascending: false });
+  return (data as DbOutfit[]) || [];
+}
+
+export async function upsertOutfit(outfit: DbOutfit) {
+  await supabase.from('outfits').upsert(outfit);
+}
+
+export async function deleteOutfit(id: string) {
+  await supabase.from('outfits').delete().eq('id', id);
+}

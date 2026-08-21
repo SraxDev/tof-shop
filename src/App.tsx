@@ -18,6 +18,7 @@ const BrandMarquee = lazy(() => import('./components/BrandMarquee'));
 const FeaturedDrop = lazy(() => import('./components/FeaturedDrop'));
 const NewArrivals = lazy(() => import('./components/NewArrivals'));
 const LaunchBanner = lazy(() => import('./components/LaunchBanner'));
+const Outfits = lazy(() => import('./components/Outfits'));
 const LegalPage = lazy(() => import('./components/LegalPage'));
 const Brands = lazy(() => import('./components/Brands'));
 const Reviews = lazy(() => import('./components/Reviews'));
@@ -258,6 +259,9 @@ export default function App() {
         <NewArrivals />
       </Suspense>
       <Products />
+      <Suspense fallback={<SectionFallback />}>
+        <Outfits />
+      </Suspense>
       <Suspense fallback={<SectionFallback />}>
         <FeaturedDrop />
         <Brands />

@@ -15,7 +15,8 @@ import {
   onOnlineCountChange, getPresenceState, trackVisitor, fetchConversations,
   sendChatMessage, subscribeToChatMessages, deleteConversation, deleteChatMessage,
   fetchPromoCodes, upsertPromoCode, deletePromoCode,
-  type DbProduct, type DbOrder, type DbDrop, type DbNote, type DbChatMessage, type DbPromoCode,
+  fetchOutfits, upsertOutfit, deleteOutfit,
+  type DbProduct, type DbOrder, type DbDrop, type DbNote, type DbChatMessage, type DbPromoCode, type DbOutfit,
 } from '../lib/db';
 import { showToast, showActionToast } from './Toast';
 import { supabase } from '../lib/supabase';
@@ -1858,7 +1859,7 @@ export default function AdminPanel() {
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'products' | 'drop' | 'promos' | 'settings' | 'estimate' | 'notes' | 'chat'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'products' | 'outfits' | 'drop' | 'promos' | 'settings' | 'estimate' | 'notes' | 'chat'>('dashboard');
   const [notes, setNotes] = useState<DbNote[]>([]);
   const [noteFilter, setNoteFilter] = useState<'all' | 'idea' | 'todo' | 'urgent' | 'done'>('all');
   const [newNote, setNewNote] = useState({ text: '', category: 'todo' });
@@ -1871,6 +1872,8 @@ export default function AdminPanel() {
   const [csvImportOpen, setCsvImportOpen] = useState(false);
   const [csvText, setCsvText] = useState('');
   const [csvError, setCsvError] = useState('');
+  const [outfits, setOutfits] = useState<DbOutfit[]>([]);
+  const [outfitDraft, setOutfitDraft] = useState<DbOutfit | null>(null);
   const [chatFilter, setChatFilter] = useState<'all' | 'unread' | 'needsHelp'>('all');
   const [notifOn, setNotifOn] = useState(false);
   const [chatMessages, setChatMessages] = useState<DbChatMessage[]>([]);
@@ -2236,7 +2239,7 @@ export default function AdminPanel() {
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [dbProds, dbOrds, dbDr, dbNotes, dbChat, dbPromos] = await Promise.all([fetchProducts(), fetchOrders(), fetchDrop(), fetchNotes(), fetchConversations(), fetchPromoCodes()]);
+      const [dbProds, dbOrds, dbDr, dbNotes, dbChat, dbPromos, dbOutfits] = await Promise.all([fetchProducts(), fetchOrders(), fetchDrop(), fetchNotes(), fetchConversations(), fetchPromoCodes(), fetchOutfits()]);
       await hydrateSiteSettings();
       setProducts(dbProds.map(dbToProduct).map(normalizedProduct));
       setOrders(dbOrds.map(dbToOrder));
@@ -2244,6 +2247,7 @@ export default function AdminPanel() {
       setNotes(dbNotes);
       setChatMessages(dbChat);
       setPromoCodes(dbPromos);
+      setOutfits(dbOutfits);
       setSiteSettings(readSiteSettings());
     } catch (e) { console.error('load error', e); }
     setLoading(false);
@@ -2790,6 +2794,47 @@ export default function AdminPanel() {
     });
   };
 
+  // ── Outfits CRUD ──
+  const openNewOutfit = () => {
+    setOutfitDraft({
+      id: `o${Date.now()}`,
+      name: '',
+      description: '',
+      image_url: '',
+      product_ids: '',
+      price_eur: null,
+      discount_pct: null,
+      active: true,
+    });
+  };
+
+  const toggleOutfitProduct = (productId: string) => {
+    if (!outfitDraft) return;
+    const ids = (outfitDraft.product_ids || '').split(',').map((s) => s.trim()).filter(Boolean);
+    const has = ids.includes(productId);
+    const next = has ? ids.filter((id) => id !== productId) : [...ids, productId];
+    setOutfitDraft({ ...outfitDraft, product_ids: next.join(',') });
+  };
+
+  const saveOutfit = async () => {
+    if (!outfitDraft || !outfitDraft.name.trim()) return;
+    if (!outfitDraft.product_ids) {
+      showToast('Sélectionne au moins un produit', 'warning');
+      return;
+    }
+    await upsertOutfit(outfitDraft);
+    const fresh = await fetchOutfits();
+    setOutfits(fresh);
+    setOutfitDraft(null);
+    showToast('Outfit sauvegardé ✓');
+  };
+
+  const removeOutfit = async (id: string) => {
+    await deleteOutfit(id);
+    setOutfits((prev) => prev.filter((o) => o.id !== id));
+    showToast('Outfit supprimé');
+  };
+
   const handleDropImageUpload = useCallback(
     (file: File) => uploadDropImage(file, 1200, 0.8).then((r) => ({ url: r.url, hasAlpha: r.hasAlpha })),
     [],
@@ -3170,6 +3215,7 @@ export default function AdminPanel() {
             { id: 'dashboard', label: 'Dashboard' },
             { id: 'orders', label: 'Commandes', badge: ordersNeedingAction },
             { id: 'products', label: 'Produits & liens' },
+            { id: 'outfits', label: 'Outfits' },
             { id: 'drop', label: 'Drop semaine' },
             { id: 'promos', label: 'Promos' },
             { id: 'settings', label: 'Réglages' },
@@ -3866,6 +3912,167 @@ export default function AdminPanel() {
             )}
           </div>
         )}
+        {activeTab === 'outfits' && (
+          <div className="space-y-5">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <h3 className="font-bold text-white">Outfits complets</h3>
+                <p className="text-sm text-white/40 mt-0.5">
+                  Des ensembles de produits vendus ensemble. Chaque outfit a son prix (manuel ou remise %).
+                </p>
+              </div>
+              <button onClick={openNewOutfit} className="inline-flex items-center gap-2 rounded-full bg-accent px-5 py-2.5 text-sm font-bold text-white hover:brightness-110 transition-colors">
+                <Plus size={15} /> Nouvel outfit
+              </button>
+            </div>
+
+            {/* Éditeur */}
+            {outfitDraft && (
+              <div className="rounded-3xl bg-white text-dark p-5 sm:p-6 space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <h4 className="font-bold">{outfitDraft.id.startsWith('o') && !outfits.some((o) => o.id === outfitDraft.id) ? 'Nouvel outfit' : 'Édition outfit'}</h4>
+                  <button onClick={() => setOutfitDraft(null)} className="h-9 w-9 rounded-full bg-dark/5 text-dark/50 hover:bg-dark/10 flex items-center justify-center">
+                    <X size={16} />
+                  </button>
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <SInput label="Nom de l'outfit *" value={outfitDraft.name} onChange={(v) => setOutfitDraft({ ...outfitDraft, name: v })} placeholder="Ex : Total look streetwear" />
+                  <SInput label="Image de couverture (URL)" value={outfitDraft.image_url || ''} onChange={(v) => setOutfitDraft({ ...outfitDraft, image_url: v })} placeholder="https://..." />
+                  <div className="sm:col-span-2">
+                    <STextarea label="Description" value={outfitDraft.description || ''} onChange={(v) => setOutfitDraft({ ...outfitDraft, description: v })} rows={2} />
+                  </div>
+                </div>
+
+                <SCard title="Prix" subtitle="Choisis un mode : prix manuel OU remise automatique.">
+                  <div className="grid grid-cols-2 gap-3">
+                    <SInput
+                      label="Prix manuel (€, prioritaire)"
+                      type="number"
+                      value={outfitDraft.price_eur ?? ''}
+                      onChange={(v) => setOutfitDraft({ ...outfitDraft, price_eur: v === '' ? null : Number(v) })}
+                      placeholder="Laisse vide pour utiliser la remise"
+                    />
+                    <SInput
+                      label="Remise automatique (%)"
+                      type="number"
+                      value={outfitDraft.discount_pct ?? ''}
+                      onChange={(v) => setOutfitDraft({ ...outfitDraft, discount_pct: v === '' ? null : Number(v) })}
+                      placeholder="Ex : 20"
+                    />
+                  </div>
+                </SCard>
+
+                <SCard title="Produits de l'outfit" subtitle="Coche les pièces à inclure.">
+                  <div className="max-h-72 overflow-y-auto rounded-2xl border border-dark/10 divide-y divide-dark/5">
+                    {products.filter((p) => p.status === 'active').map((p) => {
+                      const checked = (outfitDraft.product_ids || '').split(',').map((s) => s.trim()).includes(p.id);
+                      const img = p.imageUrl ? p.imageUrl.split('|').map((s) => s.trim()).find(Boolean) || '' : '';
+                      return (
+                        <label key={p.id} className="flex items-center gap-3 p-3 cursor-pointer hover:bg-bg transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleOutfitProduct(p.id)}
+                            className="h-4 w-4 accent-accent flex-shrink-0"
+                          />
+                          {img ? (
+                            <img src={img} alt="" className="h-10 w-10 rounded-lg object-contain bg-white border border-dark/5 flex-shrink-0" />
+                          ) : (
+                            <span className="h-10 w-10 rounded-lg bg-bg flex items-center justify-center flex-shrink-0">📦</span>
+                          )}
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold text-dark truncate">{p.brand} {p.name}</div>
+                            <div className="text-xs text-dark/40">{euro(p.salePrice)}</div>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-2 text-[11px] text-dark/35">
+                    {(outfitDraft.product_ids || '').split(',').filter(Boolean).length} produit(s) sélectionné(s).
+                  </p>
+                </SCard>
+
+                <div className="flex items-center justify-between gap-3">
+                  <label className="flex items-center gap-2 text-sm font-semibold text-dark/60">
+                    <input
+                      type="checkbox"
+                      checked={outfitDraft.active}
+                      onChange={(e) => setOutfitDraft({ ...outfitDraft, active: e.target.checked })}
+                      className="h-4 w-4"
+                    />
+                    Actif (visible sur le site)
+                  </label>
+                  <button onClick={saveOutfit} className="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-2.5 text-sm font-bold text-white hover:brightness-110 transition-colors">
+                    <Save size={15} /> Sauvegarder
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Liste */}
+            {outfits.length === 0 && !outfitDraft ? (
+              <div className="rounded-3xl border border-dashed border-white/12 bg-white/[0.02] p-10 text-center">
+                <div className="mx-auto h-14 w-14 rounded-2xl bg-white/5 flex items-center justify-center text-2xl mb-4">🧥</div>
+                <p className="font-bold text-white/80">Aucun outfit pour l'instant</p>
+                <p className="text-sm text-white/35 mt-2">Crée ton premier ensemble complet avec le bouton ci-dessus.</p>
+              </div>
+            ) : (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {outfits.map((o) => {
+                  const ids = (o.product_ids || '').split(',').filter(Boolean);
+                  const items = ids.map((id) => products.find((p) => p.id === id)).filter(Boolean) as Product[];
+                  const totalValue = items.reduce((s, p) => s + p.salePrice, 0);
+                  const bundlePrice = o.price_eur && o.price_eur > 0 ? o.price_eur : o.discount_pct && o.discount_pct > 0 ? Math.round(totalValue * (1 - o.discount_pct / 100)) : totalValue;
+                  return (
+                    <div key={o.id} className="rounded-3xl bg-white text-dark p-5 flex flex-col gap-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <h4 className="font-bold truncate">{o.name}</h4>
+                          <div className="text-xs text-dark/40 mt-0.5">{items.length} pièce(s)</div>
+                        </div>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold flex-shrink-0 ${o.active ? 'bg-green-500/10 text-green-600' : 'bg-dark/10 text-dark/40'}`}>
+                          {o.active ? 'Actif' : 'Masqué'}
+                        </span>
+                      </div>
+                      {o.image_url ? (
+                        <img src={o.image_url} alt="" className="aspect-[4/3] rounded-2xl object-cover border border-dark/5" />
+                      ) : (
+                        <div className="aspect-[4/3] rounded-2xl bg-bg border border-dark/5 flex items-center justify-center text-3xl">🧥</div>
+                      )}
+                      <div className="flex items-baseline justify-between">
+                        <div>
+                          <div className="text-lg font-800">{euro(bundlePrice)}</div>
+                          {bundlePrice < totalValue && (
+                            <div className="text-xs text-dark/30 line-through">{euro(totalValue)}</div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => setOutfitDraft({ ...o })}
+                            title="Modifier"
+                            className="h-9 w-9 rounded-full bg-dark/5 text-dark/50 hover:bg-dark/10 flex items-center justify-center"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          <button
+                            onClick={() => removeOutfit(o.id)}
+                            title="Supprimer"
+                            className="h-9 w-9 rounded-full bg-red-500/10 text-red-500 hover:bg-red-500/20 flex items-center justify-center"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {activeTab === 'drop' && (
           <div className="grid lg:grid-cols-5 gap-5">
             <div className="lg:col-span-3 rounded-3xl bg-white text-dark p-6">
