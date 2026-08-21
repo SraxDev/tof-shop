@@ -848,9 +848,9 @@ function DeleteBtn({ onClick, title = 'Supprimer' }: { onClick: () => void; titl
       type="button"
       onClick={onClick}
       title={title}
-      className="flex-shrink-0 h-9 w-9 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white flex items-center justify-center transition-colors"
+      className="flex-shrink-0 h-10 w-10 min-h-[44px] min-w-[44px] rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white flex items-center justify-center transition-colors"
     >
-      <Trash2 size={14} />
+      <Trash2 size={15} />
     </button>
   );
 }
@@ -860,9 +860,9 @@ function AddBtn({ onClick, label }: { onClick: () => void; label: string }) {
     <button
       type="button"
       onClick={onClick}
-      className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-dark text-white px-4 py-2 text-xs font-bold hover:bg-accent transition-colors"
+      className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-dark text-white px-4 py-2.5 min-h-[44px] text-xs font-bold hover:bg-accent transition-colors"
     >
-      <Plus size={14} /> {label}
+      <Plus size={15} /> {label}
     </button>
   );
 }
@@ -1868,6 +1868,9 @@ export default function AdminPanel() {
   const [onlineCount, setOnlineCount] = useState(0);
   const [chatSearch, setChatSearch] = useState('');
   const [orderSearch, setOrderSearch] = useState('');
+  const [csvImportOpen, setCsvImportOpen] = useState(false);
+  const [csvText, setCsvText] = useState('');
+  const [csvError, setCsvError] = useState('');
   const [chatFilter, setChatFilter] = useState<'all' | 'unread' | 'needsHelp'>('all');
   const [notifOn, setNotifOn] = useState(false);
   const [chatMessages, setChatMessages] = useState<DbChatMessage[]>([]);
@@ -2679,6 +2682,103 @@ export default function AdminPanel() {
     showToast('Commandes exportées en CSV ✓');
   }, [orders, products]);
 
+  // ── Import CSV en masse ──
+  const importCsvProducts = async () => {
+    setCsvError('');
+    const lines = csvText
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+    if (lines.length === 0) {
+      setCsvError('Colle des lignes CSV d\'abord.');
+      return;
+    }
+
+    // Détection du séparateur sur la ligne d'en-tête
+    const sep = lines[0].includes(';') ? ';' : ',';
+    const header = lines[0].split(sep).map((h) => h.trim().toLowerCase());
+    const idx = (names: string[]) => header.findIndex((h) => names.includes(h));
+
+    const col = {
+      brand: idx(['brand', 'marque']),
+      name: idx(['name', 'nom', 'produit', 'product']),
+      category: idx(['category', 'categorie', 'catégorie']),
+      gender: idx(['gender', 'genre']),
+      price: idx(['saleprice', 'sale_price', 'prix', 'prix€', 'prix €', 'price']),
+      oldPrice: idx(['oldprice', 'old_price', 'prixbarre', 'prix barré']),
+      cny: idx(['sourcepricecny', 'source_price_cny', 'prix¥', 'prix ¥', 'cny']),
+      sizes: idx(['sizes', 'tailles']),
+      colors: idx(['colors', 'couleurs', 'variantes']),
+      sourceUrl: idx(['sourceurl', 'source_url', 'lien', 'url']),
+      imageUrl: idx(['imageurl', 'image_url', 'image', 'photo']),
+    };
+
+    if (col.brand < 0 || col.name < 0) {
+      setCsvError('La première ligne doit être un en-tête avec au moins « brand » et « name ».');
+      return;
+    }
+
+    const rows = lines.slice(1);
+    const created: Product[] = [];
+    const skipped: string[] = [];
+
+    for (const line of rows) {
+      // split en respectant les guillemets simples (pas de CSV complexe attendu)
+      const cells = line.split(sep).map((c) => c.trim().replace(/^"|"$/g, ''));
+      const get = (i: number) => (i >= 0 && i < cells.length ? cells[i] : '');
+      const brand = get(col.brand);
+      const name = get(col.name);
+      if (!brand || !name) {
+        skipped.push(line.slice(0, 40));
+        continue;
+      }
+      const category = get(col.category) || 'T-shirt';
+      const preset = categoryPresets.find((p) => p.label === category) || defaultPreset;
+      const price = Number(get(col.price)) || 0;
+      const cny = Number(get(col.cny)) || 100;
+      const oldPriceRaw = Number(get(col.oldPrice)) || 0;
+      const genderRaw = get(col.gender).toLowerCase();
+      const gender = (['homme', 'femme', 'mixte'].includes(genderRaw) ? genderRaw : 'mixte') as Product['gender'];
+
+      created.push({
+        id: `p${Date.now()}${Math.floor(Math.random() * 1000)}`,
+        brand,
+        name,
+        category,
+        gender,
+        salePrice: price || suggestedSalePrice(cny, preset.weight, preset.packaging),
+        oldPrice: oldPriceRaw > 0 ? oldPriceRaw : undefined,
+        sourcePriceCny: cny,
+        weightGrams: preset.weight,
+        packaging: preset.packaging,
+        sizes: get(col.sizes) || preset.defaultSizes,
+        colors: get(col.colors) || preset.defaultColors,
+        imageUrl: get(col.imageUrl),
+        sourceUrl: get(col.sourceUrl),
+        status: 'active',
+      });
+    }
+
+    if (created.length === 0) {
+      setCsvError('Aucune ligne valide trouvée (il faut au moins « brand » et « name » par ligne).');
+      return;
+    }
+
+    setProducts((prev) => [...created, ...prev]);
+    try {
+      await Promise.all(created.map((p) => upsertProduct(productToDb(p))));
+    } catch (err) {
+      console.error('csv import failed', err);
+      setProducts((prev) => prev.filter((p) => !created.some((c) => c.id === p.id)));
+      setCsvError("Erreur pendant l'import — rien n'a été enregistré.");
+      return;
+    }
+
+    showToast(`${created.length} produit(s) importé(s) ✓${skipped.length ? ` · ${skipped.length} ligne(s) ignorée(s)` : ''}`);
+    setCsvText('');
+    setCsvImportOpen(false);
+  };
+
   // Réordonner les avis (haut/bas)
   const moveReview = (i: number, dir: -1 | 1) => {
     setSiteSettings((s) => {
@@ -3038,7 +3138,7 @@ export default function AdminPanel() {
   }
 
   return (
-    <section id="admin" className="py-8 sm:py-20 lg:py-28 bg-dark text-white">
+    <section id="admin" className="py-8 sm:py-20 lg:py-28 pb-28 sm:pb-20 bg-dark text-white">
       <div className="mx-auto max-w-6xl px-3 sm:px-5">
         <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6 mb-10">
           <div>
@@ -3065,7 +3165,7 @@ export default function AdminPanel() {
           </div>
         </div>
 
-        <div className="flex gap-2 mb-6 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-thin">
+        <div className="sticky top-[72px] sm:top-[76px] z-40 -mx-3 sm:-mx-5 px-3 sm:px-5 pt-3 pb-2 bg-dark/90 backdrop-blur-xl flex gap-2 overflow-x-auto -mt-3 mb-4 scrollbar-thin">
           {[
             { id: 'dashboard', label: 'Dashboard' },
             { id: 'orders', label: 'Commandes', badge: ordersNeedingAction },
@@ -3474,10 +3574,43 @@ export default function AdminPanel() {
                   <span className="hidden sm:inline text-dark/35 text-xs"> nouveau</span>
                 </p>
               </div>
-              <button onClick={openCreateDrawer} className="inline-flex items-center gap-2 rounded-full bg-dark px-5 py-2.5 sm:py-3 text-sm font-semibold text-white hover:bg-accent hover:brightness-110 transition-colors self-start sm:self-auto flex-shrink-0">
-                <Plus size={15} /> Nouveau produit
-              </button>
+              <div className="flex items-center gap-2 self-start sm:self-auto flex-shrink-0">
+                <button onClick={() => setCsvImportOpen((v) => !v)} className="inline-flex items-center gap-2 rounded-full bg-dark/5 px-4 py-2.5 sm:py-3 text-sm font-semibold text-dark/60 hover:bg-dark/10 hover:text-dark transition-colors">
+                  <Download size={15} /> Import CSV
+                </button>
+                <button onClick={openCreateDrawer} className="inline-flex items-center gap-2 rounded-full bg-dark px-5 py-2.5 sm:py-3 text-sm font-semibold text-white hover:bg-accent hover:brightness-110 transition-colors">
+                  <Plus size={15} /> Nouveau produit
+                </button>
+              </div>
             </div>
+
+            {/* Panneau import CSV */}
+            {csvImportOpen && (
+              <div className="p-4 sm:p-5 border-b border-dark/5 bg-bg/50 space-y-3">
+                <div>
+                  <h4 className="font-bold text-sm text-dark">Import en masse</h4>
+                  <p className="text-xs text-dark/40 mt-0.5">
+                    Première ligne = en-tête. Colonnes reconnues : <b>brand, name</b> (obligatoires), puis category, gender, price, oldPrice, cny, sizes, colors, sourceUrl, imageUrl. Séparateur <b>,</b> ou <b>;</b>.
+                  </p>
+                </div>
+                <textarea
+                  value={csvText}
+                  onChange={(e) => setCsvText(e.target.value)}
+                  rows={7}
+                  placeholder={'brand,name,category,price,sizes\nLouis Vuitton,LV Get Ready,Sac,65,"39,40,41,42"\nDior,Saddle Dior,Sac,85,"39,40,41,42,43"'}
+                  className="w-full rounded-xl bg-white px-4 py-3 text-sm text-dark outline-none border border-dark/10 font-mono resize-none"
+                />
+                {csvError && <p className="text-xs font-bold text-red-500">{csvError}</p>}
+                <div className="flex items-center gap-2">
+                  <button onClick={importCsvProducts} className="rounded-full bg-accent px-5 py-2.5 text-sm font-bold text-white hover:brightness-110 transition-colors">
+                    Importer
+                  </button>
+                  <button onClick={() => { setCsvImportOpen(false); setCsvError(''); }} className="rounded-full bg-dark/5 px-5 py-2.5 text-sm font-semibold text-dark/60 hover:bg-dark/10 transition-colors">
+                    Annuler
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Barre recherche + filtres + tri */}
             <div className="sticky top-[72px] sm:top-[76px] z-10 bg-white/95 backdrop-blur border-b border-dark/5 p-3 sm:p-4 flex flex-col gap-2">
@@ -4152,19 +4285,19 @@ export default function AdminPanel() {
                                 type="button"
                                 onClick={() => moveReview(i, -1)}
                                 disabled={i === 0}
-                                className="h-9 w-9 rounded-lg bg-dark/5 text-dark/50 hover:bg-dark hover:text-white flex items-center justify-center disabled:opacity-25 disabled:hover:bg-dark/5 disabled:hover:text-dark/50 transition-colors"
+                                className="h-10 w-10 min-h-[44px] min-w-[44px] rounded-lg bg-dark/5 text-dark/50 hover:bg-dark hover:text-white flex items-center justify-center disabled:opacity-25 disabled:hover:bg-dark/5 disabled:hover:text-dark/50 transition-colors"
                                 aria-label="Monter"
                               >
-                                <ChevronUp size={14} />
+                                <ChevronUp size={15} />
                               </button>
                               <button
                                 type="button"
                                 onClick={() => moveReview(i, 1)}
                                 disabled={i === siteSettings.reviews.length - 1}
-                                className="h-9 w-9 rounded-lg bg-dark/5 text-dark/50 hover:bg-dark hover:text-white flex items-center justify-center disabled:opacity-25 disabled:hover:bg-dark/5 disabled:hover:text-dark/50 transition-colors"
+                                className="h-10 w-10 min-h-[44px] min-w-[44px] rounded-lg bg-dark/5 text-dark/50 hover:bg-dark hover:text-white flex items-center justify-center disabled:opacity-25 disabled:hover:bg-dark/5 disabled:hover:text-dark/50 transition-colors"
                                 aria-label="Descendre"
                               >
-                                <ChevronDown size={14} />
+                                <ChevronDown size={15} />
                               </button>
                               <DeleteBtn onClick={() => setSiteSettings((s) => ({ ...s, reviews: s.reviews.filter((_, j) => j !== i) }))} />
                             </div>
