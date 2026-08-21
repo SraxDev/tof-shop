@@ -40,7 +40,7 @@ export const defaultSettings: SiteSettings = {
   heroTitleStart: 'Les meilleurs',
   heroTitleHighlight: 'reps 1:1',
   heroDescription: 'Sneakers et streetwear sélectionnés pièce par pièce. Chaque pièce est vérifiée sur photo QC par moi à l\'entrepôt avant expédition. Paiement par carte sécurisé via SumUp. Livraison suivie 10-20 jours.',
-  heroSubnote: 'Géré tout seul depuis Limoges — réponses rapide sur Snap & WhatsApp.',
+  heroSubnote: 'Géré tout seul depuis Limoges — réponses rapides sur Snap & WhatsApp.',
   heroStatValue: '10-20j',
   heroStatLabel: 'livraison suivie',
   heroTopBadge: 'VÉRIFIÉ 🔍',

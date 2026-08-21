@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 const APPLE_CDN = 'https://cdn.jsdelivr.net/npm/emoji-datasource-apple@16.0.0/img/apple/64/';
 
 // Map of emoji character to its unicode codepoint filename
@@ -29,10 +31,17 @@ interface AppleEmojiProps {
 }
 
 export default function AppleEmoji({ emoji, size = 32, className = '' }: AppleEmojiProps) {
+  const [failed, setFailed] = useState(false);
   const code = EMOJI_MAP[emoji];
 
-  if (!code) {
-    return <span className={className}>{emoji}</span>;
+  // Pas de correspondance, ou le CDN a échoué : on affiche l'emoji natif
+  // (l'appareil a toujours un rendu, même sans réseau tiers).
+  if (!code || failed) {
+    return (
+      <span className={className} style={{ fontSize: size, lineHeight: 1 }} role="img" aria-label={emoji}>
+        {emoji}
+      </span>
+    );
   }
 
   return (
@@ -44,6 +53,7 @@ export default function AppleEmoji({ emoji, size = 32, className = '' }: AppleEm
       className={className}
       style={{ width: size, height: size, objectFit: 'contain' }}
       draggable={false}
+      onError={() => setFailed(true)}
     />
   );
 }

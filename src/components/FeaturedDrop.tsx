@@ -57,6 +57,7 @@ export default function FeaturedDrop() {
   const { ref, isInView } = useInView(0.1);
   const [drop, setDrop] = useState<FeaturedDropConfig>(defaultDrop);
   const [settings, setSettings] = useState(readSiteSettings);
+  const [selectedSize, setSelectedSize] = useState('');
 
   useEffect(() => {
     loadDrop().then(setDrop);
@@ -75,6 +76,12 @@ export default function FeaturedDrop() {
   }, []);
 
   const sizes = drop.sizes.split(',').map((size) => size.trim()).filter(Boolean);
+
+  // Présélectionne la première taille disponible à l'ouverture,
+  // et réinitialise si la liste des tailles change (nouveau drop).
+  useEffect(() => {
+    setSelectedSize((prev) => (sizes.includes(prev) ? prev : sizes[0] ?? ''));
+  }, [sizes]);
 
   return (
     <section id="drop" className="py-14 sm:py-20 lg:py-28 bg-dark text-white" ref={ref}>
@@ -132,14 +139,25 @@ export default function FeaturedDrop() {
                 Tailles dispos
               </span>
               <div className="flex flex-wrap gap-2">
-                {sizes.map((size) => (
-                  <button
-                    key={size}
-                    className="h-11 min-w-[48px] rounded-xl bg-white/5 border border-white/10 px-3 text-sm font-semibold text-white/60 hover:bg-accent hover:border-accent hover:text-white transition-all active:scale-95"
-                  >
-                    {size}
-                  </button>
-                ))}
+                {sizes.map((size) => {
+                  const selected = selectedSize === size;
+                  return (
+                    <button
+                      key={size}
+                      type="button"
+                      onClick={() => setSelectedSize(size)}
+                      aria-pressed={selected}
+                      aria-label={`Taille ${size}`}
+                      className={`h-11 min-w-[48px] rounded-xl border px-3 text-sm font-semibold transition-all active:scale-95 ${
+                        selected
+                          ? 'bg-accent border-accent text-white shadow-lg shadow-accent/20'
+                          : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10 hover:border-white/25 hover:text-white'
+                      }`}
+                    >
+                      {size}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
