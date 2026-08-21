@@ -19,6 +19,12 @@ export type DbProduct = {
   source_url: string;
   status: string;
   created_at?: string;
+  /** Description libre affichée sur la fiche produit (facultatif). */
+  description?: string | null;
+  /** Conseil de taille, ex. « Taille normalement ». */
+  size_advice?: string | null;
+  /** Contenu du colis, ex. « Paire + boîte + dustbag ». */
+  box_content?: string | null;
 };
 
 export type DbOrderItem = {
@@ -85,13 +91,43 @@ export async function fetchProducts(): Promise<DbProduct[]> {
   return (data as DbProduct[]) || [];
 }
 
+/** Champs ajoutés par supabase/08-description-produit.sql. */
+const OPTIONAL_PRODUCT_FIELDS = ['description', 'size_advice', 'box_content'] as const;
+
+/** Vrai si PostgREST se plaint d'une colonne absente (SQL 08 pas encore lancé). */
+function isMissingColumnError(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  if (error.code === 'PGRST204' || error.code === '42703') return true;
+  return OPTIONAL_PRODUCT_FIELDS.some((f) => error.message?.includes(f));
+}
+
+function withoutOptionalFields<T extends object>(row: T): T {
+  const copy = { ...row } as Record<string, unknown>;
+  OPTIONAL_PRODUCT_FIELDS.forEach((f) => delete copy[f]);
+  return copy as T;
+}
+
+/**
+ * Enregistre un produit.
+ *
+ * Si la migration 08 n'a pas encore été exécutée, les colonnes description /
+ * size_advice / box_content n'existent pas et PostgREST rejette la requête.
+ * Plutôt que de faire échouer la sauvegarde (et de faire perdre son travail à
+ * l'admin), on réessaie sans ces champs facultatifs.
+ */
 export async function upsertProduct(product: DbProduct) {
-  await supabase.from('products').upsert(product);
+  const { error } = await supabase.from('products').upsert(product);
+  if (isMissingColumnError(error)) {
+    await supabase.from('products').upsert(withoutOptionalFields(product));
+  }
   window.dispatchEvent(new CustomEvent('tof-products-updated'));
 }
 
 export async function upsertProducts(products: DbProduct[]) {
-  await supabase.from('products').upsert(products);
+  const { error } = await supabase.from('products').upsert(products);
+  if (isMissingColumnError(error)) {
+    await supabase.from('products').upsert(products.map(withoutOptionalFields));
+  }
   window.dispatchEvent(new CustomEvent('tof-products-updated'));
 }
 

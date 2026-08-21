@@ -47,6 +47,12 @@ type Product = {
   imageUrl: string;
   sourceUrl: string;
   status: 'active' | 'link_dead' | 'paused';
+  /** Texte libre affiché sur la fiche (matière, coupe, détails). */
+  description?: string;
+  /** Conseil de taille, ex. « Taille normalement ». */
+  sizeAdvice?: string;
+  /** Contenu du colis, ex. « Paire + boîte + dustbag ». */
+  boxContent?: string;
 };
 
 type OrderStatus = 'new' | 'to_order' | 'ordered' | 'qc_received' | 'shipped' | 'done';
@@ -215,6 +221,9 @@ function productToDb(p: Product): DbProduct {
     weight_grams: p.weightGrams, packaging: p.packaging,
     sizes: p.sizes, colors: p.colors, image_url: p.imageUrl || '',
     source_url: p.sourceUrl, status: p.status,
+    description: p.description || null,
+    size_advice: p.sizeAdvice || null,
+    box_content: p.boxContent || null,
   };
 }
 
@@ -225,6 +234,9 @@ function dbToProduct(d: DbProduct): Product {
     weightGrams: d.weight_grams, packaging: d.packaging as Product['packaging'],
     sizes: d.sizes, colors: d.colors, imageUrl: d.image_url || '',
     sourceUrl: d.source_url, status: d.status as Product['status'],
+    description: d.description || undefined,
+    sizeAdvice: d.size_advice || undefined,
+    boxContent: d.box_content || undefined,
   };
 }
 
@@ -899,7 +911,10 @@ const ProductEditDrawer = memo(function ProductEditDrawer({
       draft.weightGrams !== original.weightGrams ||
       draft.sizes !== original.sizes ||
       draft.colors !== original.colors ||
-      draft.imageUrl !== original.imageUrl
+      draft.imageUrl !== original.imageUrl ||
+      (draft.description || '') !== (original.description || '') ||
+      (draft.sizeAdvice || '') !== (original.sizeAdvice || '') ||
+      (draft.boxContent || '') !== (original.boxContent || '')
     );
   }, [draft, original, isNew]);
 
@@ -997,6 +1012,47 @@ const ProductEditDrawer = memo(function ProductEditDrawer({
                 isNew={isNew}
               />
             </Field>
+          </div>
+
+          {/* Ce que le client lit avant de se décider. Tout est facultatif :
+              un produit sans description s'affiche comme avant. */}
+          <div className="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-white/50">
+              Description <span className="text-white/25 normal-case font-medium">— facultatif, mais ça fait vendre</span>
+            </h4>
+            <Field label="Description">
+              <textarea
+                value={draft.description || ''}
+                onChange={(e) => onChange({ ...draft, description: e.target.value })}
+                rows={4}
+                maxLength={600}
+                placeholder="Matière, coupe, finitions, détails qui rassurent. Ex : Coton épais 280g, coupe droite, broderie sur la poitrine. Finitions propres, coutures renforcées."
+                className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2.5 text-sm text-white placeholder:text-white/20 outline-none focus:border-accent/40 resize-y"
+              />
+            </Field>
+            <div className="text-[10px] text-white/25 -mt-1">
+              {(draft.description || '').length}/600 caractères
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field label="Conseil de taille">
+                <input
+                  value={draft.sizeAdvice || ''}
+                  onChange={(e) => onChange({ ...draft, sizeAdvice: e.target.value })}
+                  maxLength={120}
+                  placeholder="Taille normalement"
+                  className="w-full rounded-xl bg-white/5 border border-white/10 px-3 h-11 text-sm text-white placeholder:text-white/20 outline-none focus:border-accent/40"
+                />
+              </Field>
+              <Field label="Contenu du colis">
+                <input
+                  value={draft.boxContent || ''}
+                  onChange={(e) => onChange({ ...draft, boxContent: e.target.value })}
+                  maxLength={120}
+                  placeholder="Paire + boîte + dustbag"
+                  className="w-full rounded-xl bg-white/5 border border-white/10 px-3 h-11 text-sm text-white placeholder:text-white/20 outline-none focus:border-accent/40"
+                />
+              </Field>
+            </div>
           </div>
 
           <div className="rounded-2xl bg-white/5 border border-white/10 p-4 space-y-3">

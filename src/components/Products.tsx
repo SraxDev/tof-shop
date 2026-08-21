@@ -24,6 +24,9 @@ type Product = {
   status: string;
   createdAt?: string;
   orderCount?: number;
+  description?: string;
+  sizeAdvice?: string;
+  boxContent?: string;
 };
 
 const INITIAL_SHOW = 8;
@@ -92,6 +95,9 @@ function dbToShopProduct(d: DbProduct): Product {
     imageUrl: d.image_url || '',
     status: d.status,
     createdAt: d.created_at,
+    description: d.description || undefined,
+    sizeAdvice: d.size_advice || undefined,
+    boxContent: d.box_content || undefined,
   };
 }
 
@@ -609,6 +615,29 @@ function QuickAddModal({
                   )}
                   <span className="text-xs text-dark/30 font-medium">TVA incluse</span>
                 </div>
+
+                {/* Description : ce qui répond aux questions du client avant
+                    qu'il ait à les poser. Masqué si non renseigné. */}
+                {product.description?.trim() && (
+                  <p className="mt-5 text-[14px] leading-relaxed text-dark/60 whitespace-pre-line">
+                    {product.description.trim()}
+                  </p>
+                )}
+
+                {(product.sizeAdvice?.trim() || product.boxContent?.trim()) && (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {product.sizeAdvice?.trim() && (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-accent/[0.07] px-3 py-1.5 text-[11px] font-bold text-accent">
+                        <Ruler size={12} /> {product.sizeAdvice.trim()}
+                      </span>
+                    )}
+                    {product.boxContent?.trim() && (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-dark/[0.04] px-3 py-1.5 text-[11px] font-bold text-dark/60">
+                        📦 {product.boxContent.trim()}
+                      </span>
+                    )}
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 gap-2 mt-6">
                   {[

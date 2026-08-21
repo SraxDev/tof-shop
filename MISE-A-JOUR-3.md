@@ -327,6 +327,42 @@ sur « Recommencer », et quand tu supprimes la conversation depuis l'admin
 même question reposée → le bot enchaîne par « Pour rappel » et garde le prénom.
 Aucune erreur JavaScript.
 
+## 16. Fiches produit : descriptions
+
+⚠️ **Nécessite d'exécuter `supabase/08-description-produit.sql`.**
+
+Ta fiche produit affichait la marque, le nom, le prix et deux badges. Rien
+d'autre. Pour un maillot Burberry à 70 €, le client n'avait aucune réponse :
+quelle matière ? ça taille comment ? qu'est-ce qu'il y a dans le colis ?
+Sans réponse au moment où il hésite, il ferme l'onglet.
+
+Trois champs facultatifs sont maintenant disponibles dans l'admin, sur la
+fiche de chaque produit :
+
+| Champ | Exemple |
+|---|---|
+| **Description** (600 car. max) | « Coton épais 280g, coupe droite légèrement oversize. Broderie sur la poitrine, finitions propres. » |
+| **Conseil de taille** | « Taille normalement », « Prends une taille au-dessus » |
+| **Contenu du colis** | « Paire + boîte + dustbag », « Pièce + étiquettes » |
+
+Côté client, la description s'affiche juste sous le prix, et les deux autres
+champs deviennent des pastilles. **Un produit sans description s'affiche
+exactement comme avant** — tu remplis à ton rythme, en commençant par tes
+pièces les plus chères.
+
+**Sécurité** : si tu appliques cette mise à jour avant d'avoir lancé le SQL 08,
+l'enregistrement d'un produit aurait dû échouer (`PGRST204`). Le code détecte
+ce cas et réenregistre sans les nouveaux champs, pour ne jamais te faire perdre
+ton travail. Une fois le SQL lancé, tout fonctionne normalement.
+
+## 17. Mobile : bas d'écran désencombré
+
+Sur un écran de 390 px, la pastille « VÉRIFIÉ 🔍 » du hero venait se superposer
+au bouton de chat, juste au-dessus de la barre Boutique / Panier / WhatsApp.
+Trois éléments empilés dans le même coin : ça mangeait le contenu et ça faisait
+« site qui insiste ». La pastille est désormais masquée sur mobile et reste
+visible sur ordinateur, où la place ne manque pas.
+
 ## 9. Référencement & partage
 
 - `public/og-image.jpg` (1200×630, 30 Ko) : l'aperçu qui s'affiche quand on colle ton lien sur WhatsApp, Insta ou Snap

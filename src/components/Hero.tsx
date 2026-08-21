@@ -193,7 +193,9 @@ export default function Hero() {
                     </div>
                   </div>
                 </div>
-                <div className="absolute -top-3 -right-3 bg-accent text-white rounded-xl px-4 py-2 text-xs font-bold shadow-lg shadow-accent/20 anim-float flex items-center gap-1.5 z-20" style={{ animationDelay: '2s' }}>
+                {/* Masqué sur mobile : la pastille chevauchait le bouton de chat
+                    et la barre d'actions, ce qui encombrait le bas de l'écran. */}
+                <div className="hidden sm:flex absolute -top-3 -right-3 bg-accent text-white rounded-xl px-4 py-2 text-xs font-bold shadow-lg shadow-accent/20 anim-float items-center gap-1.5 z-20" style={{ animationDelay: '2s' }}>
                   {settings.heroTopBadge} <AppleEmoji emoji="🚀" size={14} />
                 </div>
               </div>
