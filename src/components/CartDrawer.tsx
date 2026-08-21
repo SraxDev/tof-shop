@@ -643,14 +643,30 @@ export default function CartDrawer({
                   <span className="font-900 text-lg text-dark">{formatPrice(savedTotal)}</span>
                 </div>
               <div className="mt-6 space-y-3">
-                <a
-                  href={settings.sumupUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="h-12 rounded-full bg-accent px-7 text-sm font-bold text-white hover:brightness-110 transition-all text-center flex items-center justify-center gap-2"
-                >
-                  💳 Payer {formatPrice(savedTotal)} par carte (SumUp)
-                </a>
+                {/* Tant que le lien SumUp n'est pas configuré (valeur "#"), on
+                    n'affiche pas un bouton qui ne mène nulle part : le client
+                    cliquerait dans le vide sans comprendre. On l'oriente vers
+                    WhatsApp, qui fonctionne toujours. */}
+                {settings.sumupUrl && settings.sumupUrl !== '#' ? (
+                  <a
+                    href={settings.sumupUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="h-12 rounded-full bg-accent px-7 text-sm font-bold text-white hover:brightness-110 transition-all text-center flex items-center justify-center gap-2"
+                  >
+                    💳 Payer {formatPrice(savedTotal)} par carte (SumUp)
+                  </a>
+                ) : (
+                  <div className="rounded-2xl bg-accent/[0.06] border border-accent/20 px-4 py-3 text-center">
+                    <p className="text-[13px] font-bold text-dark/75">
+                      Ta commande est bien enregistrée ✅
+                    </p>
+                    <p className="text-[12px] text-dark/50 mt-1 leading-relaxed">
+                      Contacte-moi sur WhatsApp juste en dessous : je t'envoie ton lien de
+                      paiement sécurisé et je lance ta commande.
+                    </p>
+                  </div>
+                )}
                 <a
                   href={whatsappCheckoutLink()}
                   target="_blank"

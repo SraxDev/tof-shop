@@ -363,6 +363,43 @@ Trois éléments empilés dans le même coin : ça mangeait le contenu et ça fa
 « site qui insiste ». La pastille est désormais masquée sur mobile et reste
 visible sur ordinateur, où la place ne manque pas.
 
+## 18. Tunnel d'achat : testé de bout en bout
+
+Personne n'avait jamais parcouru ton tunnel d'achat en entier. Je l'ai fait :
+5 vraies commandes passées depuis un navigateur mobile, du clic sur le produit
+jusqu'à l'écran de confirmation.
+
+**Résultat : ça marche.** Choix taille/couleur → Acheter maintenant → panier →
+formulaire → `POST 201` en base → numéro `TOF-XXXX` généré → écran de
+confirmation. Zéro erreur JavaScript. Le suivi de commande retrouve bien la
+commande, avec la ville masquée (`Ba•••`) comme prévu.
+
+**La sécurité tient aussi** : en tant que visiteur anonyme, la lecture directe
+de la table `orders` renvoie `[]`, et la suppression est refusée. Seul le suivi
+par numéro fonctionne. C'est exactement le comportement attendu.
+
+### Un défaut corrigé : le bouton « Payer » qui ne menait nulle part
+
+Tant que `sumupUrl` vaut `#`, le bouton **« Payer 78 € par carte (SumUp) »**
+s'affichait quand même. Le client cliquait… et il ne se passait rien. Aucun
+message, aucune explication. C'est le pire moment pour perdre quelqu'un : il a
+rempli tout le formulaire, il est prêt à payer.
+
+Désormais, tant que le lien n'est pas configuré, le bouton est remplacé par :
+
+> **Ta commande est bien enregistrée ✅**
+> Contacte-moi sur WhatsApp juste en dessous : je t'envoie ton lien de paiement
+> sécurisé et je lance ta commande.
+
+Le client est orienté vers WhatsApp, qui fonctionne toujours. **Dès que tu
+colles ton lien SumUp dans les Réglages, le bouton de paiement réapparaît
+automatiquement** — rien d'autre à faire.
+
+### ⚠️ À faire : supprimer mes commandes de test
+
+Mes 5 commandes de test sont encore en base et fausseraient ton chiffre
+d'affaires. Exécute **`supabase/09-supprimer-commandes-test.sql`**.
+
 ## 9. Référencement & partage
 
 - `public/og-image.jpg` (1200×630, 30 Ko) : l'aperçu qui s'affiche quand on colle ton lien sur WhatsApp, Insta ou Snap
