@@ -2293,10 +2293,21 @@ export default function AdminPanel() {
   useEffect(() => {
     const unsubOrders = subscribeToOrders(
       () => {
-        fetchOrders().then((data) => setOrders(data.map(dbToOrder)));
+        fetchOrders().then((data) => {
+          setOrders(data.map(dbToOrder));
+          // La commande la plus récente = celle qui vient d'arriver.
+          const latest = data[0];
+          const name = latest?.customer_name?.trim();
+          notify(
+            '🛒 Nouvelle commande',
+            name
+              ? `${name} vient de commander sur tof.`
+              : 'Une commande vient de tomber sur tof. — ouvre le panel pour la traiter.',
+            'order',
+          );
+        });
         showToast('Nouvelle commande reçue !');
         playNewOrder();
-        notify('🛒 Nouvelle commande', 'Une commande vient de tomber sur tof. — ouvre le panel pour la traiter.', 'order');
       },
       () => {
         fetchOrders().then((data) => setOrders(data.map(dbToOrder)));

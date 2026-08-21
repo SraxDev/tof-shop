@@ -46,10 +46,21 @@ export async function requestNotifications(): Promise<NotifPermission> {
 /**
  * Affiche une notification. Silencieuse si l'onglet est déjà au premier plan
  * (le toast + le son suffisent dans ce cas).
+ * Ajoute une vibration sur mobile (Android) pour un retour tactile.
  */
 export function notify(title: string, body: string, tag?: string) {
   if (!notificationsEnabled()) return;
   if (typeof document !== 'undefined' && document.visibilityState === 'visible') return;
+
+  // Vibration (Android) : deux impulsions courtes pour les commandes, une pour le reste.
+  try {
+    if ('vibrate' in navigator) {
+      navigator.vibrate(tag === 'order' ? [120, 60, 120] : 80);
+    }
+  } catch {
+    /* ignore */
+  }
+
   try {
     const n = new Notification(title, {
       body,
