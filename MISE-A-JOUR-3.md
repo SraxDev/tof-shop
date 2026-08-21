@@ -400,6 +400,60 @@ automatiquement** — rien d'autre à faire.
 Mes 5 commandes de test sont encore en base et fausseraient ton chiffre
 d'affaires. Exécute **`supabase/09-supprimer-commandes-test.sql`**.
 
+## 19. Paiement obligatoire avant commande
+
+Tu ne veux pas avancer l'argent : normal, c'est ton modèle. Le site disait
+pourtant l'inverse.
+
+**Avant**, l'écran de fin annonçait « Commande enregistrée — *je commande ta
+pièce dans les 2h qui suivent* », puis mentionnait le paiement comme une
+formalité à faire plus tard. Un client pouvait légitimement croire que tu
+lançais l'achat sans avoir payé. Pire : la commande arrivait dans ton admin
+avec le statut **« À commander »** alors qu'elle n'était pas réglée.
+
+**Maintenant** le message est sans ambiguïté :
+
+> **Commande réservée**
+> Ta pièce est mise de côté. **Dernière étape : le paiement.** Dès qu'il est
+> reçu, je commande ta pièce et je te ferai parvenir les photos QC sous 2-5 jours.
+>
+> ⏳ **Ta réservation est valable 24 h.** Passé ce délai, la pièce repart en
+> stock — le paiement confirme ta commande.
+
+Le délai de 24 h crée une urgence saine : le client sait qu'il doit agir, sans
+se sentir piégé.
+
+### Côté admin : impossible de se tromper
+
+- Une commande non réglée arrive désormais en **« Nouvelle »** (plus jamais en
+  « À commander »).
+- Elle porte un badge rouge **« ⏳ NON PAYÉE — ne pas commander »**, et un badge
+  vert **« ✓ PAYÉE »** une fois encaissée.
+- **Quand tu passes une commande en « Payée », elle bascule automatiquement en
+  « À commander ».** Un seul clic au lieu de deux, et aucun risque d'oubli.
+
+**Testé de bout en bout** : commande `TOF-8805` créée avec le statut `new`
+transmis à la base, écran de confirmation conforme, zéro erreur JavaScript.
+
+⚠️ **À faire** : exécuter `supabase/10-supprimer-commande-test-finale.sql`
+pour retirer cette commande de test.
+
+## 20. Animations
+
+Le site avait déjà une bonne base : apparition des cartes au scroll, effet de
+survol, badge du panier qui rebondit, marquee des marques — le tout désactivé
+automatiquement si le visiteur a activé « animations réduites » dans son
+système. J'ai donc ajouté seulement ce qui manquait, là où ça sert la vente :
+
+| Animation | Où | Pourquoi |
+|---|---|---|
+| **Coche qui apparaît en rebond + halo vert** | Fin de commande | Marque le moment de satisfaction, la commande « se sent » validée |
+| **Battement doux** | Bouton « Payer par carte » | Attire l'œil sur la seule action attendue à cet instant |
+
+Je me suis limité volontairement : au-delà, les animations ralentissent le
+mobile et donnent un air « toc » qui dessert un site où la confiance est déjà
+le point sensible. Le tunnel d'achat doit rester rapide.
+
 ## 9. Référencement & partage
 
 - `public/og-image.jpg` (1200×630, 30 Ko) : l'aperçu qui s'affiche quand on colle ton lien sur WhatsApp, Insta ou Snap

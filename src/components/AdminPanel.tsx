@@ -1375,6 +1375,17 @@ const OrderCard = memo(function OrderCard({ order, product, margin, copied, copi
             <span className="rounded-full bg-dark/5 px-3 py-1 text-xs font-semibold text-dark/45">
               {statusLabels[order.status]}
             </span>
+            {/* Signal clair : ne rien commander tant que ce n'est pas encaissé. */}
+            {(order.paymentStatus || 'pending') === 'pending' && order.status !== 'done' && (
+              <span className="rounded-full bg-red-500/10 px-3 py-1 text-xs font-black text-red-600">
+                ⏳ NON PAYÉE — ne pas commander
+              </span>
+            )}
+            {order.paymentStatus === 'paid' && (
+              <span className="rounded-full bg-green-500/10 px-3 py-1 text-xs font-black text-green-700">
+                ✓ PAYÉE
+              </span>
+            )}
           </div>
           <h3 className="font-bold">
             {order.items && order.items.length > 1
@@ -2399,9 +2410,23 @@ export default function AdminPanel() {
     };
     // Clé côté état React (camelCase) ≠ clé côté base (snake_case)
     const stateField: Record<string, string> = { qc_photos: 'qcPhotos' };
-    await updateOrder(id, { [dbField[field] || field]: value });
-    setOrders((prev) => prev.map((o) => o.id === id ? { ...o, [stateField[field] || field]: value } : o));
-  }, []);
+
+    const patch: Record<string, string> = { [dbField[field] || field]: value };
+    const statePatch: Record<string, string> = { [stateField[field] || field]: value };
+
+    // Règle métier : on ne commande rien tant que ce n'est pas payé.
+    // Dès que tu encaisses, la commande bascule seule en « À commander ».
+    if (field === 'paymentStatus' && value === 'paid') {
+      const current = orders.find((o) => o.id === id);
+      if (current && current.status === 'new') {
+        patch.status = 'to_order';
+        statePatch.status = 'to_order';
+      }
+    }
+
+    await updateOrder(id, patch);
+    setOrders((prev) => prev.map((o) => o.id === id ? { ...o, ...statePatch } : o));
+  }, [orders]);
 
   const saveDrop = async () => {
     await dbSaveDrop(dropToDb(dropDraft));

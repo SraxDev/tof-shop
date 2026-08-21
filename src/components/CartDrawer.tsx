@@ -266,7 +266,10 @@ export default function CartDrawer({
       zip: form.zip,
       country: form.country,
       snap_or_whatsapp: form.snapOrWhatsapp,
-      status: 'to_order',
+      // La commande n'est pas encore payée : elle reste en "Nouvelle" tant que
+      // le paiement n'est pas encaissé. Elle ne passe en "À commander" que
+      // lorsque tu la marques comme payée dans l'admin — pas avant.
+      status: 'new',
       payment_status: 'pending',
       tracking: null,
       items_json: itemsJson,
@@ -630,16 +633,18 @@ export default function CartDrawer({
         {step === 'done' && (
           <div className="flex-1 flex items-center justify-center p-8">
             <div className="text-center">
-              <div className="mx-auto h-16 w-16 rounded-3xl bg-green-500/10 text-green-600 flex items-center justify-center text-3xl font-800 mb-5">✓</div>
-                <h3 className="font-display text-3xl font-800 tracking-tight text-dark">Commande enregistrée</h3>
+              <div className="anim-check-pop mx-auto h-16 w-16 rounded-3xl bg-green-500/10 text-green-600 flex items-center justify-center text-3xl font-800 mb-5">✓</div>
+                <h3 className="font-display text-3xl font-800 tracking-tight text-dark">Commande réservée</h3>
                 <p className="mt-3 text-dark/55 max-w-sm mx-auto text-sm leading-relaxed">
-                  C'est noté ! Je commande ta pièce dans les 2h qui suivent. Tu reçois les photos QC sous 2-5j après paiement, et le colis part juste après.
+                  Ta pièce est mise de côté. <b className="text-dark/75">Dernière étape : le paiement.</b>{' '}
+                  Dès qu'il est reçu, je commande ta pièce et je te ferai parvenir les photos QC sous 2-5 jours.
                 </p>
-                <div className="mt-4 text-dark/45 max-w-sm mx-auto text-xs leading-relaxed rounded-xl bg-bg p-3">
-                  <b>Prochaine étape :</b> paie ta commande par carte via notre lien SumUp sécurisé (CB, Apple Pay, Google Pay), puis envoie-moi la confirmation sur WhatsApp.
+                <div className="mt-4 max-w-sm mx-auto text-xs leading-relaxed rounded-xl bg-accent/[0.07] border border-accent/20 p-3 text-dark/65">
+                  ⏳ <b>Ta réservation est valable 24 h.</b> Passé ce délai, la pièce
+                  repart en stock — le paiement confirme ta commande.
                 </div>
                 <div className="mt-4 mx-auto max-w-sm rounded-xl bg-dark/[0.03] border border-dark/5 px-4 py-3 flex items-center justify-between">
-                  <span className="text-xs font-bold text-dark/40 uppercase tracking-wider">À payer · {createdOrderId}</span>
+                  <span className="text-xs font-bold text-dark/40 uppercase tracking-wider">Montant à régler · {createdOrderId}</span>
                   <span className="font-900 text-lg text-dark">{formatPrice(savedTotal)}</span>
                 </div>
               <div className="mt-6 space-y-3">
@@ -652,18 +657,18 @@ export default function CartDrawer({
                     href={settings.sumupUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="h-12 rounded-full bg-accent px-7 text-sm font-bold text-white hover:brightness-110 transition-all text-center flex items-center justify-center gap-2"
+                    className="anim-attention h-12 rounded-full bg-accent px-7 text-sm font-bold text-white hover:brightness-110 transition-all text-center flex items-center justify-center gap-2"
                   >
                     💳 Payer {formatPrice(savedTotal)} par carte (SumUp)
                   </a>
                 ) : (
                   <div className="rounded-2xl bg-accent/[0.06] border border-accent/20 px-4 py-3 text-center">
                     <p className="text-[13px] font-bold text-dark/75">
-                      Ta commande est bien enregistrée ✅
+                      Ta pièce est réservée ✅
                     </p>
                     <p className="text-[12px] text-dark/50 mt-1 leading-relaxed">
-                      Contacte-moi sur WhatsApp juste en dessous : je t'envoie ton lien de
-                      paiement sécurisé et je lance ta commande.
+                      Écris-moi sur WhatsApp juste en dessous : je t'envoie ton lien de
+                      paiement sécurisé. <b>Je lance la commande dès réception du paiement.</b>
                     </p>
                   </div>
                 )}
