@@ -201,7 +201,7 @@ export default function Hero() {
       </div>
 
       {/* Scroll indicator */}
-      <div className="absolute bottom-24 sm:bottom-8 left-1/2 -translate-x-1/2">
+      <div className="absolute bottom-28 sm:bottom-8 left-1/2 -translate-x-1/2">
         <a href="#shop" aria-label="Défiler vers le shop" className="h-10 w-10 rounded-full bg-white/70 backdrop-blur border border-dark/5 flex items-center justify-center text-dark/30 hover:text-accent transition-colors">
           <ArrowDown size={16} strokeWidth={2.5} className="animate-bounce" />
         </a>

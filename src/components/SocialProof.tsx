@@ -127,7 +127,7 @@ export default function SocialProof() {
       {/* Popup preuve sociale */}
       {current && !dismissed && (
         <div
-          className={`fixed z-[70] left-4 bottom-[104px] md:bottom-6 md:left-6 max-w-[320px] transition-all duration-500 ${
+          className={`fixed z-[70] left-4 bottom-[104px] md:bottom-6 md:left-6 max-w-[calc(100vw-4.5rem)] sm:max-w-[320px] transition-all duration-500 ${
             visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
           }`}
           role="status"

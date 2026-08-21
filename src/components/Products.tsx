@@ -837,6 +837,20 @@ function QuickAddModal({
 
             {/* Sticky CTA desktop */}
             <div className="hidden sm:block p-5 sm:p-6 border-t border-dark/5 bg-white/95 backdrop-blur z-20 flex-shrink-0 space-y-2.5">
+              {(selectedSize || selectedColor) && (
+                <div className="flex flex-wrap items-center justify-center gap-1.5 text-[11px] font-bold text-dark/50">
+                  <span className="text-dark/30 uppercase tracking-wider">Ta sélection</span>
+                  {selectedSize && (
+                    <span className="rounded-full bg-dark/5 px-2.5 py-1">Taille {selectedSize}</span>
+                  )}
+                  {selectedColor && (
+                    <span className="rounded-full bg-dark/5 px-2.5 py-1">{selectedColor}</span>
+                  )}
+                  {quantity > 1 && (
+                    <span className="rounded-full bg-accent/10 text-accent px-2.5 py-1">×{quantity}</span>
+                  )}
+                </div>
+              )}
               <button
                 onClick={handleBuyNow}
                 disabled={!canAdd()}
@@ -882,6 +896,20 @@ function QuickAddModal({
 
         {/* Mobile sticky CTA */}
         <div className="sm:hidden p-4 pt-3 border-t border-dark/5 bg-white/95 backdrop-blur-xl z-30 flex-shrink-0 safe-bottom space-y-2">
+          {(selectedSize || selectedColor) && (
+            <div className="flex flex-wrap items-center justify-center gap-1.5 text-[11px] font-bold text-dark/50">
+              <span className="text-dark/30 uppercase tracking-wider">Ta sélection</span>
+              {selectedSize && (
+                <span className="rounded-full bg-dark/5 px-2.5 py-1">Taille {selectedSize}</span>
+              )}
+              {selectedColor && (
+                <span className="rounded-full bg-dark/5 px-2.5 py-1">{selectedColor}</span>
+              )}
+              {quantity > 1 && (
+                <span className="rounded-full bg-accent/10 text-accent px-2.5 py-1">×{quantity}</span>
+              )}
+            </div>
+          )}
           <button
             onClick={handleBuyNow}
             disabled={!canAdd()}
