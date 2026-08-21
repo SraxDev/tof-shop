@@ -6,7 +6,7 @@
 --  maintenant de les supprimer avec la clé publique (c'est le but !).
 --
 --  Colle ceci dans Supabase → SQL Editor → Run pour les effacer.
---  Sans danger : cible uniquement les identifiants de test.
+--  Sans danger : cible uniquement les identifiants de test.d
 -- ============================================================================
 
 delete from public.orders        where id = 'TOF-TEST-RLS';
