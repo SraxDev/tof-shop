@@ -2107,21 +2107,43 @@ export default function AdminPanel() {
     snapOrWhatsapp: '',
   });
   const defaultPreset = categoryPresets.find((preset) => preset.label === 'T-shirt') || categoryPresets[0];
-  const [quickProduct, setQuickProduct] = useState<Omit<Product, 'id' | 'status'>>({
-    brand: '',
-    name: '',
-    category: defaultPreset.label,
-    salePrice: suggestedSalePrice(100, defaultPreset.weight, defaultPreset.packaging),
-    oldPrice: undefined,
-    sourcePriceCny: 100,
-    weightGrams: defaultPreset.weight,
-    packaging: defaultPreset.packaging,
-    sizes: defaultPreset.defaultSizes,
-    colors: defaultPreset.defaultColors,
-    imageUrl: '',
-    gender: 'mixte',
-    sourceUrl: '',
+  const QUICK_DRAFT_KEY = 'tof-quick-draft-v1';
+  const [quickProduct, setQuickProduct] = useState<Omit<Product, 'id' | 'status'>>(() => {
+    const base: Omit<Product, 'id' | 'status'> = {
+      brand: '',
+      name: '',
+      category: defaultPreset.label,
+      salePrice: suggestedSalePrice(100, defaultPreset.weight, defaultPreset.packaging),
+      oldPrice: undefined,
+      sourcePriceCny: 100,
+      weightGrams: defaultPreset.weight,
+      packaging: defaultPreset.packaging,
+      sizes: defaultPreset.defaultSizes,
+      colors: defaultPreset.defaultColors,
+      imageUrl: '',
+      gender: 'mixte',
+      sourceUrl: '',
+    };
+    try {
+      const raw = localStorage.getItem(QUICK_DRAFT_KEY);
+      if (raw) return { ...base, ...(JSON.parse(raw) as Partial<typeof base>) };
+    } catch { /* ignore */ }
+    return base;
   });
+  const [chainAdd, setChainAdd] = useState(false);
+
+  // Brouillon persistant : on ne perd pas un ajout en cours si on change d'onglet
+  useEffect(() => {
+    try {
+      localStorage.setItem(QUICK_DRAFT_KEY, JSON.stringify(quickProduct));
+    } catch { /* ignore */ }
+  }, [quickProduct]);
+
+  // Marques déjà utilisées (autocomplétion)
+  const brandList = useMemo(
+    () => Array.from(new Set(products.map((p) => p.brand).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [products],
+  );
   const [dropDraft, setDropDraft] = useState<FeaturedDropConfig>(defaultDrop);
   const [siteSettings, setSiteSettings] = useState<SiteSettings>({ ...defaultSettings });
   const [settingsSaved, setSettingsSaved] = useState(false);
@@ -2632,6 +2654,15 @@ export default function AdminPanel() {
 
   const addQuickProduct = async () => {
     if (!quickProduct.brand || !quickProduct.name || !quickProduct.sourceUrl) return;
+
+    // Anti-doublon : même lien source déjà présent ?
+    const url = quickProduct.sourceUrl.trim().toLowerCase();
+    const dup = products.find((p) => (p.sourceUrl || '').trim().toLowerCase() === url);
+    if (dup) {
+      showToast('Ce produit existe déjà (même lien source)', 'warning');
+      return;
+    }
+
     const product: Product = {
       ...quickProduct,
       id: `p${Date.now()}`,
@@ -2650,22 +2681,36 @@ export default function AdminPanel() {
     setSelectedEstimateProduct(product.id);
     setNewOrder((prev) => ({ ...prev, productId: product.id }));
     const resetPreset = categoryPresets.find((p) => p.label === quickProduct.category) || defaultPreset;
-    setQuickProduct({
-      brand: '',
-      name: '',
-      category: quickProduct.category,
-      salePrice: suggestedSalePrice(150, resetPreset.weight, resetPreset.packaging),
-      oldPrice: undefined,
-      sourcePriceCny: 150,
-      weightGrams: resetPreset.weight,
-      packaging: resetPreset.packaging,
-      sizes: resetPreset.defaultSizes,
-      colors: resetPreset.defaultColors,
-      imageUrl: '',
-      gender: 'mixte',
-      sourceUrl: '',
-    });
-    showToast('Produit ajouté au catalogue ✓');
+
+    if (chainAdd) {
+      // « Enchaîner » : on garde marque, catégorie, prix et tailles, on vide
+      // seulement les champs propres à la pièce (nom, lien, photo).
+      setQuickProduct((prev) => ({
+        ...prev,
+        name: '',
+        sourceUrl: '',
+        imageUrl: '',
+        oldPrice: undefined,
+      }));
+      showToast('Ajouté ✓ — tu peux enchaîner');
+    } else {
+      setQuickProduct({
+        brand: '',
+        name: '',
+        category: quickProduct.category,
+        salePrice: suggestedSalePrice(150, resetPreset.weight, resetPreset.packaging),
+        oldPrice: undefined,
+        sourcePriceCny: 150,
+        weightGrams: resetPreset.weight,
+        packaging: resetPreset.packaging,
+        sizes: resetPreset.defaultSizes,
+        colors: resetPreset.defaultColors,
+        imageUrl: '',
+        gender: 'mixte',
+        sourceUrl: '',
+      });
+      showToast('Produit ajouté au catalogue ✓');
+    }
   };
 
   const updateQuickPreset = (category: string) => {
@@ -3473,9 +3518,12 @@ export default function AdminPanel() {
               </summary>
               <div className="p-4 sm:p-5 pt-0 space-y-2 sm:space-y-3">
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
-                  <input value={quickProduct.brand} onChange={(e) => setQuickProduct({ ...quickProduct, brand: e.target.value })} placeholder="Marque *" className="rounded-xl bg-white px-3 sm:px-4 py-2.5 sm:py-3 text-sm outline-none border border-dark/5" />
+                  <input value={quickProduct.brand} onChange={(e) => setQuickProduct({ ...quickProduct, brand: e.target.value })} placeholder="Marque *" list="tof-brands" className="rounded-xl bg-white px-3 sm:px-4 py-2.5 sm:py-3 text-sm outline-none border border-dark/5" />
                   <input value={quickProduct.name} onChange={(e) => setQuickProduct({ ...quickProduct, name: e.target.value })} placeholder="Nom produit *" className="rounded-xl bg-white px-3 sm:px-4 py-2.5 sm:py-3 text-sm outline-none border border-dark/5 sm:col-span-2" />
                 </div>
+                <datalist id="tof-brands">
+                  {brandList.map((b) => <option key={b} value={b} />)}
+                </datalist>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
                   <select value={quickProduct.gender} onChange={(e) => setQuickProduct({ ...quickProduct, gender: e.target.value as Product['gender'] })} className="rounded-xl bg-white px-3 py-2.5 sm:py-3 text-sm outline-none border border-dark/5">
                     <option value="homme">Homme</option>
@@ -3493,6 +3541,16 @@ export default function AdminPanel() {
                     <input type="number" value={quickProduct.salePrice} onChange={(e) => setQuickProduct({ ...quickProduct, salePrice: Number(e.target.value) })} placeholder="Prix €" className="rounded-xl bg-white px-3 sm:px-4 py-2.5 sm:py-3 text-sm outline-none border border-dark/5 flex-1 min-w-0" />
                     <button onClick={autoPriceQuickProduct} className="rounded-xl bg-accent text-white px-3 py-2.5 sm:py-3 text-xs font-bold hue-rotate-0 hover:brightness-110 transition-colors flex-shrink-0">Auto</button>
                   </div>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+                  <input type="number" value={quickProduct.oldPrice ?? ''} onChange={(e) => setQuickProduct({ ...quickProduct, oldPrice: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="Prix barré € (optionnel)" className="rounded-xl bg-white px-3 sm:px-4 py-2.5 sm:py-3 text-sm outline-none border border-dark/5 sm:col-span-2" />
+                  {quickProduct.oldPrice !== undefined && quickProduct.oldPrice > quickProduct.salePrice && (
+                    <div className="flex items-center sm:col-span-2">
+                      <span className="rounded-full bg-red-500/10 text-red-500 text-[11px] font-bold px-3 py-1">
+                        -{Math.round(((quickProduct.oldPrice - quickProduct.salePrice) / quickProduct.oldPrice) * 100)}% affiché
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <div className="rounded-xl bg-white/80 border border-dark/5 p-3 space-y-2">
                   <div className="text-[11px] font-bold text-dark/40 uppercase tracking-wider">Tailles</div>
@@ -3544,6 +3602,15 @@ export default function AdminPanel() {
                   <button onClick={addQuickProduct} className="rounded-xl bg-accent px-6 py-2.5 sm:py-3 text-sm font-bold text-white hue-rotate-0 hover:brightness-110 transition-colors w-full sm:w-auto">
                     Ajouter au shop
                   </button>
+                  <label className="flex items-center gap-2 text-xs font-semibold text-dark/50 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={chainAdd}
+                      onChange={(e) => setChainAdd(e.target.checked)}
+                      className="h-4 w-4"
+                    />
+                    Enchaîner (garder marque & prix, vider juste le nom)
+                  </label>
                 </div>
               </div>
             </details>
