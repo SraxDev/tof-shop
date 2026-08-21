@@ -6,12 +6,15 @@ import { botReply, createBotState, type BotState } from '../lib/bot';
 import {
   searchProducts, formatProductList, listBrands,
   extractOrderId, trackOrderSummary, availableSizes, soldOutSizes, getCatalog, formatPrice,
+  readVisitorContext, humanAvailability,
 } from '../lib/botKnowledge';
 
 const CHAT_ID_KEY = 'tof-chat-id-v2';
 const CHAT_NAME_KEY = 'tof-chat-name';
 const CHAT_OPEN_KEY = 'tof-chat-open';
 const CHAT_WELCOMED_KEY = 'tof-chat-welcomed-v2';
+/** Préfixe des messages internes destinés à l'admin, jamais affichés au client. */
+const ESCALATION_TAG = '⚠️ À REPRENDRE';
 
 /** Délai d'inactivité avant que le bot réponde à une rafale de messages. */
 const BOT_IDLE_DELAY = 1400;
@@ -38,6 +41,24 @@ async function answerFromData(
   intent: string,
 ): Promise<{ reply: string; suggestions?: string[] } | null> {
   const q = text.toLowerCase();
+  const ctx = await readVisitorContext();
+
+  // ── 0. Questions sur le panier en cours ──
+  if (/\b(mon panier|dans mon panier|mon total|ma selection|jai mis|j ai mis)\b/.test(q)) {
+    if (ctx.cart.length === 0) {
+      return {
+        reply: "Ton panier est vide pour l'instant. 🛒\n\nDis-moi ce que tu cherches (une marque, un type de pièce, un budget) et je te sors ce qu'on a.",
+        suggestions: ['🛒 Voir le shop', '🏷️ Les marques'],
+      };
+    }
+    const lines = ctx.cart
+      .map((i) => `• ${i.brand} ${i.name}${i.size ? ` (${i.size})` : ''} ×${i.quantity} — ${formatPrice(i.salePrice * i.quantity)}`)
+      .join('\n');
+    return {
+      reply: `Voilà ton panier 🛒\n\n${lines}\n\n**Total : ${formatPrice(ctx.cartTotal)}**\n\nTu veux finaliser ? Je te guide.`,
+      suggestions: ['🛒 Finaliser ma commande', '💳 Paiement', '💬 Parler à Tof'],
+    };
+  }
 
   // ── 1. Suivi de commande : "où est ma commande TOF-3148 ?" ──
   const orderId = extractOrderId(text);
@@ -60,6 +81,15 @@ async function answerFromData(
     };
   }
 
+  // ── 1bis. Demande d'humain : annoncer un délai réaliste selon l'heure ──
+  if (intent === 'human' || intent === 'contact_whatsapp') {
+    const avail = humanAvailability();
+    return {
+      reply: `Pas de souci, je te passe la main. 🙌\n\n${avail.label}\n\nÉcris-lui sur WhatsApp — et si tu as un numéro de commande, donne-le-lui direct, ça ira plus vite.`,
+      suggestions: ['💬 Parler à Tof', '📦 Suivre ma commande'],
+    };
+  }
+
   // ── 2. Marques disponibles : liste réelle du catalogue ──
   if (intent === 'brands' || /quelles? marques?|vous avez quoi|vos marques/.test(q)) {
     const found = await searchProducts(text, 4);
@@ -77,6 +107,20 @@ async function answerFromData(
       };
     }
     return null;
+  }
+
+  // ── 2bis. Question de tailles sans produit identifié ──
+  // "c koi les tailles dispo ?" hors contexte : au lieu de deviner (et de
+  // sortir des claquettes pour une question sur des sneakers), on demande.
+  if (intent === 'sizing' || /\btaille|pointure|size\b/.test(q)) {
+    const cited = await searchProducts(text, 1);
+    if (cited.length === 0 && !ctx.lastViewed) {
+      const brands = await listBrands();
+      return {
+        reply: `Sur quelle pièce ? 👀 Dis-moi la marque et le type (par ex. « sneakers Asics » ou « t-shirt LV ») et je te donne les tailles encore dispo.\n\nOn a en ce moment : ${brands.slice(0, 8).join(', ')}...`,
+        suggestions: ['🛒 Voir le shop', '💬 Parler à Tof'],
+      };
+    }
   }
 
   // ── 3. Recherche produit / budget / dispo ──
@@ -119,7 +163,12 @@ async function answerFromData(
 
   // ── 4. Tailles : répondre avec le vrai stock si un produit est cité ──
   if (intent === 'sizing') {
-    const found = await searchProducts(text, 1);
+    let found = await searchProducts(text, 1);
+
+    // Aucun produit cité mais le client vient d'en consulter un :
+    // "et en 42 ?" porte évidemment sur cette pièce-là.
+    if (found.length === 0 && ctx.lastViewed) found = [ctx.lastViewed];
+
     if (found.length === 1) {
       const p = found[0];
       const sizes = availableSizes(p.sizes);
@@ -195,6 +244,7 @@ export default function ChatWidget() {
   const hadMessagesRef = useRef(false);     // la conv a déjà contenu des messages
   const wipedByAdminRef = useRef(false);    // l'admin l'a supprimée
   const welcomeSentRef = useRef(false);     // accueil déjà envoyé cette session
+  const escalationLoggedRef = useRef(false); // alerte "à reprendre" déjà posée
   const [loadedTick, setLoadedTick] = useState(0);
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
@@ -383,9 +433,23 @@ export default function ChatWidget() {
 
       window.setTimeout(() => {
         void pushBotMessage(reply, suggestions);
+
+        // Le bot a séché ou passe la main : on laisse une trace explicite dans
+        // la conversation pour que Tof la repère d'un coup d'œil dans l'admin.
+        const failed = decision.intent === 'off_topic' || decision.intent === 'human';
+        if (failed && !escalationLoggedRef.current) {
+          escalationLoggedRef.current = true;
+          void sendChatMessage({
+            id: `m-${Date.now()}-esc`,
+            conversation_id: conversationId,
+            sender: 'bot',
+            message: `${ESCALATION_TAG} — le bot n'a pas su répondre à : « ${joined.slice(0, 180)} »`,
+            client_name: name,
+          }).catch(() => {});
+        }
       }, typingDelay);
     })();
-  }, [hasAdminReplied, pushBotMessage]);
+  }, [hasAdminReplied, pushBotMessage, conversationId, name]);
 
   const queueClientMessage = useCallback(async (text: string) => {
     if (!text.trim() || !nameSet) return;
@@ -620,7 +684,7 @@ export default function ChatWidget() {
                   </span>
                 </div>
 
-                {messages.map((msg) => {
+                {messages.filter((m) => !m.message.startsWith(ESCALATION_TAG)).map((msg) => {
                   const isClient = msg.sender === 'client';
                   const isAdmin = msg.sender === 'admin';
                   return (

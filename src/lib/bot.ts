@@ -9,6 +9,8 @@
  *  - Contextualisé (produit ouvert, panier...)
  */
 
+import { expand, fuzzyIncludes, detectMood, isFiller, isQuestion, type Mood } from './botNlp';
+
 export type Intent =
   | 'greeting'
   | 'order_howto'
@@ -47,6 +49,14 @@ export type BotState = {
   turn: number;
   /** Nombre de fois d'affilée où le bot n'a pas compris. */
   confusion: number;
+  /** Humeur détectée au dernier message. */
+  mood?: Mood;
+  /** Le bot a déjà proposé de passer à un humain. */
+  escalated?: boolean;
+  /** Marque/produit évoqué récemment (pour comprendre "et en 42 ?"). */
+  lastTopic?: string;
+  /** Nombre de messages envoyés par le client. */
+  clientTurns?: number;
 };
 
 export type BotDecision = {
@@ -100,12 +110,17 @@ function normalize(str: string): string {
 }
 
 function detectIntents(text: string): Intent[] {
-  const n = normalize(text);
+  // `expand` corrige le langage SMS ("jvx cmd" -> "je veux commande")
+  const n = expand(text);
   if (!n) return [];
   const found: Array<{ intent: Intent; weight: number }> = [];
   for (const rule of RULES) {
-    if (rule.keywords.some((k) => n.includes(normalize(k)))) {
-      found.push({ intent: rule.intent, weight: rule.weight ?? 1 });
+    // Correspondance exacte d'abord (rapide), puis floue (tolère les fautes)
+    const exact = rule.keywords.some((k) => n.includes(normalize(k)));
+    const fuzzy = exact || rule.keywords.some((k) => fuzzyIncludes(n, k));
+    if (fuzzy) {
+      // Une correspondance approximative pèse un peu moins qu'une exacte
+      found.push({ intent: rule.intent, weight: (rule.weight ?? 1) + (exact ? 0.5 : 0) });
     }
   }
   // Dé-doublonne et trie par poids
@@ -249,6 +264,38 @@ export function botReply(
   const joined = arr.join('. ');
   const intents = detectIntents(joined);
 
+  state.clientTurns = (state.clientTurns || 0) + 1;
+
+  // ── Humeur : un client agacé ne doit pas subir un parcours de bot ──
+  const mood = detectMood(joined);
+  state.mood = mood;
+
+  if (mood === 'frustrated' && !state.escalated) {
+    state.escalated = true;
+    state.turn += 1;
+    state.lastIntent = 'human';
+    return {
+      reply:
+        "Je comprends, et je ne veux pas te faire perdre plus de temps avec un bot. 🙏\n\n"
+        + "J'alerte Tof tout de suite — écris-lui sur WhatsApp, c'est le plus rapide "
+        + "(il répond en général en moins de 5 min). Donne-lui ton numéro de commande "
+        + "s'il y en a un, il règle ça directement.",
+      suggestions: ['💬 Parler à Tof maintenant', '📦 Suivre ma commande'],
+      intent: 'human',
+    };
+  }
+
+  // ── Messages sans contenu ("ok", "mdr") : réponse courte, pas de tartine ──
+  if (isFiller(joined) && state.turn > 0) {
+    state.turn += 1;
+    const acks = ['👌', 'Ça marche 👌', 'Nickel. Autre chose ?', '👍'];
+    return {
+      reply: acks[Math.floor(Math.random() * acks.length)],
+      suggestions: state.covered.size > 2 ? [] : ['🛒 Voir le shop', '💬 Parler à Tof'],
+      intent: 'ack_ok',
+    };
+  }
+
   // Petite détection de nom dans le premier message (ex: "salut c'est Alex")
   if (!state.userName) {
     const m = joined.match(/(?:c'est|je suis|moi c'est)\s+([a-zéèêëàâäîïôöùûüçœæ-]{2,15})/i);
@@ -287,6 +334,12 @@ export function botReply(
     state.confusion = (state.confusion || 0) + 1;
   } else {
     state.confusion = 0;
+  }
+
+  // Une affirmation vague ("je regardais juste") n'est pas un échec du bot :
+  // on ne la compte pas comme une incompréhension.
+  if (intent === 'off_topic' && !isQuestion(joined) && joined.length < 40) {
+    state.confusion = Math.max(0, (state.confusion || 1) - 1);
   }
 
   if (intent === 'off_topic' && state.confusion >= 2) {
@@ -334,5 +387,8 @@ export function createBotState(): BotState {
     covered: new Set<Intent>(),
     turn: 0,
     confusion: 0,
+    mood: 'neutral',
+    escalated: false,
+    clientTurns: 0,
   };
 }

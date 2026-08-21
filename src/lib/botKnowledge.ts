@@ -16,6 +16,9 @@
  */
 
 import { fetchProducts, fetchOrderById, type DbProduct } from './db';
+import { readCart } from './cart';
+import { expand, fuzzyIncludes } from './botNlp';
+import { readRecentlyViewed } from './recentlyViewed';
 
 // ─── Cache catalogue ─────────────────────────────────────
 // Évite de retélécharger les produits à chaque message.
@@ -106,7 +109,8 @@ export type ProductMatch = {
  */
 export async function searchProducts(query: string, limit = 4): Promise<DbProduct[]> {
   const items = await getCatalog();
-  const q = normalize(query);
+  // `expand` corrige le SMS et les fautes ("snekers" -> "sneakers")
+  const q = expand(query);
   if (!q) return [];
 
   // Budget : "moins de 80", "sous 100e", "max 90 euros"
@@ -131,7 +135,8 @@ export async function searchProducts(query: string, limit = 4): Promise<DbProduc
     if (/\blv\b/.test(q) && brand.includes('louis vuitton')) score += 10;
     if (/\bcp\b/.test(q) && brand.includes('cp company')) score += 8;
 
-    if (cat && q.includes(cat)) score += 6;
+    if (cat && q.includes(cat)) score += 8;
+    else if (cat && fuzzyIncludes(q, cat)) score += 6;
 
     for (const w of words) {
       if (brand.includes(w)) score += 3;
@@ -154,7 +159,8 @@ export async function searchProducts(query: string, limit = 4): Promise<DbProduc
       'veste legere': ['veste', 'blouson', 'manteau'],
     };
     for (const [catKey, syns] of Object.entries(synonyms)) {
-      if (cat.includes(normalize(catKey)) && syns.some((sy) => q.includes(sy))) score += 5;
+      if (cat.includes(normalize(catKey))
+          && syns.some((sy) => q.includes(sy) || fuzzyIncludes(q, sy))) score += 7;
     }
 
     if (score > 0 || (maxPrice !== null && score === 0 && words.length <= 2)) {
@@ -218,4 +224,58 @@ export async function trackOrderSummary(orderId: string): Promise<string | null>
   } catch {
     return null;
   }
+}
+
+
+// ─── Contexte visiteur ───────────────────────────────────
+
+/**
+ * Le bot doit savoir ce que le client a sous les yeux : ce qu'il a dans son
+ * panier, la pièce qu'il vient de consulter. Sans ça il répond dans le vide.
+ */
+export type VisitorContext = {
+  cart: { brand: string; name: string; size: string; quantity: number; salePrice: number }[];
+  cartTotal: number;
+  lastViewed?: DbProduct;
+};
+
+export async function readVisitorContext(): Promise<VisitorContext> {
+  // On réutilise les modules officiels : pas de clé localStorage recopiée à
+  // la main, qui se désynchroniserait au prochain changement de version.
+  const cart = readCart().map((i) => ({
+    brand: i.brand, name: i.name, size: i.size,
+    quantity: i.quantity, salePrice: i.salePrice,
+  }));
+
+  const cartTotal = cart.reduce((sum, i) => sum + (i.salePrice || 0) * (i.quantity || 1), 0);
+
+  let lastViewed: DbProduct | undefined;
+  try {
+    const ids = readRecentlyViewed();
+    if (ids.length > 0) {
+      const catalog = await getCatalog();
+      lastViewed = catalog.find((p) => p.id === ids[0]);
+    }
+  } catch { /* ignore */ }
+
+  return { cart, cartTotal, lastViewed };
+}
+
+// ─── Disponibilité humaine ───────────────────────────────
+
+/**
+ * Sait-on si Tof est probablement joignable ?
+ * Évite de promettre "réponse en 5 min" à 4h du matin — une promesse non
+ * tenue coûte plus cher qu'une attente annoncée.
+ */
+export function humanAvailability(): { open: boolean; label: string } {
+  const now = new Date();
+  const h = now.getHours();
+  if (h >= 9 && h < 23) {
+    return { open: true, label: 'Tof répond en général en moins de 5 min à cette heure-ci.' };
+  }
+  if (h >= 23 || h < 7) {
+    return { open: false, label: 'Il est tard — Tof répondra dès demain matin, mais laisse ton message, il le verra en priorité.' };
+  }
+  return { open: false, label: 'Tof est sûrement encore en train de dormir 😴 — laisse ton message, il répond dès le réveil.' };
 }
