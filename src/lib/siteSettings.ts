@@ -62,6 +62,26 @@ export type SiteSettings = {
   brandNames: string[];
   // Apparence
   accentColor: string;
+
+  // ── Lancement / nouveautés ──────────────────────────────────────────────
+  // Fenêtre « considéré comme nouveau » (en jours) — badge + section nouveautés
+  newProductDays: number;
+  // Section « Nouveautés »
+  newArrivalsEnabled: boolean;
+  newArrivalsTitle: string;
+  newArrivalsSubtitle: string;
+  newArrivalsCount: number;
+  // Bannière de lancement (pleine largeur, sous le hero)
+  launchBannerEnabled: boolean;
+  launchBannerBadge: string;
+  launchBannerTitle: string;
+  launchBannerDescription: string;
+  launchBannerPrice: number;
+  launchBannerOldPrice: number;
+  launchBannerCtaLabel: string;
+  launchBannerCtaUrl: string;
+  launchBannerImage: string;
+  launchBannerEndsAt: string;
 };
 
 export const SETTINGS_STORAGE_KEY = 'tof-site-settings-v2';
@@ -245,6 +265,22 @@ export const defaultSettings: SiteSettings = {
   ],
 
   accentColor: '#e84d1a',
+
+  newProductDays: 7,
+  newArrivalsEnabled: true,
+  newArrivalsTitle: 'nouveautés',
+  newArrivalsSubtitle: 'les dernières pièces qui viennent de tomber',
+  newArrivalsCount: 8,
+  launchBannerEnabled: false,
+  launchBannerBadge: '🔥 NOUVEAU DROP',
+  launchBannerTitle: 'Le drop que tout le monde attend',
+  launchBannerDescription: 'Quantités limitées, QC avant envoi, paiement CB sécurisé. Ça part vite.',
+  launchBannerPrice: 0,
+  launchBannerOldPrice: 0,
+  launchBannerCtaLabel: 'Je le veux',
+  launchBannerCtaUrl: '#shop',
+  launchBannerImage: '',
+  launchBannerEndsAt: '',
 };
 
 // Local cache for instant reads (hydrated from Supabase)

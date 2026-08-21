@@ -2124,7 +2124,7 @@ export default function AdminPanel() {
   const [dropDraft, setDropDraft] = useState<FeaturedDropConfig>(defaultDrop);
   const [siteSettings, setSiteSettings] = useState<SiteSettings>({ ...defaultSettings });
   const [settingsSaved, setSettingsSaved] = useState(false);
-  const [settingsSection, setSettingsSection] = useState<'vitrine' | 'avis' | 'faq' | 'comment' | 'pourquoi' | 'footer' | 'marques' | 'apparence'>('vitrine');
+  const [settingsSection, setSettingsSection] = useState<'vitrine' | 'avis' | 'faq' | 'comment' | 'pourquoi' | 'footer' | 'marques' | 'nouveautes' | 'lancement' | 'apparence'>('vitrine');
 
   const totals = useMemo(() => {
     return products.reduce(
@@ -3804,6 +3804,8 @@ export default function AdminPanel() {
                     { id: 'pourquoi', label: 'Pourquoi tof' },
                     { id: 'footer', label: 'Footer' },
                     { id: 'marques', label: 'Marques' },
+                    { id: 'nouveautes', label: 'Nouveautés' },
+                    { id: 'lancement', label: 'Lancement (drop)' },
                     { id: 'apparence', label: 'Apparence' },
                   ] as { id: typeof settingsSection; label: string }[]).map((s) => (
                     <button
@@ -4111,6 +4113,73 @@ export default function AdminPanel() {
                     />
                     <p className="mt-2 text-[11px] text-dark/35">{siteSettings.brandNames.length} marque(s).</p>
                   </SCard>
+                )}
+
+                {/* ============ NOUVEAUTÉS ============ */}
+                {settingsSection === 'nouveautes' && (
+                  <>
+                    <SCard title="Section Nouveautés" subtitle="Un rail horizontal des dernières pièces, affiché juste au-dessus du shop.">
+                      <label className="flex items-center gap-2 text-sm font-semibold text-dark/70">
+                        <input
+                          type="checkbox"
+                          checked={siteSettings.newArrivalsEnabled}
+                          onChange={(e) => setSiteSettings({ ...siteSettings, newArrivalsEnabled: e.target.checked })}
+                          className="h-4 w-4"
+                        />
+                        Afficher la section Nouveautés
+                      </label>
+                    </SCard>
+                    <SCard title="Contenu">
+                      <div className="space-y-3">
+                        <SInput label="Titre" value={siteSettings.newArrivalsTitle} onChange={(v) => setSiteSettings({ ...siteSettings, newArrivalsTitle: v })} />
+                        <SInput label="Sous-titre" value={siteSettings.newArrivalsSubtitle} onChange={(v) => setSiteSettings({ ...siteSettings, newArrivalsSubtitle: v })} />
+                        <SInput label="Nombre de pièces affichées" type="number" value={siteSettings.newArrivalsCount} onChange={(v) => setSiteSettings({ ...siteSettings, newArrivalsCount: Math.max(1, Number(v) || 8) })} />
+                        <SInput label="Fenêtre « nouveau » (en jours)" type="number" value={siteSettings.newProductDays} onChange={(v) => setSiteSettings({ ...siteSettings, newProductDays: Math.max(1, Number(v) || 7) })} />
+                      </div>
+                      <p className="mt-2 text-[11px] text-dark/35">
+                        La fenêtre « nouveau » contrôle aussi le badge « Nouveau » sur les cartes du shop : un produit ajouté il y a moins de ce nombre de jours l'affiche automatiquement.
+                      </p>
+                    </SCard>
+                  </>
+                )}
+
+                {/* ============ LANCEMENT ============ */}
+                {settingsSection === 'lancement' && (
+                  <>
+                    <SCard title="Bannière de lancement" subtitle="Une bannière pleine largeur sous le hero pour annoncer un drop, avec compte à rebours.">
+                      <label className="flex items-center gap-2 text-sm font-semibold text-dark/70">
+                        <input
+                          type="checkbox"
+                          checked={siteSettings.launchBannerEnabled}
+                          onChange={(e) => setSiteSettings({ ...siteSettings, launchBannerEnabled: e.target.checked })}
+                          className="h-4 w-4"
+                        />
+                        Afficher la bannière
+                      </label>
+                    </SCard>
+                    <SCard title="Contenu">
+                      <div className="grid sm:grid-cols-2 gap-3">
+                        <SInput label="Badge (ex : 🔥 NOUVEAU DROP)" value={siteSettings.launchBannerBadge} onChange={(v) => setSiteSettings({ ...siteSettings, launchBannerBadge: v })} />
+                        <SInput label="Titre" value={siteSettings.launchBannerTitle} onChange={(v) => setSiteSettings({ ...siteSettings, launchBannerTitle: v })} />
+                        <div className="sm:col-span-2">
+                          <STextarea label="Description" value={siteSettings.launchBannerDescription} onChange={(v) => setSiteSettings({ ...siteSettings, launchBannerDescription: v })} rows={2} />
+                        </div>
+                        <SInput label="Prix (€)" type="number" value={siteSettings.launchBannerPrice} onChange={(v) => setSiteSettings({ ...siteSettings, launchBannerPrice: Number(v) || 0 })} />
+                        <SInput label="Ancien prix (€, optionnel)" type="number" value={siteSettings.launchBannerOldPrice} onChange={(v) => setSiteSettings({ ...siteSettings, launchBannerOldPrice: Number(v) || 0 })} />
+                        <SInput label="Texte du bouton" value={siteSettings.launchBannerCtaLabel} onChange={(v) => setSiteSettings({ ...siteSettings, launchBannerCtaLabel: v })} />
+                        <SInput label="Lien du bouton (ex : #shop)" value={siteSettings.launchBannerCtaUrl} onChange={(v) => setSiteSettings({ ...siteSettings, launchBannerCtaUrl: v })} />
+                        <div className="sm:col-span-2">
+                          <SInput label="Image (URL)" value={siteSettings.launchBannerImage} onChange={(v) => setSiteSettings({ ...siteSettings, launchBannerImage: v })} placeholder="https://..." />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <SInput label="Fin du compte à rebours (date + heure)" value={siteSettings.launchBannerEndsAt} onChange={(v) => setSiteSettings({ ...siteSettings, launchBannerEndsAt: v })} placeholder="2026-08-25T20:00:00" />
+                          <p className="mt-1 text-[11px] text-dark/35">
+                            Laisse vide pour ne pas afficher de compte à rebours. Format : AAAA-MM-JJTHH:MM:SS (heure locale).
+                          </p>
+                        </div>
+                      </div>
+                    </SCard>
+                  </>
                 )}
 
                 {/* ============ APPARENCE ============ */}

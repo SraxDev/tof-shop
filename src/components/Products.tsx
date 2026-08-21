@@ -116,8 +116,9 @@ async function loadProducts(): Promise<Product[]> {
 
 function isNew(product: Product) {
   if (!product.createdAt) return false;
+  const days = readSiteSettings().newProductDays;
   const diff = Date.now() - new Date(product.createdAt).getTime();
-  return diff < 7 * 24 * 60 * 60 * 1000;
+  return diff < days * 24 * 60 * 60 * 1000;
 }
 
 function getBadge(product: Product): { text: string; color: string } | null {

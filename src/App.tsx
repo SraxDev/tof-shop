@@ -15,6 +15,8 @@ import ToastContainer from './components/Toast';
 // Lazy-load below-the-fold sections for faster TTI
 const BrandMarquee = lazy(() => import('./components/BrandMarquee'));
 const FeaturedDrop = lazy(() => import('./components/FeaturedDrop'));
+const NewArrivals = lazy(() => import('./components/NewArrivals'));
+const LaunchBanner = lazy(() => import('./components/LaunchBanner'));
 const Brands = lazy(() => import('./components/Brands'));
 const Reviews = lazy(() => import('./components/Reviews'));
 const WhyUs = lazy(() => import('./components/WhyUs'));
@@ -223,10 +225,16 @@ export default function App() {
       <AnnouncementBar />
       <Hero />
       <Suspense fallback={<SectionFallback />}>
+        <LaunchBanner />
+      </Suspense>
+      <Suspense fallback={<SectionFallback />}>
         <BrandMarquee />
       </Suspense>
       <Suspense fallback={<SectionFallback />}>
         <HowItWorks />
+      </Suspense>
+      <Suspense fallback={<SectionFallback />}>
+        <NewArrivals />
       </Suspense>
       <Products />
       <Suspense fallback={<SectionFallback />}>
