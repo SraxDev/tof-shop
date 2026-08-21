@@ -23,17 +23,16 @@ export default function Footer() {
               tof<span className="text-accent">.</span>
             </span>
             <p className="text-sm mt-2 text-white/30 leading-relaxed">
-              Sneakers & streetwear sélectionnés pièce par pièce, vérifiés avant expédition.
+              {settings.footerDescription}
             </p>
           </div>
 
           <div>
             <p className="text-[11px] font-bold text-white/20 uppercase tracking-widest mb-3">Garanties</p>
             <ul className="space-y-1.5 text-sm">
-              <li>✓ Chaque pièce vérifiée par moi</li>
-              <li>✓ Paiement carte sécurisé via SumUp</li>
-              <li>✓ Livraison suivie 10-20j, colis discret</li>
-              <li>✓ Si problème, on arrange ça</li>
+              {settings.footerGuarantees.map((g) => (
+                <li key={g}>✓ {g}</li>
+              ))}
             </ul>
           </div>
 

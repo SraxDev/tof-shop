@@ -1,34 +1,20 @@
+import { useEffect, useState } from 'react';
+import { readSiteSettings } from '../lib/siteSettings';
+
 export default function WhyUs() {
-  const points = [
-    {
-      emoji: '🔍',
-      title: 'Vérification systématique',
-      desc: "Chaque pièce est contrôlée sur photo QC à l'entrepôt avant de partir. Je refuse ce qui ne va pas.",
-      stat: '100%',
-      statLabel: 'vérifié',
-    },
-    {
-      emoji: '💳',
-      title: 'Paiement sécurisé',
-      desc: 'Paiement par carte via SumUp, vérification 3D Secure. Zéro risque à commander.',
-      stat: '3DS',
-      statLabel: 'sécurisé',
-    },
-    {
-      emoji: '📦',
-      title: 'Livraison suivie',
-      desc: 'Tracking envoyé sur Snap/WhatsApp dès expédition. Colis discret.',
-      stat: '10-20j',
-      statLabel: 'ouvré',
-    },
-    {
-      emoji: '⚡',
-      title: 'Réponse rapide',
-      desc: "C'est moi qui gère tout seul — je réponds en 5-10min sur Snap ou WhatsApp, 7j/7.",
-      stat: '~5min',
-      statLabel: 'réponse',
-    },
-  ];
+  const [settings, setSettings] = useState(readSiteSettings);
+
+  useEffect(() => {
+    const sync = () => setSettings(readSiteSettings());
+    window.addEventListener('tof-settings-updated', sync);
+    window.addEventListener('storage', sync);
+    return () => {
+      window.removeEventListener('tof-settings-updated', sync);
+      window.removeEventListener('storage', sync);
+    };
+  }, []);
+
+  const points = settings.whyUsPoints;
 
   return (
     <section id="apropos" className="py-14 sm:py-20 lg:py-28 bg-bg">
@@ -38,7 +24,7 @@ export default function WhyUs() {
             pourquoi <span className="text-accent">tof</span> ?
           </h2>
           <p className="mt-3 text-dark/40 max-w-md mx-auto text-sm sm:text-base">
-            petit shop géré par une seule personne, pas de grosse équipe, pas de magasin — juste des pièces vérifiées une par une
+            {settings.whyUsIntro}
           </p>
         </div>
 

@@ -1,10 +1,21 @@
-const brands = [
-  'GUCCI', 'LOUIS VUITTON', 'PRADA', 'BALENCIAGA', 'DIOR',
-  'NIKE', 'JORDAN', 'VERSACE', 'BURBERRY', 'OFF-WHITE',
-  'SAINT LAURENT', 'GIVENCHY', 'STONE ISLAND', 'MONCLER', 'AMIRI',
-];
+import { useEffect, useState } from 'react';
+import { readSiteSettings } from '../lib/siteSettings';
 
 export default function BrandMarquee() {
+  const [settings, setSettings] = useState(readSiteSettings);
+
+  useEffect(() => {
+    const sync = () => setSettings(readSiteSettings());
+    window.addEventListener('tof-settings-updated', sync);
+    window.addEventListener('storage', sync);
+    return () => {
+      window.removeEventListener('tof-settings-updated', sync);
+      window.removeEventListener('storage', sync);
+    };
+  }, []);
+
+  const brands = settings.brandNames;
+
   return (
     <div className="py-6 bg-dark overflow-hidden">
       <div className="flex anim-marquee whitespace-nowrap">

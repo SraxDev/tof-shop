@@ -779,6 +779,93 @@ function Field({ label, error, children }: { label: string; error?: string; chil
   );
 }
 
+// ── Petits composants pour l'onglet Réglages (thème clair) ──────────────────
+function SInput({
+  label,
+  value,
+  onChange,
+  placeholder,
+  type = 'text',
+}: {
+  label: string;
+  value: string | number;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  type?: string;
+}) {
+  return (
+    <label className="text-xs text-dark/45 block">
+      <span className="mb-1 block">{label}</span>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="mt-1 w-full rounded-xl bg-white px-4 py-3 text-sm text-dark outline-none border border-dark/10 focus:border-accent/40"
+      />
+    </label>
+  );
+}
+
+function STextarea({
+  label,
+  value,
+  onChange,
+  rows = 3,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  rows?: number;
+}) {
+  return (
+    <label className="text-xs text-dark/45 block">
+      <span className="mb-1 block">{label}</span>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        rows={rows}
+        className="mt-1 w-full rounded-xl bg-white px-4 py-3 text-sm text-dark outline-none border border-dark/10 focus:border-accent/40 resize-none"
+      />
+    </label>
+  );
+}
+
+function SCard({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl bg-bg p-4">
+      <h4 className="font-bold text-sm text-dark">{title}</h4>
+      {subtitle && <p className="text-xs text-dark/40 mt-0.5 mb-3">{subtitle}</p>}
+      <div className={subtitle ? '' : 'mt-3'}>{children}</div>
+    </div>
+  );
+}
+
+function DeleteBtn({ onClick, title = 'Supprimer' }: { onClick: () => void; title?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      className="flex-shrink-0 h-9 w-9 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white flex items-center justify-center transition-colors"
+    >
+      <Trash2 size={14} />
+    </button>
+  );
+}
+
+function AddBtn({ onClick, label }: { onClick: () => void; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-dark text-white px-4 py-2 text-xs font-bold hover:bg-accent transition-colors"
+    >
+      <Plus size={14} /> {label}
+    </button>
+  );
+}
+
 /**
  * Source URL input with auto-cleanup on paste.
  *
@@ -2037,6 +2124,7 @@ export default function AdminPanel() {
   const [dropDraft, setDropDraft] = useState<FeaturedDropConfig>(defaultDrop);
   const [siteSettings, setSiteSettings] = useState<SiteSettings>({ ...defaultSettings });
   const [settingsSaved, setSettingsSaved] = useState(false);
+  const [settingsSection, setSettingsSection] = useState<'vitrine' | 'avis' | 'faq' | 'comment' | 'pourquoi' | 'footer' | 'marques' | 'apparence'>('vitrine');
 
   const totals = useMemo(() => {
     return products.reduce(
@@ -3688,172 +3776,395 @@ export default function AdminPanel() {
         )}
 
         {activeTab === 'settings' && (
-          <div className="grid lg:grid-cols-5 gap-5">
-            <div className="lg:col-span-3 rounded-3xl bg-white text-dark p-6">
-              <div className="flex items-start justify-between gap-4 mb-6">
-                <div>
-                  <h3 className="font-bold text-xl">Reglages vitrine, paiement & reseaux</h3>
-                  <p className="text-sm text-dark/40 mt-1">
-                    Mets tes liens une fois ici. Ils se mettent ensuite partout sur le site.
-                  </p>
-                </div>
-                <button
-                  onClick={saveSettings}
-                  className="inline-flex items-center gap-2 rounded-full bg-accent px-5 py-3 text-sm font-bold text-white hue-rotate-0 hover:brightness-110 transition-colors"
-                >
-                  <Save size={15} /> {settingsSaved ? 'Sauvegarde' : 'Sauvegarder'}
-                </button>
+          <div>
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-5">
+              <div>
+                <h2 className="font-bold text-2xl text-white">Réglages du site</h2>
+                <p className="text-sm text-white/40 mt-1">
+                  Tout le contenu de la vitrine est modifiable ici. Pense à sauvegarder en bas ou en haut.
+                </p>
               </div>
-
-              <div className="space-y-4">
-                <div className="rounded-2xl bg-bg p-4">
-                  <div className="flex items-center justify-between gap-3 mb-3">
-                    <div>
-                      <h4 className="font-bold text-sm">Barre d'annonce rotative</h4>
-                      <p className="text-xs text-dark/35">Sépare plusieurs messages par « | » : ils défilent automatiquement.</p>
-                    </div>
-                    <label className="flex items-center gap-2 text-xs font-bold text-dark/45">
-                      <input
-                        type="checkbox"
-                        checked={siteSettings.announcementEnabled}
-                        onChange={(e) => setSiteSettings({ ...siteSettings, announcementEnabled: e.target.checked })}
-                      />
-                      Activee
-                    </label>
-                  </div>
-                  <input
-                    value={siteSettings.announcementText}
-                    onChange={(e) => setSiteSettings({ ...siteSettings, announcementText: e.target.value })}
-                    placeholder="Livraison offerte dès 140€ | Paiement CB sécurisé SumUp | Réponse en 5 min"
-                    className="w-full rounded-xl bg-white px-4 py-3 text-sm text-dark outline-none border border-dark/5"
-                  />
-                  <p className="mt-2 text-[11px] text-dark/30">
-                    Laisse vide pour afficher la rotation par défaut (livraison offerte, réponse rapide, paiement SumUp, contrôle QC).
-                  </p>
-                </div>
-
-                <div className="rounded-2xl bg-bg p-4">
-                  <h4 className="font-bold text-sm mb-3">Hero principal</h4>
-                  <div className="grid sm:grid-cols-2 gap-3">
-                    <label className="text-xs text-dark/35">Badge
-                      <input value={siteSettings.heroBadge} onChange={(e) => setSiteSettings({ ...siteSettings, heroBadge: e.target.value })} className="mt-1 w-full rounded-xl bg-white px-4 py-3 text-sm text-dark outline-none border border-dark/5" />
-                    </label>
-                    <label className="text-xs text-dark/35">Badge flottant
-                      <input value={siteSettings.heroTopBadge} onChange={(e) => setSiteSettings({ ...siteSettings, heroTopBadge: e.target.value })} className="mt-1 w-full rounded-xl bg-white px-4 py-3 text-sm text-dark outline-none border border-dark/5" />
-                    </label>
-                    <label className="text-xs text-dark/35">Titre debut
-                      <input value={siteSettings.heroTitleStart} onChange={(e) => setSiteSettings({ ...siteSettings, heroTitleStart: e.target.value })} className="mt-1 w-full rounded-xl bg-white px-4 py-3 text-sm text-dark outline-none border border-dark/5" />
-                    </label>
-                    <label className="text-xs text-dark/35">Titre souligne
-                      <input value={siteSettings.heroTitleHighlight} onChange={(e) => setSiteSettings({ ...siteSettings, heroTitleHighlight: e.target.value })} className="mt-1 w-full rounded-xl bg-white px-4 py-3 text-sm text-dark outline-none border border-dark/5" />
-                    </label>
-                    <label className="text-xs text-dark/35 sm:col-span-2">Description
-                      <textarea value={siteSettings.heroDescription} onChange={(e) => setSiteSettings({ ...siteSettings, heroDescription: e.target.value })} rows={2} className="mt-1 w-full rounded-xl bg-white px-4 py-3 text-sm text-dark outline-none border border-dark/5 resize-none" />
-                    </label>
-                    <label className="text-xs text-dark/35 sm:col-span-2">Note sous description
-                      <input value={siteSettings.heroSubnote} onChange={(e) => setSiteSettings({ ...siteSettings, heroSubnote: e.target.value })} className="mt-1 w-full rounded-xl bg-white px-4 py-3 text-sm text-dark outline-none border border-dark/5" />
-                    </label>
-                    <label className="text-xs text-dark/35">Stat flottante
-                      <input value={siteSettings.heroStatValue} onChange={(e) => setSiteSettings({ ...siteSettings, heroStatValue: e.target.value })} className="mt-1 w-full rounded-xl bg-white px-4 py-3 text-sm text-dark outline-none border border-dark/5" />
-                    </label>
-                    <label className="text-xs text-dark/35">Label stat
-                      <input value={siteSettings.heroStatLabel} onChange={(e) => setSiteSettings({ ...siteSettings, heroStatLabel: e.target.value })} className="mt-1 w-full rounded-xl bg-white px-4 py-3 text-sm text-dark outline-none border border-dark/5" />
-                    </label>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl bg-bg p-4">
-                  <h4 className="font-bold text-sm mb-3">Bloc Snap / WhatsApp</h4>
-                  <div className="space-y-3">
-                    <label className="block text-xs text-dark/35">Titre CTA
-                      <input value={siteSettings.ctaTitle} onChange={(e) => setSiteSettings({ ...siteSettings, ctaTitle: e.target.value })} className="mt-1 w-full rounded-xl bg-white px-4 py-3 text-sm text-dark outline-none border border-dark/5" />
-                    </label>
-                    <label className="block text-xs text-dark/35">Description CTA
-                      <textarea value={siteSettings.ctaDescription} onChange={(e) => setSiteSettings({ ...siteSettings, ctaDescription: e.target.value })} rows={2} className="mt-1 w-full rounded-xl bg-white px-4 py-3 text-sm text-dark outline-none border border-dark/5 resize-none" />
-                    </label>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl bg-bg p-4 space-y-4">
-                  <h4 className="font-bold text-sm">Livraison</h4>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-sm font-semibold text-dark/70">Livraison offerte sur tout</div>
-                      <div className="text-xs text-dark/35">Active ça pour l'offre d'ouverture. Désactive quand l'offre est finie.</div>
-                    </div>
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={siteSettings.freeShipping}
-                        onChange={(e) => setSiteSettings({ ...siteSettings, freeShipping: e.target.checked })}
-                        className="h-5 w-5"
-                      />
-                    </label>
-                  </div>
-                  {!siteSettings.freeShipping && (
-                    <div className="grid grid-cols-3 gap-3">
-                      <label className="text-xs text-dark/35">Gratuit dès €
-                        <input type="number" value={siteSettings.freeShippingThreshold} onChange={(e) => setSiteSettings({ ...siteSettings, freeShippingThreshold: Number(e.target.value) })} className="mt-1 w-full rounded-xl bg-white px-3 py-2.5 text-sm text-dark outline-none border border-dark/5" />
-                      </label>
-                      <label className="text-xs text-dark/35">Standard €
-                        <input type="number" value={siteSettings.standardShippingFee} onChange={(e) => setSiteSettings({ ...siteSettings, standardShippingFee: Number(e.target.value) })} className="mt-1 w-full rounded-xl bg-white px-3 py-2.5 text-sm text-dark outline-none border border-dark/5" />
-                      </label>
-                      <label className="text-xs text-dark/35">Express €
-                        <input type="number" value={siteSettings.expressShippingFee} onChange={(e) => setSiteSettings({ ...siteSettings, expressShippingFee: Number(e.target.value) })} className="mt-1 w-full rounded-xl bg-white px-3 py-2.5 text-sm text-dark outline-none border border-dark/5" />
-                      </label>
-                    </div>
-                  )}
-                </div>
-
-                <div className="rounded-2xl bg-bg p-4 space-y-4">
-                  <h4 className="font-bold text-sm">Liens & paiement</h4>
-                  <label className="block text-xs text-dark/35">Lien WhatsApp
-                    <input
-                      value={siteSettings.whatsappUrl}
-                      onChange={(e) => setSiteSettings({ ...siteSettings, whatsappUrl: e.target.value })}
-                      placeholder="https://wa.me/33..."
-                      className="mt-1 w-full rounded-xl bg-bg px-4 py-3 text-sm text-dark outline-none"
-                    />
-                  </label>
-                  <label className="block text-xs text-dark/35">Lien Snapchat
-                    <input
-                      value={siteSettings.snapchatUrl}
-                      onChange={(e) => setSiteSettings({ ...siteSettings, snapchatUrl: e.target.value })}
-                      placeholder="https://www.snapchat.com/add/tonpseudo"
-                      className="mt-1 w-full rounded-xl bg-bg px-4 py-3 text-sm text-dark outline-none"
-                    />
-                  </label>
-                  <label className="block text-xs text-dark/35">Lien de paiement SumUp
-                    <input
-                      value={siteSettings.sumupUrl}
-                      onChange={(e) => setSiteSettings({ ...siteSettings, sumupUrl: e.target.value })}
-                      placeholder="https://pay.sumup.com/b2c/..."
-                      className="mt-1 w-full rounded-xl bg-bg px-4 py-3 text-sm text-dark outline-none"
-                    />
-                  </label>
-                  <label className="block text-xs text-dark/35">Texte paiement
-                    <textarea
-                      value={siteSettings.paymentText}
-                      onChange={(e) => setSiteSettings({ ...siteSettings, paymentText: e.target.value })}
-                      rows={3}
-                      className="mt-1 w-full rounded-xl bg-bg px-4 py-3 text-sm text-dark outline-none resize-none"
-                    />
-                  </label>
-                </div>
-              </div>
+              <button
+                onClick={saveSettings}
+                className="inline-flex items-center gap-2 rounded-full bg-accent px-5 py-3 text-sm font-bold text-white hover:brightness-110 transition-colors"
+              >
+                <Save size={15} /> {settingsSaved ? 'Sauvegardé ✓' : 'Sauvegarder'}
+              </button>
             </div>
 
-            <div className="lg:col-span-2 rounded-3xl bg-white/5 border border-white/10 p-6 text-white">
-              <h3 className="font-bold text-xl mb-4">Utilisation</h3>
-              <div className="space-y-3 text-sm text-white/45 leading-relaxed">
-                <p>WhatsApp alimente les boutons contact, CTA et la barre mobile.</p>
-                <p>Snap alimente les boutons Snapchat du site.</p>
-                <p>SumUp sert pour le paiement par carte : le lien est proposé au client après sa commande et utilisé dans tes messages de paiement.</p>
+            <div className="grid lg:grid-cols-4 gap-5 items-start">
+              {/* ── Navigation latérale ── */}
+              <div className="lg:col-span-1">
+                <nav className="rounded-3xl bg-white/5 border border-white/10 p-2 flex lg:flex-col gap-1 overflow-x-auto scrollbar-hide">
+                  {([
+                    { id: 'vitrine', label: 'Vitrine & liens' },
+                    { id: 'avis', label: 'Avis clients' },
+                    { id: 'faq', label: 'FAQ' },
+                    { id: 'comment', label: 'Comment ça marche' },
+                    { id: 'pourquoi', label: 'Pourquoi tof' },
+                    { id: 'footer', label: 'Footer' },
+                    { id: 'marques', label: 'Marques' },
+                    { id: 'apparence', label: 'Apparence' },
+                  ] as { id: typeof settingsSection; label: string }[]).map((s) => (
+                    <button
+                      key={s.id}
+                      onClick={() => setSettingsSection(s.id)}
+                      className={`px-4 py-2.5 rounded-xl text-sm font-semibold text-left whitespace-nowrap transition-colors ${
+                        settingsSection === s.id
+                          ? 'bg-accent text-white'
+                          : 'text-white/55 hover:bg-white/10 hover:text-white'
+                      }`}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </nav>
               </div>
-              <div className="mt-5 space-y-2 text-xs">
-                <a href={siteSettings.whatsappUrl} className="block rounded-xl bg-[#25D366]/10 px-4 py-3 font-bold text-[#25D366]">Tester WhatsApp →</a>
-                <a href={siteSettings.snapchatUrl} className="block rounded-xl bg-[#FFFC00]/10 px-4 py-3 font-bold text-[#FFFC00]">Tester Snap →</a>
-                <a href={siteSettings.sumupUrl} className="block rounded-xl bg-white/5 px-4 py-3 font-bold text-white/55">Tester SumUp →</a>
+
+              {/* ── Contenu ── */}
+              <div className="lg:col-span-3 rounded-3xl bg-white text-dark p-5 sm:p-6 space-y-4">
+                {/* ============ VITRINE ============ */}
+                {settingsSection === 'vitrine' && (
+                  <>
+                    <SCard title="Barre d'annonce rotative" subtitle="Sépare plusieurs messages par « | » : ils défilent automatiquement.">
+                      <div className="flex items-center justify-between gap-3 mb-3">
+                        <label className="flex items-center gap-2 text-xs font-bold text-dark/50">
+                          <input
+                            type="checkbox"
+                            checked={siteSettings.announcementEnabled}
+                            onChange={(e) => setSiteSettings({ ...siteSettings, announcementEnabled: e.target.checked })}
+                            className="h-4 w-4"
+                          />
+                          Activée
+                        </label>
+                      </div>
+                      <input
+                        value={siteSettings.announcementText}
+                        onChange={(e) => setSiteSettings({ ...siteSettings, announcementText: e.target.value })}
+                        placeholder="Livraison offerte dès 140€ | Paiement CB sécurisé SumUp | Réponse en 5 min"
+                        className="w-full rounded-xl bg-white px-4 py-3 text-sm text-dark outline-none border border-dark/10"
+                      />
+                    </SCard>
+
+                    <SCard title="Hero principal">
+                      <div className="grid sm:grid-cols-2 gap-3">
+                        <SInput label="Badge" value={siteSettings.heroBadge} onChange={(v) => setSiteSettings({ ...siteSettings, heroBadge: v })} />
+                        <SInput label="Badge flottant" value={siteSettings.heroTopBadge} onChange={(v) => setSiteSettings({ ...siteSettings, heroTopBadge: v })} />
+                        <SInput label="Titre début" value={siteSettings.heroTitleStart} onChange={(v) => setSiteSettings({ ...siteSettings, heroTitleStart: v })} />
+                        <SInput label="Titre souligné" value={siteSettings.heroTitleHighlight} onChange={(v) => setSiteSettings({ ...siteSettings, heroTitleHighlight: v })} />
+                        <div className="sm:col-span-2">
+                          <STextarea label="Description" value={siteSettings.heroDescription} onChange={(v) => setSiteSettings({ ...siteSettings, heroDescription: v })} rows={2} />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <SInput label="Note sous description" value={siteSettings.heroSubnote} onChange={(v) => setSiteSettings({ ...siteSettings, heroSubnote: v })} />
+                        </div>
+                        <SInput label="Stat flottante" value={siteSettings.heroStatValue} onChange={(v) => setSiteSettings({ ...siteSettings, heroStatValue: v })} />
+                        <SInput label="Label stat" value={siteSettings.heroStatLabel} onChange={(v) => setSiteSettings({ ...siteSettings, heroStatLabel: v })} />
+                      </div>
+                      {/* Aperçu en direct */}
+                      <div className="mt-4 rounded-2xl bg-bg p-4">
+                        <p className="text-[10px] uppercase tracking-widest text-dark/30 font-bold mb-2">Aperçu</p>
+                        <h3 className="font-display text-2xl font-800 tracking-tight">
+                          {siteSettings.heroTitleStart || 'Titre'}{' '}
+                          <span className="text-accent underline decoration-accent/40">{siteSettings.heroTitleHighlight || 'souligné'}</span>.
+                        </h3>
+                      </div>
+                    </SCard>
+
+                    <SCard title="Badges de confiance" subtitle="Affichés dans le hero et sous « Comment ça marche ».">
+                      {siteSettings.trustBadges.map((b, i) => (
+                        <div key={i} className="flex items-center gap-2 mb-2">
+                          <input
+                            value={b}
+                            onChange={(e) =>
+                              setSiteSettings((s) => ({
+                                ...s,
+                                trustBadges: s.trustBadges.map((x, j) => (j === i ? e.target.value : x)),
+                              }))
+                            }
+                            className="flex-1 rounded-xl bg-white px-4 py-3 text-sm text-dark outline-none border border-dark/10"
+                          />
+                          <DeleteBtn onClick={() => setSiteSettings((s) => ({ ...s, trustBadges: s.trustBadges.filter((_, j) => j !== i) }))} />
+                        </div>
+                      ))}
+                      <AddBtn label="Ajouter un badge" onClick={() => setSiteSettings((s) => ({ ...s, trustBadges: [...s.trustBadges, 'Nouveau badge'] }))} />
+                    </SCard>
+
+                    <SCard title="Bloc Snap / WhatsApp">
+                      <div className="space-y-3">
+                        <SInput label="Titre CTA" value={siteSettings.ctaTitle} onChange={(v) => setSiteSettings({ ...siteSettings, ctaTitle: v })} />
+                        <STextarea label="Description CTA" value={siteSettings.ctaDescription} onChange={(v) => setSiteSettings({ ...siteSettings, ctaDescription: v })} rows={2} />
+                      </div>
+                    </SCard>
+
+                    <SCard title="Livraison">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-sm font-semibold text-dark/70">Livraison offerte sur tout</div>
+                          <div className="text-xs text-dark/40">Active pour l'offre d'ouverture.</div>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={siteSettings.freeShipping}
+                          onChange={(e) => setSiteSettings({ ...siteSettings, freeShipping: e.target.checked })}
+                          className="h-5 w-5"
+                        />
+                      </div>
+                      {!siteSettings.freeShipping && (
+                        <div className="grid grid-cols-3 gap-3 mt-3">
+                          <SInput label="Gratuit dès €" type="number" value={siteSettings.freeShippingThreshold} onChange={(v) => setSiteSettings({ ...siteSettings, freeShippingThreshold: Number(v) })} />
+                          <SInput label="Standard €" type="number" value={siteSettings.standardShippingFee} onChange={(v) => setSiteSettings({ ...siteSettings, standardShippingFee: Number(v) })} />
+                          <SInput label="Express €" type="number" value={siteSettings.expressShippingFee} onChange={(v) => setSiteSettings({ ...siteSettings, expressShippingFee: Number(v) })} />
+                        </div>
+                      )}
+                    </SCard>
+
+                    <SCard title="Liens & paiement">
+                      <div className="space-y-3">
+                        <SInput label="Lien WhatsApp" value={siteSettings.whatsappUrl} onChange={(v) => setSiteSettings({ ...siteSettings, whatsappUrl: v })} placeholder="https://wa.me/33..." />
+                        <SInput label="Lien Snapchat" value={siteSettings.snapchatUrl} onChange={(v) => setSiteSettings({ ...siteSettings, snapchatUrl: v })} placeholder="https://www.snapchat.com/add/tonpseudo" />
+                        <SInput label="Lien de paiement SumUp" value={siteSettings.sumupUrl} onChange={(v) => setSiteSettings({ ...siteSettings, sumupUrl: v })} placeholder="https://pay.sumup.com/b2c/..." />
+                        <STextarea label="Texte paiement" value={siteSettings.paymentText} onChange={(v) => setSiteSettings({ ...siteSettings, paymentText: v })} rows={3} />
+                      </div>
+                    </SCard>
+                  </>
+                )}
+
+                {/* ============ AVIS ============ */}
+                {settingsSection === 'avis' && (
+                  <>
+                    <SCard title="Statistiques affichées" subtitle="Les 3 chiffres sous la grille d'avis.">
+                      <div className="grid grid-cols-3 gap-3">
+                        {siteSettings.reviewStats.map((s, i) => (
+                          <div key={i}>
+                            <SInput label={`Valeur ${i + 1}`} value={s.value} onChange={(v) => setSiteSettings((s0) => ({ ...s0, reviewStats: s0.reviewStats.map((x, j) => (j === i ? { ...x, value: v } : x)) }))} />
+                            <div className="mt-1">
+                              <SInput label="Libellé" value={s.label} onChange={(v) => setSiteSettings((s0) => ({ ...s0, reviewStats: s0.reviewStats.map((x, j) => (j === i ? { ...x, label: v } : x)) }))} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </SCard>
+
+                    <SCard title="Avis automatiques" subtitle="Affiche les vraies commandes (prénom, ville, produit) en plus de tes avis rédigés.">
+                      <label className="flex items-center gap-2 text-sm font-semibold text-dark/70">
+                        <input
+                          type="checkbox"
+                          checked={siteSettings.reviewsAutoEnabled}
+                          onChange={(e) => setSiteSettings({ ...siteSettings, reviewsAutoEnabled: e.target.checked })}
+                          className="h-4 w-4"
+                        />
+                        Activer les avis tirés des commandes réelles
+                      </label>
+                    </SCard>
+
+                    <SCard title="Avis rédigés" subtitle="Modifie, ajoute ou supprime les témoignages.">
+                      {siteSettings.reviews.map((r, i) => (
+                        <div key={r.id} className="rounded-2xl bg-white border border-dark/10 p-4 mb-3">
+                          <div className="flex items-start gap-3">
+                            <div className="flex-1 grid sm:grid-cols-2 gap-3">
+                              <SInput label="Nom" value={r.name} onChange={(v) => setSiteSettings((s) => ({ ...s, reviews: s.reviews.map((x, j) => (j === i ? { ...x, name: v } : x)) }))} />
+                              <SInput label="Ville" value={r.city} onChange={(v) => setSiteSettings((s) => ({ ...s, reviews: s.reviews.map((x, j) => (j === i ? { ...x, city: v } : x)) }))} />
+                              <SInput label="Produit acheté" value={r.product} onChange={(v) => setSiteSettings((s) => ({ ...s, reviews: s.reviews.map((x, j) => (j === i ? { ...x, product: v } : x)) }))} />
+                              <SInput label="Étoiles (1-5)" type="number" value={r.stars} onChange={(v) => setSiteSettings((s) => ({ ...s, reviews: s.reviews.map((x, j) => (j === i ? { ...x, stars: Math.min(5, Math.max(1, Number(v) || 5)) } : x)) }))} />
+                              <div className="sm:col-span-2">
+                                <STextarea label="Texte de l'avis" value={r.text} onChange={(v) => setSiteSettings((s) => ({ ...s, reviews: s.reviews.map((x, j) => (j === i ? { ...x, text: v } : x)) }))} rows={3} />
+                              </div>
+                            </div>
+                            <DeleteBtn onClick={() => setSiteSettings((s) => ({ ...s, reviews: s.reviews.filter((_, j) => j !== i) }))} />
+                          </div>
+                        </div>
+                      ))}
+                      <AddBtn
+                        label="Ajouter un avis"
+                        onClick={() =>
+                          setSiteSettings((s) => ({
+                            ...s,
+                            reviews: [
+                              ...s.reviews,
+                              { id: `r${Date.now()}`, name: 'Prénom N.', city: 'Ville', product: 'Produit', text: '', stars: 5 },
+                            ],
+                          }))
+                        }
+                      />
+                    </SCard>
+                  </>
+                )}
+
+                {/* ============ FAQ ============ */}
+                {settingsSection === 'faq' && (
+                  <SCard title="Questions fréquentes" subtitle="Chaque entrée est une question + sa réponse.">
+                    {siteSettings.faq.map((f, i) => (
+                      <div key={i} className="rounded-2xl bg-white border border-dark/10 p-4 mb-3">
+                        <div className="flex items-start gap-3">
+                          <div className="flex-1 space-y-3">
+                            <SInput label="Question" value={f.q} onChange={(v) => setSiteSettings((s) => ({ ...s, faq: s.faq.map((x, j) => (j === i ? { ...x, q: v } : x)) }))} />
+                            <STextarea label="Réponse" value={f.a} onChange={(v) => setSiteSettings((s) => ({ ...s, faq: s.faq.map((x, j) => (j === i ? { ...x, a: v } : x)) }))} rows={3} />
+                          </div>
+                          <DeleteBtn onClick={() => setSiteSettings((s) => ({ ...s, faq: s.faq.filter((_, j) => j !== i) }))} />
+                        </div>
+                      </div>
+                    ))}
+                    <AddBtn
+                      label="Ajouter une question"
+                      onClick={() => setSiteSettings((s) => ({ ...s, faq: [...s.faq, { q: 'Nouvelle question ?', a: 'Réponse...' }] }))}
+                    />
+                  </SCard>
+                )}
+
+                {/* ============ COMMENT ÇA MARCHE ============ */}
+                {settingsSection === 'comment' && (
+                  <>
+                    <SCard title="En-tête">
+                      <div className="space-y-3">
+                        <SInput label="Titre" value={siteSettings.howItWorksTitle} onChange={(v) => setSiteSettings({ ...siteSettings, howItWorksTitle: v })} />
+                        <SInput label="Sous-titre" value={siteSettings.howItWorksSubtitle} onChange={(v) => setSiteSettings({ ...siteSettings, howItWorksSubtitle: v })} />
+                      </div>
+                    </SCard>
+                    <SCard title="Les étapes" subtitle="Emoji + titre + durée + description.">
+                      {siteSettings.steps.map((st, i) => (
+                        <div key={i} className="rounded-2xl bg-white border border-dark/10 p-4 mb-3">
+                          <div className="flex items-start gap-3">
+                            <div className="flex-1 grid sm:grid-cols-2 gap-3">
+                              <SInput label="Emoji" value={st.emoji} onChange={(v) => setSiteSettings((s) => ({ ...s, steps: s.steps.map((x, j) => (j === i ? { ...x, emoji: v } : x)) }))} />
+                              <SInput label="Durée (ex : 2 min)" value={st.tag} onChange={(v) => setSiteSettings((s) => ({ ...s, steps: s.steps.map((x, j) => (j === i ? { ...x, tag: v } : x)) }))} />
+                              <div className="sm:col-span-2">
+                                <SInput label="Titre" value={st.title} onChange={(v) => setSiteSettings((s) => ({ ...s, steps: s.steps.map((x, j) => (j === i ? { ...x, title: v } : x)) }))} />
+                              </div>
+                              <div className="sm:col-span-2">
+                                <STextarea label="Description" value={st.text} onChange={(v) => setSiteSettings((s) => ({ ...s, steps: s.steps.map((x, j) => (j === i ? { ...x, text: v } : x)) }))} rows={2} />
+                              </div>
+                            </div>
+                            <DeleteBtn onClick={() => setSiteSettings((s) => ({ ...s, steps: s.steps.filter((_, j) => j !== i) }))} />
+                          </div>
+                        </div>
+                      ))}
+                      <AddBtn
+                        label="Ajouter une étape"
+                        onClick={() => setSiteSettings((s) => ({ ...s, steps: [...s.steps, { emoji: '✨', title: 'Nouvelle étape', text: 'Description...', tag: 'durée' }] }))}
+                      />
+                    </SCard>
+                  </>
+                )}
+
+                {/* ============ POURQUOI TOF ============ */}
+                {settingsSection === 'pourquoi' && (
+                  <>
+                    <SCard title="Texte d'introduction">
+                      <SInput label="Intro" value={siteSettings.whyUsIntro} onChange={(v) => setSiteSettings({ ...siteSettings, whyUsIntro: v })} />
+                    </SCard>
+                    <SCard title="Les 4 points" subtitle="Emoji, titre, description, stat + libellé.">
+                      {siteSettings.whyUsPoints.map((p, i) => (
+                        <div key={i} className="rounded-2xl bg-white border border-dark/10 p-4 mb-3">
+                          <div className="flex items-start gap-3">
+                            <div className="flex-1 grid sm:grid-cols-2 gap-3">
+                              <SInput label="Emoji" value={p.emoji} onChange={(v) => setSiteSettings((s) => ({ ...s, whyUsPoints: s.whyUsPoints.map((x, j) => (j === i ? { ...x, emoji: v } : x)) }))} />
+                              <SInput label="Titre" value={p.title} onChange={(v) => setSiteSettings((s) => ({ ...s, whyUsPoints: s.whyUsPoints.map((x, j) => (j === i ? { ...x, title: v } : x)) }))} />
+                              <div className="sm:col-span-2">
+                                <STextarea label="Description" value={p.desc} onChange={(v) => setSiteSettings((s) => ({ ...s, whyUsPoints: s.whyUsPoints.map((x, j) => (j === i ? { ...x, desc: v } : x)) }))} rows={2} />
+                              </div>
+                              <SInput label="Stat (ex : 100%)" value={p.stat} onChange={(v) => setSiteSettings((s) => ({ ...s, whyUsPoints: s.whyUsPoints.map((x, j) => (j === i ? { ...x, stat: v } : x)) }))} />
+                              <SInput label="Libellé stat" value={p.statLabel} onChange={(v) => setSiteSettings((s) => ({ ...s, whyUsPoints: s.whyUsPoints.map((x, j) => (j === i ? { ...x, statLabel: v } : x)) }))} />
+                            </div>
+                            <DeleteBtn onClick={() => setSiteSettings((s) => ({ ...s, whyUsPoints: s.whyUsPoints.filter((_, j) => j !== i) }))} />
+                          </div>
+                        </div>
+                      ))}
+                      <AddBtn
+                        label="Ajouter un point"
+                        onClick={() => setSiteSettings((s) => ({ ...s, whyUsPoints: [...s.whyUsPoints, { emoji: '✨', title: 'Nouveau point', desc: 'Description...', stat: 'stat', statLabel: 'libellé' }] }))}
+                      />
+                    </SCard>
+                  </>
+                )}
+
+                {/* ============ FOOTER ============ */}
+                {settingsSection === 'footer' && (
+                  <>
+                    <SCard title="Description">
+                      <STextarea label="Texte sous le logo" value={siteSettings.footerDescription} onChange={(v) => setSiteSettings({ ...siteSettings, footerDescription: v })} rows={2} />
+                    </SCard>
+                    <SCard title="Garanties" subtitle="La liste à puces du footer.">
+                      {siteSettings.footerGuarantees.map((g, i) => (
+                        <div key={i} className="flex items-center gap-2 mb-2">
+                          <input
+                            value={g}
+                            onChange={(e) => setSiteSettings((s) => ({ ...s, footerGuarantees: s.footerGuarantees.map((x, j) => (j === i ? e.target.value : x)) }))}
+                            className="flex-1 rounded-xl bg-white px-4 py-3 text-sm text-dark outline-none border border-dark/10"
+                          />
+                          <DeleteBtn onClick={() => setSiteSettings((s) => ({ ...s, footerGuarantees: s.footerGuarantees.filter((_, j) => j !== i) }))} />
+                        </div>
+                      ))}
+                      <AddBtn label="Ajouter une garantie" onClick={() => setSiteSettings((s) => ({ ...s, footerGuarantees: [...s.footerGuarantees, 'Nouvelle garantie'] }))} />
+                    </SCard>
+                  </>
+                )}
+
+                {/* ============ MARQUES ============ */}
+                {settingsSection === 'marques' && (
+                  <SCard title="Bandeau des marques" subtitle="Une marque par ligne (bandeau défilant sous le hero).">
+                    <textarea
+                      value={siteSettings.brandNames.join('\n')}
+                      onChange={(e) => setSiteSettings((s) => ({ ...s, brandNames: e.target.value.split('\n').map((x) => x.trim()).filter(Boolean) }))}
+                      rows={10}
+                      className="w-full rounded-xl bg-white px-4 py-3 text-sm text-dark outline-none border border-dark/10 font-mono resize-none"
+                    />
+                    <p className="mt-2 text-[11px] text-dark/35">{siteSettings.brandNames.length} marque(s).</p>
+                  </SCard>
+                )}
+
+                {/* ============ APPARENCE ============ */}
+                {settingsSection === 'apparence' && (
+                  <SCard title="Couleur d'accent" subtitle="La couleur orange principale du site (boutons, soulignés, badges).">
+                    <div className="flex items-center gap-4">
+                      <input
+                        type="color"
+                        value={siteSettings.accentColor}
+                        onChange={(e) => {
+                          const c = e.target.value;
+                          setSiteSettings((s) => ({ ...s, accentColor: c }));
+                          document.documentElement.style.setProperty('--color-accent', c);
+                        }}
+                        className="h-12 w-16 rounded-xl border border-dark/10 bg-white cursor-pointer"
+                      />
+                      <input
+                        value={siteSettings.accentColor}
+                        onChange={(e) => setSiteSettings((s) => ({ ...s, accentColor: e.target.value }))}
+                        className="w-32 rounded-xl bg-white px-4 py-3 text-sm text-dark outline-none border border-dark/10 font-mono"
+                      />
+                      <div className="flex gap-2">
+                        {['#e84d1a', '#111111', '#2563eb', '#16a34a', '#9333ea', '#db2777'].map((c) => (
+                          <button
+                            key={c}
+                            onClick={() => {
+                              setSiteSettings((s) => ({ ...s, accentColor: c }));
+                              document.documentElement.style.setProperty('--color-accent', c);
+                            }}
+                            style={{ background: c }}
+                            className={`h-8 w-8 rounded-full border-2 ${siteSettings.accentColor === c ? 'border-dark' : 'border-transparent'}`}
+                            aria-label={c}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    {/* Aperçu */}
+                    <div className="mt-4 rounded-2xl bg-bg p-4 space-y-2">
+                      <button className="bg-accent text-white px-4 py-2 rounded-full text-xs font-bold">Bouton principal</button>
+                      <span className="ml-2 inline-block h-6 w-6 rounded-full bg-accent" />
+                      <span className="ml-2 text-accent font-bold">Texte accent</span>
+                    </div>
+                  </SCard>
+                )}
+
+                {/* Bouton sauvegarder en bas */}
+                <div className="flex justify-end pt-2">
+                  <button
+                    onClick={saveSettings}
+                    className="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3 text-sm font-bold text-white hover:brightness-110 transition-colors"
+                  >
+                    <Save size={15} /> {settingsSaved ? 'Sauvegardé ✓' : 'Sauvegarder les réglages'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

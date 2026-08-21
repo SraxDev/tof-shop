@@ -1,32 +1,21 @@
-const STEPS = [
-  {
-    emoji: '🛒',
-    title: 'Tu choisis & tu réserves',
-    text: "Ajoute ta pièce au panier (taille, couleur, quantité) et remplis tes infos. Tu reçois ton numéro de commande TOF-XXXX immédiatement.",
-    tag: '2 min',
-  },
-  {
-    emoji: '💳',
-    title: 'Tu paies par carte',
-    text: 'Lien de paiement SumUp sécurisé (CB, Visa, Mastercard, Apple Pay, Google Pay, 3D Secure). Dès réception, je commande ta pièce et je contrôle les photos QC une par une.',
-    tag: '2-5 jours',
-  },
-  {
-    emoji: '📦',
-    title: 'Tu reçois ton colis',
-    text: "La pièce validée part de l'entrepôt en colis discret. Tu suis ta commande en direct avec ton numéro de tracking dans la section Suivi.",
-    tag: '10-20 jours',
-  },
-];
-
-const BADGES = [
-  '✓ Vérifié avant expédition',
-  '✓ Paiement CB sécurisé (SumUp)',
-  '✓ Livraison suivie 10-20j',
-  '✓ Si problème, on gère',
-];
+import { useEffect, useState } from 'react';
+import { readSiteSettings } from '../lib/siteSettings';
 
 export default function HowItWorks() {
+  const [settings, setSettings] = useState(readSiteSettings);
+
+  useEffect(() => {
+    const sync = () => setSettings(readSiteSettings());
+    window.addEventListener('tof-settings-updated', sync);
+    window.addEventListener('storage', sync);
+    return () => {
+      window.removeEventListener('tof-settings-updated', sync);
+      window.removeEventListener('storage', sync);
+    };
+  }, []);
+
+  const steps = settings.steps;
+
   return (
     <section id="comment-ca-marche" className="py-14 sm:py-20 bg-bg border-t border-dark/5">
       <div className="mx-auto max-w-6xl px-5">
@@ -35,10 +24,10 @@ export default function HowItWorks() {
             🛒 Comment ça marche
           </span>
           <h2 className="mt-3 font-display text-3xl sm:text-4xl lg:text-5xl font-800 tracking-tight text-dark">
-            3 étapes, <span className="text-accent">zéro surprise</span>
+            {settings.howItWorksTitle}
           </h2>
           <p className="mt-2 text-dark/45 text-sm sm:text-base max-w-lg mx-auto">
-            Pas de stock, pas d'intermédiaire : chaque pièce est commandée et vérifiée pour toi.
+            {settings.howItWorksSubtitle}
           </p>
         </div>
 
@@ -47,7 +36,7 @@ export default function HowItWorks() {
           <div className="hidden sm:block absolute left-[12%] right-[12%] top-[38px] h-[2px] bg-gradient-to-r from-accent/20 via-accent/40 to-accent/20" aria-hidden />
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 sm:gap-6">
-            {STEPS.map((step, i) => (
+            {steps.map((step, i) => (
               <div key={step.title} className="relative flex sm:flex-col gap-4 sm:gap-0">
                 {/* Pastille numérotée */}
                 <div className="relative flex sm:justify-center flex-shrink-0">
@@ -58,7 +47,7 @@ export default function HowItWorks() {
                     </span>
                   </div>
                   {/* Ligne verticale mobile */}
-                  {i < STEPS.length - 1 && (
+                  {i < steps.length - 1 && (
                     <span className="sm:hidden absolute left-[26px] top-[52px] h-[calc(100%+20px)] w-[2px] bg-dark/8" aria-hidden />
                   )}
                 </div>
@@ -78,9 +67,9 @@ export default function HowItWorks() {
         </div>
 
         <div className="mt-10 flex flex-wrap justify-center gap-2">
-          {BADGES.map((b) => (
+          {settings.trustBadges.map((b) => (
             <span key={b} className="rounded-full bg-green-500/10 text-green-700 px-3 py-1.5 text-xs font-bold">
-              {b}
+              ✓ {b}
             </span>
           ))}
         </div>

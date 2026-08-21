@@ -2,47 +2,6 @@ import { ChevronDown } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { readSiteSettings } from '../lib/siteSettings';
 
-type QA = { q: string; a: string };
-
-const FAQ: QA[] = [
-  {
-    q: 'Comment je paie ma commande ?',
-    a: "Par carte bancaire via SumUp, notre prestataire de paiement français. Après validation de ton panier, tu reçois un lien de paiement sécurisé (CB, Visa, Mastercard, Apple Pay, Google Pay) protégé par 3D Secure. Aucune donnée bancaire ne transite par le site.",
-  },
-  {
-    q: 'Le paiement est-il sécurisé ?',
-    a: "Oui. SumUp est un établissement de paiement agréé : la transaction est chiffrée et validée par 3D Secure (confirmation via ton appli bancaire). Je ne vois jamais ton numéro de carte.",
-  },
-  {
-    q: 'Combien de temps pour recevoir ma commande ?',
-    a: "Compte 2 à 5 jours pour que je commande la pièce et reçoive les photos QC, puis 10 à 20 jours ouvrés de livraison suivie (5-10 jours en Express). Tu reçois ton numéro de suivi dès l'expédition, et tu peux le consulter à tout moment dans la section Suivi.",
-  },
-  {
-    q: 'Quelle est la qualité des pièces ?',
-    a: "Ce sont des reps 1:1 haut de gamme, sélectionnées pièce par pièce. Avant chaque envoi je reçois 5-6 photos QC de l'entrepôt (coutures, logo, semelle, étiquette, boîte). Si quelque chose ne va pas, je demande un échange — tu ne reçois jamais un truc que je n'aurais pas gardé pour moi.",
-  },
-  {
-    q: 'Comment choisir ma taille ?',
-    a: "Le guide des tailles détaillé (EU / US / UK / cm pour les sneakers, S à XXL pour les vêtements) est accessible dans chaque fiche produit. En général les sneakers taillent normalement (TTS). Un doute ? Envoie-moi ta pointure habituelle sur Snap ou WhatsApp, je te réponds en ~5 min.",
-  },
-  {
-    q: 'Le colis est-il discret ?',
-    a: "Oui, emballage neutre sans mention de marque ni du contenu. Le suivi est fourni de bout en bout.",
-  },
-  {
-    q: 'Et si la pièce ne me va pas ou arrive abîmée ?',
-    a: "Écris-moi dans les 14 jours avec des photos : on trouve une solution (échange de taille, renvoi ou remboursement selon le cas). Je gère le shop tout seul, donc pas de service client robot — tu me parles directement.",
-  },
-  {
-    q: 'Je peux commander depuis la Belgique / Suisse / DOM ?',
-    a: "Oui, on livre partout en Europe et dans les DOM-TOM. Les délais peuvent être un peu plus longs (jusqu'à 25 jours) et les frais de port sont ajustés au moment du checkout.",
-  },
-  {
-    q: 'Où en est ma commande ?',
-    a: "Rends-toi dans la section « Suivi », tape ton numéro TOF-XXXX et tu vois l'avancement en direct : reçue → payée → QC validé → expédiée, avec ton numéro de tracking copiable.",
-  },
-];
-
 export default function Faq() {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
   const [settings, setSettings] = useState(readSiteSettings);
@@ -69,7 +28,7 @@ export default function Faq() {
         </div>
 
         <div className="space-y-2.5">
-          {FAQ.map((item, i) => {
+          {settings.faq.map((item, i) => {
             const open = openIndex === i;
             return (
               <div
