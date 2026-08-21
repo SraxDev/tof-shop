@@ -55,6 +55,26 @@ export default function Footer() {
               >
                 👻 Snapchat @tofh2b
               </a>
+              {settings.instagramUrl && (
+                <a
+                  href={settings.instagramUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="h-11 px-5 bg-[#E1306C]/10 hover:bg-[#E1306C]/20 border border-[#E1306C]/15 rounded-full flex items-center justify-center gap-2 text-sm font-semibold text-[#E1306C]/80 hover:text-[#E1306C] transition-colors"
+                >
+                  📸 Instagram
+                </a>
+              )}
+              {settings.tiktokUrl && (
+                <a
+                  href={settings.tiktokUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="h-11 px-5 bg-white/10 hover:bg-white/20 border border-white/15 rounded-full flex items-center justify-center gap-2 text-sm font-semibold text-white/80 hover:text-white transition-colors"
+                >
+                  🎵 TikTok
+                </a>
+              )}
             </div>
           </div>
         </div>

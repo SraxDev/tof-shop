@@ -82,6 +82,12 @@ export type SiteSettings = {
   launchBannerCtaUrl: string;
   launchBannerImage: string;
   launchBannerEndsAt: string;
+
+  // ── Réseaux sociaux & SEO ────────────────────────────────────────────────
+  instagramUrl: string;
+  tiktokUrl: string;
+  seoTitle: string;
+  seoDescription: string;
 };
 
 export const SETTINGS_STORAGE_KEY = 'tof-site-settings-v2';
@@ -281,6 +287,12 @@ export const defaultSettings: SiteSettings = {
   launchBannerCtaUrl: '#shop',
   launchBannerImage: '',
   launchBannerEndsAt: '',
+
+  instagramUrl: '',
+  tiktokUrl: '',
+  seoTitle: 'tof — drip authentique',
+  seoDescription:
+    'Sneakers & streetwear sélectionnés pièce par pièce, vérifiés avant expédition. Paiement CB sécurisé, livraison suivie.',
 };
 
 // Local cache for instant reads (hydrated from Supabase)

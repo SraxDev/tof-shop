@@ -1867,6 +1867,7 @@ export default function AdminPanel() {
   const [noteSort, setNoteSort] = useState<'priority' | 'date'>('priority');
   const [onlineCount, setOnlineCount] = useState(0);
   const [chatSearch, setChatSearch] = useState('');
+  const [orderSearch, setOrderSearch] = useState('');
   const [chatFilter, setChatFilter] = useState<'all' | 'unread' | 'needsHelp'>('all');
   const [notifOn, setNotifOn] = useState(false);
   const [chatMessages, setChatMessages] = useState<DbChatMessage[]>([]);
@@ -2636,6 +2637,48 @@ export default function AdminPanel() {
     showToast('Réglages sauvegardés ✓');
   };
 
+  // Export CSV des commandes (comptabilité / suivi)
+  const exportOrdersCsv = useCallback(() => {
+    const csvEscape = (v: unknown) => {
+      const s = v === undefined || v === null ? '' : String(v);
+      return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const header = [
+      'Numéro', 'Client', 'Téléphone', 'Produit', 'Taille', 'Variante', 'Quantité',
+      'Total (€)', 'Statut', 'Paiement', 'Tracking', 'Ville', 'CP', 'Pays', 'Créée le',
+    ];
+    const rows = orders.map((o) => {
+      const product = products.find((p) => p.id === o.productId);
+      const total = product ? product.salePrice * o.quantity : 0;
+      return [
+        rootOrderId(o.id),
+        o.customerName,
+        o.phone,
+        product ? `${product.brand} ${product.name}` : (o.items?.[0] ? `${o.items[0].brand} ${o.items[0].name}` : ''),
+        o.size,
+        o.color,
+        o.quantity,
+        total,
+        statusLabels[o.status] || o.status,
+        o.paymentStatus === 'paid' ? 'Payée' : o.paymentStatus === 'cancelled' ? 'Annulée' : 'En attente',
+        o.tracking || '',
+        o.city,
+        o.zip,
+        o.country,
+        o.createdAt ? new Date(o.createdAt).toLocaleDateString('fr-FR') : '',
+      ].map(csvEscape).join(';');
+    });
+    const csv = '\uFEFF' + [header.join(';'), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `commandes-tof-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Commandes exportées en CSV ✓');
+  }, [orders, products]);
+
   // Réordonner les avis (haut/bas)
   const moveReview = (i: number, dir: -1 | 1) => {
     setSiteSettings((s) => {
@@ -3255,6 +3298,35 @@ export default function AdminPanel() {
         {activeTab === 'orders' && (
           <div className="grid lg:grid-cols-3 gap-5">
             <div className="lg:col-span-2 space-y-4">
+              {/* 🔍 Recherche + export */}
+              <div className="flex flex-col sm:flex-row gap-2">
+                <div className="relative flex-1">
+                  <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/25" />
+                  <input
+                    value={orderSearch}
+                    onChange={(e) => setOrderSearch(e.target.value)}
+                    placeholder="Rechercher par client, n° de commande ou téléphone..."
+                    className="w-full h-11 rounded-xl bg-white/5 border border-white/10 pl-10 pr-9 text-sm text-white placeholder:text-white/25 outline-none focus:border-accent/40"
+                  />
+                  {orderSearch && (
+                    <button
+                      onClick={() => setOrderSearch('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white"
+                      aria-label="Effacer"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+                <button
+                  onClick={exportOrdersCsv}
+                  disabled={orders.length === 0}
+                  className="h-11 px-4 rounded-xl bg-white/5 border border-white/10 text-xs font-bold text-white/70 hover:bg-white/10 hover:text-white disabled:opacity-30 transition-colors inline-flex items-center justify-center gap-1.5"
+                >
+                  <Download size={14} /> Exporter CSV
+                </button>
+              </div>
+
               {/* 💸 Paniers abandonnés : commandes créées mais jamais payées */}
               {unpaidOrders.length > 0 && (
                 <div className="rounded-3xl bg-accent/10 border border-accent/25 p-4 sm:p-5">
@@ -3321,7 +3393,21 @@ export default function AdminPanel() {
                 </div>
               )}
 
-              {orders.map((order) => {
+              {(orderSearch.trim()
+                ? orders.filter((o) => {
+                    const q = orderSearch.trim().toLowerCase();
+                    const product = getProduct(o.productId);
+                    const hay = [
+                      o.customerName,
+                      o.phone,
+                      o.id,
+                      o.city,
+                      product ? `${product.brand} ${product.name}` : '',
+                    ].join(' ').toLowerCase();
+                    return hay.includes(q);
+                  })
+                : orders
+              ).map((order) => {
                 const product = getProduct(order.productId);
                 const margin = estimateNetMargin(product, order.quantity);
                 return (
@@ -4004,8 +4090,17 @@ export default function AdminPanel() {
                       <div className="space-y-3">
                         <SInput label="Lien WhatsApp" value={siteSettings.whatsappUrl} onChange={(v) => setSiteSettings({ ...siteSettings, whatsappUrl: v })} placeholder="https://wa.me/33..." />
                         <SInput label="Lien Snapchat" value={siteSettings.snapchatUrl} onChange={(v) => setSiteSettings({ ...siteSettings, snapchatUrl: v })} placeholder="https://www.snapchat.com/add/tonpseudo" />
+                        <SInput label="Lien Instagram (optionnel)" value={siteSettings.instagramUrl} onChange={(v) => setSiteSettings({ ...siteSettings, instagramUrl: v })} placeholder="https://instagram.com/toncompte" />
+                        <SInput label="Lien TikTok (optionnel)" value={siteSettings.tiktokUrl} onChange={(v) => setSiteSettings({ ...siteSettings, tiktokUrl: v })} placeholder="https://tiktok.com/@toncompte" />
                         <SInput label="Lien de paiement SumUp" value={siteSettings.sumupUrl} onChange={(v) => setSiteSettings({ ...siteSettings, sumupUrl: v })} placeholder="https://pay.sumup.com/b2c/..." />
                         <STextarea label="Texte paiement" value={siteSettings.paymentText} onChange={(v) => setSiteSettings({ ...siteSettings, paymentText: v })} rows={3} />
+                      </div>
+                    </SCard>
+
+                    <SCard title="SEO" subtitle="Titre et description affichés dans Google et les aperçus de partage.">
+                      <div className="space-y-3">
+                        <SInput label="Titre du site (onglet + partage)" value={siteSettings.seoTitle} onChange={(v) => setSiteSettings({ ...siteSettings, seoTitle: v })} />
+                        <STextarea label="Description (150 caractères max conseillé)" value={siteSettings.seoDescription} onChange={(v) => setSiteSettings({ ...siteSettings, seoDescription: v })} rows={2} />
                       </div>
                     </SCard>
                   </>

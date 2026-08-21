@@ -4,23 +4,33 @@
 // des pages séparées — MAIS ces balises servent les aperçus de partage WhatsApp,
 // Snap et Instagram : c'est exactement le canal de ce shop. Une fiche produit
 // partagée affichera son nom + sa photo au lieu du titre générique.
+import { readSiteSettings } from './siteSettings';
 
 type SeoInput = {
   title: string;
   description: string;
-  image?: string;
-  url?: string;
+  image: string;
+  url: string;
 };
 
 export const SITE_URL = 'https://tof-shop.vercel.app';
 
-export const DEFAULT_SEO = {
+const FALLBACK_SEO = {
   title: 'tof — drip authentique',
   description:
     'Sneakers & streetwear sélectionnés pièce par pièce, vérifiés avant expédition. Paiement CB sécurisé, livraison suivie.',
-  image: `${SITE_URL}/og-image.jpg`,
-  url: `${SITE_URL}/`,
-} satisfies SeoInput;
+} satisfies { title: string; description: string };
+
+// Titre / description de base, pilotés depuis le panel (Réglages → Vitrine).
+function baseSeo(): SeoInput {
+  const s = readSiteSettings();
+  return {
+    title: s.seoTitle || FALLBACK_SEO.title,
+    description: s.seoDescription || FALLBACK_SEO.description,
+    image: `${SITE_URL}/og-image.jpg`,
+    url: `${SITE_URL}/`,
+  };
+}
 
 function upsertMeta(attr: 'name' | 'property', key: string, content: string) {
   let el = document.head.querySelector<HTMLMetaElement>(`meta[${attr}="${key}"]`);
@@ -33,10 +43,11 @@ function upsertMeta(attr: 'name' | 'property', key: string, content: string) {
 }
 
 export function setSeo(input: Partial<SeoInput>) {
-  const title = input.title ?? DEFAULT_SEO.title;
-  const description = input.description ?? DEFAULT_SEO.description;
-  const image = input.image ?? DEFAULT_SEO.image;
-  const url = input.url ?? DEFAULT_SEO.url;
+  const base = baseSeo();
+  const title = input.title ?? base.title;
+  const description = input.description ?? base.description;
+  const image = input.image ?? base.image;
+  const url = input.url ?? base.url;
 
   document.title = title;
 

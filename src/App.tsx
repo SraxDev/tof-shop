@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect, useState } from 'react';
 import { useTwemoji } from './hooks/useTwemoji';
 import { hydrateSiteSettings } from './lib/siteSettings';
+import { resetSeo } from './lib/seo';
 import { trackVisitor } from './lib/db';
 import { supabase } from './lib/supabase';
 import Navbar from './components/Navbar';
@@ -193,6 +194,13 @@ export default function App() {
   useEffect(() => {
     hydrateSiteSettings();
     trackVisitor('shop');
+  }, []);
+
+  // Le titre/description du site sont pilotés depuis le panel (Réglages → Vitrine).
+  useEffect(() => {
+    resetSeo();
+    window.addEventListener('tof-settings-updated', resetSeo);
+    return () => window.removeEventListener('tof-settings-updated', resetSeo);
   }, []);
 
   useEffect(() => {
