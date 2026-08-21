@@ -242,6 +242,19 @@ img.emoji {
   .anim-attention { animation: none !important; }
 }
 
+/* Navigation au clavier : un anneau net et visible.
+   `:focus-visible` ne se déclenche qu'au clavier — la souris ne l'affiche pas,
+   le design reste donc intact pour la majorité des visiteurs. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-accent, #E8541F);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+/* Sur fond sombre (admin, footer), l'anneau passe en blanc pour rester lisible. */
+.bg-dark :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline-color: #fff;
+}
+
 .delay-100 { animation-delay: 0.1s; }
 .delay-200 { animation-delay: 0.2s; }
 .delay-300 { animation-delay: 0.3s; }

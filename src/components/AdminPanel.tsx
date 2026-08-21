@@ -3162,6 +3162,20 @@ export default function AdminPanel() {
                 </div>
               )}
 
+              {orders.length === 0 && (
+                <div className="rounded-3xl border border-dashed border-white/12 bg-white/[0.02] p-10 text-center">
+                  <div className="mx-auto h-14 w-14 rounded-2xl bg-white/5 flex items-center justify-center text-2xl mb-4">
+                    📦
+                  </div>
+                  <p className="font-bold text-white/80">Aucune commande pour l'instant</p>
+                  <p className="text-sm text-white/35 mt-2 max-w-sm mx-auto leading-relaxed">
+                    Les commandes passées depuis le site arriveront ici automatiquement.
+                    Tu peux aussi en saisir une à la main avec le formulaire ci-contre
+                    (commande reçue sur Snap ou WhatsApp).
+                  </p>
+                </div>
+              )}
+
               {orders.map((order) => {
                 const product = getProduct(order.productId);
                 const margin = estimateNetMargin(product, order.quantity);

@@ -454,6 +454,50 @@ Je me suis limité volontairement : au-delà, les animations ralentissent le
 mobile et donnent un air « toc » qui dessert un site où la confiance est déjà
 le point sensible. Le tunnel d'achat doit rester rapide.
 
+## 21. Finitions UI/UX
+
+Dernière passe de polissage, guidée par un audit du site et de l'admin dans un
+vrai navigateur (mobile 390 px et ordinateur 1440 px) plutôt qu'à l'œil.
+
+### Ce que l'audit a confirmé comme déjà bon
+
+Autant le dire : la plupart des points vérifiés étaient déjà propres. Aucun
+débordement horizontal, zones tactiles au bon gabarit, aucun bouton sans nom
+accessible, aucune erreur JavaScript, sélecteur de tailles avec état « épuisée »
+correctement désactivé, panier vide avec message explicite. Je n'ai pas
+« corrigé » ce qui marchait.
+
+Deux fausses alertes écartées au passage : les images signalées « sans texte
+alternatif » sont les 2ᵉ vues au survol, volontairement marquées `alt=""` +
+`aria-hidden` — c'est la bonne pratique pour une image décorative. Et les
+« textes à faible contraste » étaient du blanc sur fond sombre, donc
+parfaitement lisibles.
+
+### Navigation au clavier enfin visible
+
+Le site n'avait **aucun style de focus**. Quelqu'un qui navigue au clavier
+(tabulation) ne voyait pas où il se trouvait — et c'est aussi ce qu'utilisent
+les lecteurs d'écran.
+
+Un anneau orange net entoure désormais l'élément actif, en blanc sur les fonds
+sombres (admin, pied de page). Il s'appuie sur `:focus-visible` : il n'apparaît
+qu'au clavier, jamais au clic de souris. **Le design reste donc identique pour
+la quasi-totalité de tes visiteurs.**
+
+### Admin : plus de page vide sans explication
+
+L'onglet **Commandes** affichait une grande zone vide quand il n'y avait aucune
+commande — on pouvait croire à un bug de chargement. Un encart explique
+maintenant que les commandes du site arrivent automatiquement, et qu'on peut en
+saisir une à la main (commande reçue sur Snap ou WhatsApp).
+
+### Bouton d'achat : dire pourquoi il est bloqué
+
+Quand une sélection manque, le bouton grisé indique désormais **« CHOISIS TA
+TAILLE »** ou **« CHOISIS TA VARIANTE »** au lieu de rester muet. En pratique la
+première taille disponible est pré-sélectionnée, donc ce cas est rare : c'est un
+filet de sécurité, utile notamment si toutes les tailles passent en rupture.
+
 ## 9. Référencement & partage
 
 - `public/og-image.jpg` (1200×630, 30 Ko) : l'aperçu qui s'affiche quand on colle ton lien sur WhatsApp, Insta ou Snap

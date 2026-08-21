@@ -424,6 +424,16 @@ function QuickAddModal({
     return true;
   };
 
+  /** Ce qu'il manque pour pouvoir acheter — affiché sur le bouton lui-même. */
+  const missingLabel = (): string | null => {
+    const needSize = needsSize(product) && !selectedSize;
+    const needColor = needsColor(product) && !selectedColor;
+    if (needSize && needColor) return 'CHOISIS TA TAILLE ET TA VARIANTE';
+    if (needSize) return 'CHOISIS TA TAILLE';
+    if (needColor) return 'CHOISIS TA VARIANTE';
+    return null;
+  };
+
   const pushToCart = () => {
     addToCart({
       productId: product.id,
@@ -836,8 +846,10 @@ function QuickAddModal({
                     : 'bg-accent hover:brightness-110 hover:scale-[1.01] active:scale-[0.99] shadow-accent/25'
                 }`}
               >
-                <Zap size={18} strokeWidth={2.5} fill="currentColor" />
-                <span>ACHETER MAINTENANT — {formatPrice(product.salePrice * quantity)}</span>
+                {canAdd() && <Zap size={18} strokeWidth={2.5} fill="currentColor" />}
+                <span>
+                  {missingLabel() || `ACHETER MAINTENANT — ${formatPrice(product.salePrice * quantity)}`}
+                </span>
               </button>
               <button
                 onClick={handleAddToCart}
@@ -879,8 +891,8 @@ function QuickAddModal({
                 : 'bg-accent active:scale-[0.98] shadow-accent/25'
             }`}
           >
-            <Zap size={16} strokeWidth={2.5} fill="currentColor" />
-            ACHETER MAINTENANT — {formatPrice(product.salePrice * quantity)}
+            {canAdd() && <Zap size={16} strokeWidth={2.5} fill="currentColor" />}
+            {missingLabel() || `ACHETER MAINTENANT — ${formatPrice(product.salePrice * quantity)}`}
           </button>
           <button
             onClick={handleAddToCart}
