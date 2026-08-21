@@ -17,6 +17,7 @@ const BrandMarquee = lazy(() => import('./components/BrandMarquee'));
 const FeaturedDrop = lazy(() => import('./components/FeaturedDrop'));
 const NewArrivals = lazy(() => import('./components/NewArrivals'));
 const LaunchBanner = lazy(() => import('./components/LaunchBanner'));
+const LegalPage = lazy(() => import('./components/LegalPage'));
 const Brands = lazy(() => import('./components/Brands'));
 const Reviews = lazy(() => import('./components/Reviews'));
 const WhyUs = lazy(() => import('./components/WhyUs'));
@@ -34,11 +35,15 @@ function SectionFallback() {
   return <div className="min-h-[200px] bg-bg" aria-hidden />;
 }
 
-/** Route courante déduite du hash : '#admin', '#suivi' (ou '#suivi?order=...'), sinon la landing. */
-function getRoute(): 'admin' | 'tracking' | 'home' {
+/** Route courante déduite du hash : '#admin', '#suivi' (ou '#suivi?order=...'), pages légales, sinon la landing. */
+type Route = 'admin' | 'tracking' | 'home' | 'cgv' | 'mentions';
+
+function getRoute(): Route {
   const hash = window.location.hash;
   if (hash === '#admin') return 'admin';
   if (hash === '#suivi' || hash.startsWith('#suivi?')) return 'tracking';
+  if (hash === '#cgv') return 'cgv';
+  if (hash === '#mentions-legales' || hash === '#mentions') return 'mentions';
   return 'home';
 }
 
@@ -183,7 +188,7 @@ function AdminAccess() {
 
 export default function App() {
   useTwemoji();
-  const [route, setRoute] = useState<'admin' | 'tracking' | 'home'>(getRoute);
+  const [route, setRoute] = useState<Route>(getRoute);
 
   useEffect(() => {
     hydrateSiteSettings();
@@ -215,6 +220,14 @@ export default function App() {
         </Suspense>
         <ToastContainer />
       </div>
+    );
+  }
+
+  if (route === 'cgv' || route === 'mentions') {
+    return (
+      <Suspense fallback={<SectionFallback />}>
+        <LegalPage page={route} />
+      </Suspense>
     );
   }
 

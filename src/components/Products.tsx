@@ -7,6 +7,7 @@ import { clearRecentlyViewed, pushRecentlyViewed, readRecentlyViewed } from '../
 import SizeGuide from './SizeGuide';
 import { fetchProducts, fetchOrders, type DbProduct } from '../lib/db';
 import { readSiteSettings } from '../lib/siteSettings';
+import { setSeo, resetSeo, SITE_URL } from '../lib/seo';
 import { useInView } from '../hooks/useInView';
 import { showToast } from './Toast';
 
@@ -143,6 +144,43 @@ function emojiForCategory(category: string) {
   if (lower.includes('parfum')) return '🧴';
   if (lower.includes('bijoux')) return '💍';
   return '👕';
+}
+
+// Noms de couleurs français → hex, pour afficher une pastille visuelle.
+const COLOR_HEX: Record<string, string> = {
+  noir: '#1a1a1a', noire: '#1a1a1a',
+  blanc: '#ffffff', blanche: '#ffffff',
+  gris: '#9ca3af', grise: '#9ca3af',
+  rouge: '#dc2626', rose: '#ec4899',
+  bleu: '#2563eb', 'bleu ciel': '#7dd3fc', ciel: '#7dd3fc',
+  vert: '#16a34a', kaki: '#6b7d4f',
+  jaune: '#eab308', orange: '#f97316',
+  violet: '#8b5cf6', mauve: '#a78bfa',
+  marron: '#78350f', bordeaux: '#7f1d1d',
+  beige: '#d6c7a1', 'crème': '#f5f0e6', creme: '#f5f0e6',
+};
+
+function colorHex(name: string): string | null {
+  const key = name.trim().toLowerCase();
+  return COLOR_HEX[key] || null;
+}
+
+// Stock total explicite : somme des quantités suffixées "41:3", "42:0"…
+// Renvoie null si aucune quantité n'est renseignée (tailles libres).
+function totalStock(product: Product): number | null {
+  const parts = parseSplit(product.sizes);
+  let sum = 0;
+  let known = false;
+  for (const raw of parts) {
+    const stock = raw.split(':')[1];
+    if (stock === undefined || stock === '') continue;
+    const n = Number(stock);
+    if (!Number.isNaN(n)) {
+      sum += n;
+      known = true;
+    }
+  }
+  return known ? sum : null;
 }
 
 function formatPrice(value: number) {
@@ -358,6 +396,7 @@ function QuickAddModal({
   const sizes = useMemo(() => parseSizes(product.sizes), [product]);
   const availableSizes = useMemo(() => sizes.filter((s) => s.inStock), [sizes]);
   const colors = useMemo(() => parseSplit(product.colors), [product]);
+  const stockQty = useMemo(() => totalStock(product), [product]);
 
   useEffect(() => {
     setSelectedSize(availableSizes[0]?.label || '');
@@ -627,6 +666,13 @@ function QuickAddModal({
                   <span className="text-xs text-dark/30 font-medium">TVA incluse</span>
                 </div>
 
+                {/* ⚡ Stock faible */}
+                {stockQty !== null && stockQty > 0 && stockQty <= 3 && (
+                  <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-red-500/10 text-red-500 text-[11px] font-bold px-3 py-1">
+                    ⚡ Plus que {stockQty} en stock
+                  </p>
+                )}
+
                 {/* Description : ce qui répond aux questions du client avant
                     qu'il ait à les poser. Masqué si non renseigné. */}
                 {product.description?.trim() && (
@@ -718,19 +764,32 @@ function QuickAddModal({
                   <div className="mt-6">
                     <label className="text-[11px] font-bold uppercase tracking-widest text-dark/40 block mb-3">Variante</label>
                     <div className="flex flex-wrap gap-2">
-                      {colors.map((c, idx) => (
-                        <button
-                          key={c}
-                          onClick={() => handleColorSelect(c, idx)}
-                          className={`h-11 min-w-[60px] px-4 rounded-xl text-sm font-bold border-2 transition-all duration-200 ${
-                            selectedColor === c
-                              ? 'bg-dark text-white border-dark'
-                              : 'bg-white text-dark/80 border-dark/10 hover:border-dark/30'
-                          }`}
-                        >
-                          {c}
-                        </button>
-                      ))}
+                      {colors.map((c, idx) => {
+                        const hex = colorHex(c);
+                        const selected = selectedColor === c;
+                        return (
+                          <button
+                            key={c}
+                            onClick={() => handleColorSelect(c, idx)}
+                            className={`flex items-center gap-2 h-11 pl-2 pr-4 rounded-xl text-sm font-bold border-2 transition-all duration-200 ${
+                              selected
+                                ? 'bg-dark text-white border-dark'
+                                : 'bg-white text-dark/80 border-dark/10 hover:border-dark/30'
+                            }`}
+                          >
+                            {hex ? (
+                              <span
+                                className="h-7 w-7 rounded-lg border border-dark/10"
+                                style={{ background: hex }}
+                                aria-hidden
+                              />
+                            ) : (
+                              <span className="h-7 w-7 rounded-lg bg-gradient-to-br from-dark/10 to-dark/30" aria-hidden />
+                            )}
+                            {c}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -1252,6 +1311,23 @@ export default function Products() {
       .filter((p) => p.id !== quickAdd.id && p.category === quickAdd.category && p.status === 'active')
       .slice(0, 3);
   }, [products, quickAdd]);
+
+  // SEO par produit : title + description + og:image pour les partages WhatsApp/Snap/Insta.
+  useEffect(() => {
+    if (quickAdd) {
+      const img = getProductImages(quickAdd)[0];
+      setSeo({
+        title: `${quickAdd.brand} ${quickAdd.name} — tof`,
+        description:
+          `${quickAdd.brand} ${quickAdd.name} — ${formatPrice(quickAdd.salePrice)}. ` +
+          (quickAdd.description?.trim().slice(0, 140) || 'Pièce sélectionnée et vérifiée avant expédition.'),
+        image: img || undefined,
+        url: `${SITE_URL}/#produit/${quickAdd.id}`,
+      });
+    } else {
+      resetSeo();
+    }
+  }, [quickAdd]);
 
   return (
     <>

@@ -3,6 +3,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Copy, ExternalLink, Package, Pencil, Plus, RotateCcw, Save, Search, Send,
   Trash2, Truck, X, ArrowUpDown, Flame, ArrowLeft, Calculator, Bell, BellOff, Download,
+  ChevronUp, ChevronDown, Zap,
 } from 'lucide-react';
 import { defaultDrop, type FeaturedDropConfig } from './FeaturedDrop';
 import { defaultSettings, readSiteSettings, saveSiteSettings, hydrateSiteSettings, type SiteSettings } from '../lib/siteSettings';
@@ -2613,6 +2614,17 @@ export default function AdminPanel() {
     showToast('Réglages sauvegardés ✓');
   };
 
+  // Réordonner les avis (haut/bas)
+  const moveReview = (i: number, dir: -1 | 1) => {
+    setSiteSettings((s) => {
+      const j = i + dir;
+      if (j < 0 || j >= s.reviews.length) return s;
+      const arr = [...s.reviews];
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+      return { ...s, reviews: arr };
+    });
+  };
+
   const handleDropImageUpload = useCallback(
     (file: File) => uploadDropImage(file, 1200, 0.8).then((r) => ({ url: r.url, hasAlpha: r.hasAlpha })),
     [],
@@ -3973,7 +3985,27 @@ export default function AdminPanel() {
                                 <STextarea label="Texte de l'avis" value={r.text} onChange={(v) => setSiteSettings((s) => ({ ...s, reviews: s.reviews.map((x, j) => (j === i ? { ...x, text: v } : x)) }))} rows={3} />
                               </div>
                             </div>
-                            <DeleteBtn onClick={() => setSiteSettings((s) => ({ ...s, reviews: s.reviews.filter((_, j) => j !== i) }))} />
+                            <div className="flex flex-col gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => moveReview(i, -1)}
+                                disabled={i === 0}
+                                className="h-9 w-9 rounded-lg bg-dark/5 text-dark/50 hover:bg-dark hover:text-white flex items-center justify-center disabled:opacity-25 disabled:hover:bg-dark/5 disabled:hover:text-dark/50 transition-colors"
+                                aria-label="Monter"
+                              >
+                                <ChevronUp size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => moveReview(i, 1)}
+                                disabled={i === siteSettings.reviews.length - 1}
+                                className="h-9 w-9 rounded-lg bg-dark/5 text-dark/50 hover:bg-dark hover:text-white flex items-center justify-center disabled:opacity-25 disabled:hover:bg-dark/5 disabled:hover:text-dark/50 transition-colors"
+                                aria-label="Descendre"
+                              >
+                                <ChevronDown size={14} />
+                              </button>
+                              <DeleteBtn onClick={() => setSiteSettings((s) => ({ ...s, reviews: s.reviews.filter((_, j) => j !== i) }))} />
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -4177,6 +4209,39 @@ export default function AdminPanel() {
                             Laisse vide pour ne pas afficher de compte à rebours. Format : AAAA-MM-JJTHH:MM:SS (heure locale).
                           </p>
                         </div>
+                      </div>
+                    </SCard>
+
+                    <SCard title="Aperçu">
+                      <div className="rounded-2xl bg-dark text-white p-5">
+                        <span className="inline-flex items-center gap-2 rounded-full bg-accent px-3 py-1 text-[10px] font-bold uppercase tracking-widest">
+                          {siteSettings.launchBannerBadge || '🔥 NOUVEAU DROP'}
+                        </span>
+                        <h4 className="font-display text-xl font-800 tracking-tight mt-3">
+                          {siteSettings.launchBannerTitle || 'Le drop que tout le monde attend'}
+                        </h4>
+                        {siteSettings.launchBannerDescription && (
+                          <p className="text-white/50 text-xs leading-relaxed mt-1.5">
+                            {siteSettings.launchBannerDescription}
+                          </p>
+                        )}
+                        {siteSettings.launchBannerPrice > 0 && (
+                          <div className="flex items-baseline gap-2 mt-3">
+                            <span className="text-lg font-800">
+                              {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(siteSettings.launchBannerPrice)}
+                            </span>
+                            {siteSettings.launchBannerOldPrice > siteSettings.launchBannerPrice && (
+                              <span className="text-xs text-white/30 line-through">
+                                {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(siteSettings.launchBannerOldPrice)}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        <button
+                          className="mt-4 inline-flex items-center gap-1.5 bg-accent text-white px-5 h-9 rounded-full text-xs font-bold pointer-events-none"
+                        >
+                          <Zap size={13} fill="currentColor" /> {siteSettings.launchBannerCtaLabel || 'Je le veux'}
+                        </button>
                       </div>
                     </SCard>
                   </>

@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "images:webp": "node scripts/convert-images-webp.mjs",
-    "images:webp:dry": "node scripts/convert-images-webp.mjs --dry"
+    "images:webp:dry": "node scripts/convert-images-webp.mjs --dry",
+    "sitemap": "node scripts/generate-sitemap.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.109.0",

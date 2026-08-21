@@ -71,7 +71,11 @@ export default function Footer() {
               </div>
             ))}
           </div>
-          <span>© {new Date().getFullYear()} tof.</span>
+          <div className="flex items-center gap-4">
+            <a href="#cgv" className="hover:text-white/50 transition-colors">CGV</a>
+            <a href="#mentions-legales" className="hover:text-white/50 transition-colors">Mentions légales</a>
+            <span>© {new Date().getFullYear()} tof.</span>
+          </div>
         </div>
       </div>
     </footer>
