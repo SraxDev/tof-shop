@@ -88,6 +88,11 @@ export type SiteSettings = {
   tiktokUrl: string;
   seoTitle: string;
   seoDescription: string;
+
+  // ── Bannière du hero (image de fond en haut de page) ─────────────────────
+  // Vide = pas de bannière (le dégradé animé s'affiche). Mettre une URL
+  // (Supabase Storage) ou un chemin local (/hero-banner.webp).
+  heroBannerImage: string;
 };
 
 export const SETTINGS_STORAGE_KEY = 'tof-site-settings-v2';
@@ -293,6 +298,8 @@ export const defaultSettings: SiteSettings = {
   seoTitle: 'tof — drip authentique',
   seoDescription:
     'Sneakers & streetwear sélectionnés pièce par pièce, vérifiés avant expédition. Paiement CB sécurisé, livraison suivie.',
+
+  heroBannerImage: '/hero-banner.webp',
 };
 
 // Local cache for instant reads (hydrated from Supabase)

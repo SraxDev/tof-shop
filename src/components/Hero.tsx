@@ -75,22 +75,51 @@ export default function Hero() {
 
   const active = useMemo(() => slides[index] || null, [slides, index]);
 
+  // Bannière de fond configurable : si définie, elle remplace le dégradé animé
+  // et on masque le carrousel (l'image contient déjà le produit).
+  const banner = settings.heroBannerImage?.trim();
+  const showBanner = Boolean(banner);
+
   return (
     <section className="relative min-h-[90svh] lg:min-h-[calc(100svh-140px)] flex items-center overflow-hidden py-10 sm:py-14 lg:py-20">
-      {/* Dégradé animé en fond (remplace le fond uni) */}
-      <div
-        className="absolute inset-0 anim-gradient pointer-events-none"
-        style={{
-          background:
-            'linear-gradient(120deg, #f6f5f2 0%, #fbe9e2 30%, #f6f5f2 55%, #fde8dc 80%, #f6f5f2 100%)',
-        }}
-      />
-      {/* Halos qui dérivent */}
-      <div className="absolute top-16 right-[-8%] w-[520px] h-[520px] rounded-full bg-accent/10 blur-3xl anim-drift pointer-events-none" />
-      <div
-        className="absolute bottom-8 left-[-6%] w-[320px] h-[320px] rounded-full bg-orange-200/40 blur-3xl anim-drift pointer-events-none"
-        style={{ animationDelay: '6s' }}
-      />
+      {showBanner ? (
+        <>
+          {/* Bannière image en fond */}
+          <img
+            src={banner}
+            alt=""
+            aria-hidden
+            className="absolute inset-0 h-full w-full object-cover object-[70%_center]"
+            fetchPriority="high"
+            decoding="async"
+          />
+          {/* Voile dégradé : garde le texte lisible à gauche, révèle l'image à droite */}
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background:
+                'linear-gradient(90deg, rgba(246,245,242,0.96) 0%, rgba(246,245,242,0.90) 34%, rgba(246,245,242,0.45) 60%, rgba(246,245,242,0.05) 78%)',
+            }}
+          />
+        </>
+      ) : (
+        <>
+          {/* Dégradé animé en fond (fallback sans bannière) */}
+          <div
+            className="absolute inset-0 anim-gradient pointer-events-none"
+            style={{
+              background:
+                'linear-gradient(120deg, #f6f5f2 0%, #fbe9e2 30%, #f6f5f2 55%, #fde8dc 80%, #f6f5f2 100%)',
+            }}
+          />
+          {/* Halos qui dérivent */}
+          <div className="absolute top-16 right-[-8%] w-[520px] h-[520px] rounded-full bg-accent/10 blur-3xl anim-drift pointer-events-none" />
+          <div
+            className="absolute bottom-8 left-[-6%] w-[320px] h-[320px] rounded-full bg-orange-200/40 blur-3xl anim-drift pointer-events-none"
+            style={{ animationDelay: '6s' }}
+          />
+        </>
+      )}
 
       <div className="relative z-10 mx-auto max-w-6xl px-5 w-full">
         <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center py-10 lg:py-0">
@@ -159,8 +188,8 @@ export default function Hero() {
             </div>
           </div>
 
-          {/* Carrousel animé (effet vidéo : fondu + zoom lent) */}
-          <div className={`relative ${active ? 'lg:block' : 'hidden lg:block'} anim-fade-in opacity-0 delay-300`}>
+          {/* Carrousel animé (effet vidéo : fondu + zoom lent) — masqué si bannière */}
+          <div className={`relative ${!showBanner && active ? 'lg:block' : 'hidden lg:block'} anim-fade-in opacity-0 delay-300`}>
             <div className="relative flex justify-center">
               {/* Floating brand pills */}
               {floatingBrands.map((b) => (

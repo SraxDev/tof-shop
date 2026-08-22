@@ -4454,6 +4454,18 @@ export default function AdminPanel() {
                         <STextarea label="Description (150 caractères max conseillé)" value={siteSettings.seoDescription} onChange={(v) => setSiteSettings({ ...siteSettings, seoDescription: v })} rows={2} />
                       </div>
                     </SCard>
+
+                    <SCard title="Bannière du hero" subtitle="Image de fond en haut du site. Vide = dégradé animé par défaut.">
+                      <div className="space-y-3">
+                        <SInput label="URL de l'image (ou chemin local)" value={siteSettings.heroBannerImage} onChange={(v) => setSiteSettings({ ...siteSettings, heroBannerImage: v })} placeholder="/hero-banner.webp ou https://..." />
+                        <p className="text-[11px] text-dark/35">
+                          Par défaut : <span className="font-mono">/hero-banner.webp</span> (image livrée avec le site). Tu peux la remplacer par une URL Supabase Storage. Laisse vide pour revenir au dégradé animé.
+                        </p>
+                        {siteSettings.heroBannerImage && (
+                          <img src={siteSettings.heroBannerImage} alt="Aperçu bannière" className="mt-2 w-full aspect-[16/9] object-cover rounded-2xl border border-dark/10" />
+                        )}
+                      </div>
+                    </SCard>
                   </>
                 )}
 
