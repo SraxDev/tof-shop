@@ -95,6 +95,28 @@ type Order = {
 // const STORAGE_PRODUCTS = 'tof-admin-products-v1';
 // const STORAGE_ORDERS = 'tof-orders-v1';
 // const STORAGE_DROP = 'tof-featured-drop-v1';
+
+// Modèle de produit réutilisable (localStorage)
+type ProductTemplate = {
+  id: string;
+  name: string;
+  brand: string;
+  category: string;
+  gender: Product['gender'];
+  sizes: string;
+  colors: string;
+  sourcePriceCny: number;
+  salePrice: number;
+  oldPrice?: number;
+  weightGrams: number;
+  packaging: Product['packaging'];
+};
+const TEMPLATES_KEY = 'tof-product-templates-v1';
+
+function escapeRegExp(s: string) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // Taux agent ¥→€ : ~7.5 ¥ = 1 € (commission agent ~6% + change + assurance)
 const CNY_TO_EUR = 1 / 7.5; // ≈ 0.1333
 const SHIPPING_SAFETY_MULTIPLIER = 1.2;
@@ -2139,6 +2161,15 @@ export default function AdminPanel() {
     return base;
   });
   const [chainAdd, setChainAdd] = useState(false);
+  const [pasteText, setPasteText] = useState('');
+  const [templateName, setTemplateName] = useState('');
+  const [templates, setTemplates] = useState<ProductTemplate[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(TEMPLATES_KEY) || '[]') as ProductTemplate[];
+    } catch {
+      return [];
+    }
+  });
 
   // Brouillon persistant : on ne perd pas un ajout en cours si on change d'onglet
   useEffect(() => {
@@ -2146,6 +2177,13 @@ export default function AdminPanel() {
       localStorage.setItem(QUICK_DRAFT_KEY, JSON.stringify(quickProduct));
     } catch { /* ignore */ }
   }, [quickProduct]);
+
+  // Modèles persistants
+  useEffect(() => {
+    try {
+      localStorage.setItem(TEMPLATES_KEY, JSON.stringify(templates));
+    } catch { /* ignore */ }
+  }, [templates]);
 
   // Marques déjà utilisées (autocomplétion)
   const brandList = useMemo(
@@ -2934,6 +2972,96 @@ export default function AdminPanel() {
       ...quickProduct,
       salePrice: suggestedSalePrice(quickProduct.sourcePriceCny, quickProduct.weightGrams, quickProduct.packaging),
     });
+  };
+
+  // ── Modèles de produits ──
+  const saveTemplate = () => {
+    const name = templateName.trim();
+    if (!name) {
+      showToast('Donne un nom au modèle', 'warning');
+      return;
+    }
+    const tpl: ProductTemplate = {
+      id: `t${Date.now()}`,
+      name,
+      brand: quickProduct.brand,
+      category: quickProduct.category,
+      gender: quickProduct.gender,
+      sizes: quickProduct.sizes,
+      colors: quickProduct.colors,
+      sourcePriceCny: quickProduct.sourcePriceCny,
+      salePrice: quickProduct.salePrice,
+      oldPrice: quickProduct.oldPrice,
+      weightGrams: quickProduct.weightGrams,
+      packaging: quickProduct.packaging,
+    };
+    setTemplates((prev) => [...prev, tpl]);
+    setTemplateName('');
+    showToast('Modèle enregistré ✓');
+  };
+
+  const applyTemplate = (tpl: ProductTemplate) => {
+    setQuickProduct((prev) => ({
+      ...prev,
+      brand: tpl.brand,
+      category: tpl.category,
+      gender: tpl.gender,
+      sizes: tpl.sizes,
+      colors: tpl.colors,
+      sourcePriceCny: tpl.sourcePriceCny,
+      salePrice: tpl.salePrice,
+      oldPrice: tpl.oldPrice,
+      weightGrams: tpl.weightGrams,
+      packaging: tpl.packaging,
+      // Champs propres au produit : on repart vide
+      name: '',
+      sourceUrl: '',
+      imageUrl: '',
+    }));
+    showToast(`Modèle « ${tpl.name} » appliqué ✓`);
+  };
+
+  const deleteTemplate = (id: string) => {
+    setTemplates((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  // ── Auto-extraction depuis un texte collé (titre + prix fournisseur) ──
+  const extractFromText = () => {
+    const raw = pasteText.trim();
+    if (!raw) return;
+
+    // Prix : "¥120", "120¥", "120 元", "CNY 120", "RMB 120"
+    let priceCny = quickProduct.sourcePriceCny;
+    const priceMatch = raw.match(/(?:¥|￥|元|CNY|RMB)\s*(\d+(?:[.,]\d+)?)|(\d+(?:[.,]\d+)?)\s*(?:¥|￥|元|CNY|RMB)/i);
+    if (priceMatch) {
+      priceCny = parseFloat((priceMatch[1] || priceMatch[2]).replace(',', '.'));
+    }
+
+    // Marque : si une marque connue apparaît dans le texte
+    let brand = '';
+    const lower = raw.toLowerCase();
+    const knownBrand = brandList.find((b) => b && lower.includes(b.toLowerCase()));
+    if (knownBrand) brand = knownBrand;
+
+    // Nom : le texte restant, sans la marque ni le prix ni les symboles
+    let name = raw;
+    if (brand) name = name.replace(new RegExp(escapeRegExp(brand), 'i'), '');
+    if (priceMatch) name = name.replace(priceMatch[0], '');
+    name = name
+      .replace(/[¥￥元]/g, '')
+      .replace(/CNY|RMB/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    setQuickProduct((prev) => ({
+      ...prev,
+      brand: brand || prev.brand,
+      name: name || prev.name,
+      sourcePriceCny: priceCny,
+      salePrice: suggestedSalePrice(priceCny, prev.weightGrams, prev.packaging),
+    }));
+    setPasteText('');
+    showToast('Contenu extrait ✓ — vérifie et ajuste');
   };
 
 
@@ -3796,6 +3924,69 @@ export default function AdminPanel() {
                 <span className="text-xs font-bold text-dark/40 group-open:rotate-180 transition-transform">▾</span>
               </summary>
               <div className="p-4 sm:p-5 pt-0 space-y-2 sm:space-y-3">
+                {/* ⚡ Collage rapide : titre + prix du fournisseur */}
+                <div className="rounded-xl bg-accent/[0.05] border border-accent/15 p-3">
+                  <div className="text-[11px] font-bold text-accent uppercase tracking-wider mb-1.5">
+                    ⚡ Collage rapide
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      value={pasteText}
+                      onChange={(e) => setPasteText(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); extractFromText(); } }}
+                      placeholder="Colle le titre + prix fournisseur, ex : « Sacoche Dior Saddle ¥85 »"
+                      className="flex-1 rounded-xl bg-white px-3 py-2.5 text-sm outline-none border border-dark/10"
+                    />
+                    <button
+                      onClick={extractFromText}
+                      className="rounded-xl bg-accent text-white px-4 py-2.5 text-xs font-bold hover:brightness-110 transition-colors flex-shrink-0"
+                    >
+                      Extraire
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-dark/35 mt-1">La marque, le nom et le prix ¥ se remplissent automatiquement.</p>
+                </div>
+
+                {/* 📦 Modèles de produits */}
+                {templates.length > 0 && (
+                  <div className="rounded-xl bg-white/80 border border-dark/5 p-3">
+                    <div className="text-[11px] font-bold text-dark/40 uppercase tracking-wider mb-1.5">Modèles</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {templates.map((t) => (
+                        <span key={t.id} className="inline-flex items-center gap-1 rounded-full bg-dark/5 pl-3 pr-1.5 py-1 text-[11px] font-semibold text-dark/70">
+                          <button onClick={() => applyTemplate(t)} className="hover:text-accent transition-colors">
+                            {t.name}
+                          </button>
+                          <button
+                            onClick={() => deleteTemplate(t.id)}
+                            aria-label="Supprimer le modèle"
+                            className="h-5 w-5 rounded-full hover:bg-red-500/10 hover:text-red-500 flex items-center justify-center transition-colors"
+                          >
+                            <X size={11} />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Enregistrer le modèle courant */}
+                <div className="flex gap-2">
+                  <input
+                    value={templateName}
+                    onChange={(e) => setTemplateName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveTemplate(); } }}
+                    placeholder="Nom du modèle (ex : Sneakers 42-45)"
+                    className="flex-1 rounded-xl bg-white px-3 py-2 text-xs outline-none border border-dark/10"
+                  />
+                  <button
+                    onClick={saveTemplate}
+                    className="rounded-xl bg-dark text-white px-3.5 py-2 text-xs font-bold hover:bg-accent transition-colors flex-shrink-0"
+                  >
+                    Enregistrer comme modèle
+                  </button>
+                </div>
+
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
                   <input value={quickProduct.brand} onChange={(e) => setQuickProduct({ ...quickProduct, brand: e.target.value })} placeholder="Marque *" list="tof-brands" className="rounded-xl bg-white px-3 sm:px-4 py-2.5 sm:py-3 text-sm outline-none border border-dark/5" />
                   <input value={quickProduct.name} onChange={(e) => setQuickProduct({ ...quickProduct, name: e.target.value })} placeholder="Nom produit *" className="rounded-xl bg-white px-3 sm:px-4 py-2.5 sm:py-3 text-sm outline-none border border-dark/5 sm:col-span-2" />
@@ -3858,11 +4049,11 @@ export default function AdminPanel() {
                     value={quickProduct.imageUrl}
                     onChange={(next) => setQuickProduct((prev) => ({ ...prev, imageUrl: next }))}
                     uploadHandler={productImageUploadHandler}
-                    multiple={false}
+                    multiple={true}
                     maxSize={800}
                     quality={0.75}
-                    label="Photo"
-                    hint="Glisse, colle ou clique. Stockée sur Supabase Storage."
+                    label="Photos"
+                    hint="Plusieurs photos d'un coup (glisse, colle ou clique). Stockées sur Supabase Storage."
                     dropHeightClass="min-h-[80px]"
                   />
                 </div>
