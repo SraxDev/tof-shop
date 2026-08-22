@@ -75,51 +75,95 @@ export default function Hero() {
 
   const active = useMemo(() => slides[index] || null, [slides, index]);
 
-  // Bannière de fond configurable : si définie, elle remplace le dégradé animé
-  // et on masque le carrousel (l'image contient déjà le produit).
   const banner = settings.heroBannerImage?.trim();
   const showBanner = Boolean(banner);
 
-  return (
-    <section className="relative min-h-[90svh] lg:min-h-[calc(100svh-140px)] flex items-center overflow-hidden py-10 sm:py-14 lg:py-20">
-      {showBanner ? (
-        <>
-          {/* Bannière image en fond */}
+  // ── Mode BANNIÈRE : l'image est l'élément principal, pleine largeur, à son
+  //    vrai ratio (16:9) → la paire est entièrement visible, jamais rognée.
+  if (showBanner) {
+    return (
+      <section className="relative bg-dark text-white overflow-hidden">
+        <div className="relative w-full aspect-[16/9] max-h-[82svh] mx-auto">
           <img
             src={banner}
             alt=""
-            aria-hidden
-            className="absolute inset-0 h-full w-full object-cover object-[70%_center]"
+            className="absolute inset-0 w-full h-full object-cover"
             fetchPriority="high"
             decoding="async"
           />
-          {/* Voile dégradé : garde le texte lisible à gauche, révèle l'image à droite */}
+          {/* Fin dégradé en bas uniquement, pour la lisibilité du texte */}
           <div
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              background:
-                'linear-gradient(90deg, rgba(246,245,242,0.96) 0%, rgba(246,245,242,0.90) 34%, rgba(246,245,242,0.45) 60%, rgba(246,245,242,0.05) 78%)',
-            }}
+            className="absolute inset-x-0 bottom-0 h-2/5 pointer-events-none"
+            style={{ background: 'linear-gradient(to top, rgba(17,17,17,0.92) 0%, rgba(17,17,17,0.35) 55%, rgba(17,17,17,0) 100%)' }}
           />
-        </>
-      ) : (
-        <>
-          {/* Dégradé animé en fond (fallback sans bannière) */}
-          <div
-            className="absolute inset-0 anim-gradient pointer-events-none"
-            style={{
-              background:
-                'linear-gradient(120deg, #f6f5f2 0%, #fbe9e2 30%, #f6f5f2 55%, #fde8dc 80%, #f6f5f2 100%)',
-            }}
-          />
-          {/* Halos qui dérivent */}
-          <div className="absolute top-16 right-[-8%] w-[520px] h-[520px] rounded-full bg-accent/10 blur-3xl anim-drift pointer-events-none" />
-          <div
-            className="absolute bottom-8 left-[-6%] w-[320px] h-[320px] rounded-full bg-orange-200/40 blur-3xl anim-drift pointer-events-none"
-            style={{ animationDelay: '6s' }}
-          />
-        </>
-      )}
+        </div>
+
+        {/* Texte par-dessus, en bas à gauche */}
+        <div className="relative z-10 mx-auto max-w-6xl px-5 -mt-40 sm:-mt-48 pb-10 sm:pb-14">
+          <div className="max-w-2xl space-y-5">
+            <span className="inline-flex items-center gap-2 bg-accent text-white rounded-full px-4 py-2 text-xs font-bold">
+              <Sparkles size={13} />
+              {settings.heroBadge}
+            </span>
+            <h1 className="font-display text-4xl sm:text-6xl lg:text-7xl font-800 leading-[0.95] tracking-tight">
+              {settings.heroTitleStart}{' '}
+              <span className="relative inline-block text-accent">
+                {settings.heroTitleHighlight}
+              </span>
+              .
+            </h1>
+            <p className="text-white/70 text-base sm:text-lg max-w-xl leading-relaxed">
+              {settings.heroDescription}
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <a
+                href="#shop"
+                className="bg-accent hover:bg-accent-light text-white px-7 h-12 rounded-full text-sm font-bold transition-colors shadow-lg shadow-accent/20 flex items-center justify-center active:scale-[0.98] anim-pulse-ring"
+              >
+                Voir le shop →
+              </a>
+              <a
+                href={settings.whatsappUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="border-2 border-white/25 text-white h-12 px-7 rounded-full text-sm font-bold hover:border-accent hover:text-accent transition-colors flex items-center justify-center active:scale-[0.98]"
+              >
+                Nous contacter
+              </a>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              {settings.trustBadges.map((badge) => (
+                <div
+                  key={badge}
+                  className="flex items-center gap-1.5 rounded-full bg-white/10 backdrop-blur px-3 py-2 text-[11px] font-semibold text-white/80 border border-white/10"
+                >
+                  <span className="text-green-400">✓</span> {badge}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  // ── Mode par défaut (sans bannière) : dégradé animé + carrousel ──
+  return (
+    <section className="relative min-h-[90svh] lg:min-h-[calc(100svh-140px)] flex items-center overflow-hidden py-10 sm:py-14 lg:py-20">
+      {/* Dégradé animé en fond */}
+      <div
+        className="absolute inset-0 anim-gradient pointer-events-none"
+        style={{
+          background:
+            'linear-gradient(120deg, #f6f5f2 0%, #fbe9e2 30%, #f6f5f2 55%, #fde8dc 80%, #f6f5f2 100%)',
+        }}
+      />
+      {/* Halos qui dérivent */}
+      <div className="absolute top-16 right-[-8%] w-[520px] h-[520px] rounded-full bg-accent/10 blur-3xl anim-drift pointer-events-none" />
+      <div
+        className="absolute bottom-8 left-[-6%] w-[320px] h-[320px] rounded-full bg-orange-200/40 blur-3xl anim-drift pointer-events-none"
+        style={{ animationDelay: '6s' }}
+      />
 
       <div className="relative z-10 mx-auto max-w-6xl px-5 w-full">
         <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center py-10 lg:py-0">
@@ -188,10 +232,9 @@ export default function Hero() {
             </div>
           </div>
 
-          {/* Carrousel animé (effet vidéo : fondu + zoom lent) — masqué si bannière */}
-          <div className={`relative ${!showBanner && active ? 'lg:block' : 'hidden lg:block'} anim-fade-in opacity-0 delay-300`}>
+          {/* Carrousel animé */}
+          <div className={`relative ${active ? 'lg:block' : 'hidden lg:block'} anim-fade-in opacity-0 delay-300`}>
             <div className="relative flex justify-center">
-              {/* Floating brand pills */}
               {floatingBrands.map((b) => (
                 <div
                   key={b.name}
@@ -226,7 +269,6 @@ export default function Hero() {
                           height={507}
                         />
                       ))}
-                      {/* Indicateur de rotation */}
                       {slides.length > 1 && (
                         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
                           {slides.map((_, i) => (
@@ -270,8 +312,6 @@ export default function Hero() {
                     </div>
                   </div>
                 </div>
-                {/* Masqué sur mobile : la pastille chevauchait le bouton de chat
-                    et la barre d'actions, ce qui encombrait le bas de l'écran. */}
                 <div className="hidden sm:flex absolute -top-3 -right-3 bg-accent text-white rounded-xl px-4 py-2 text-xs font-bold shadow-lg shadow-accent/20 anim-float items-center gap-1.5 z-20" style={{ animationDelay: '2s' }}>
                   {settings.heroTopBadge} <AppleEmoji emoji="🚀" size={14} />
                 </div>
