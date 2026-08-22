@@ -1,23 +1,26 @@
 import { ArrowDown, Sparkles } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import AppleEmoji from './AppleEmoji';
 import { readSiteSettings } from '../lib/siteSettings';
-import { fetchDrop, type DbDrop } from '../lib/db';
+import { fetchDrop, fetchProducts, type DbDrop, type DbProduct } from '../lib/db';
 
 const floatingBrands = [
   { name: 'Nike', top: '8%', left: '-12%', delay: '0s' },
   { name: 'Stüssy', top: '30%', left: '-16%', delay: '1.5s' },
-  { name: 'Arc\'teryx', top: '65%', left: '-10%', delay: '3s' },
+  { name: "Arc'teryx", top: '65%', left: '-10%', delay: '3s' },
   { name: 'Jordan', top: '5%', right: '-14%', delay: '2s' },
   { name: 'Corteiz', top: '45%', right: '-16%', delay: '0.5s' },
   { name: 'Represent', top: '78%', right: '-10%', delay: '2.5s' },
 ];
 
-type DropImage = { imageUrl: string; brand: string; name: string } | null;
+type Slide = { imageUrl: string; brand: string; name: string };
+
+const ROTATE_MS = 4500;
 
 export default function Hero() {
   const [settings, setSettings] = useState(readSiteSettings);
-  const [dropImg, setDropImg] = useState<DropImage>(null);
+  const [slides, setSlides] = useState<Slide[]>([]);
+  const [index, setIndex] = useState(0);
 
   useEffect(() => {
     const sync = () => setSettings(readSiteSettings());
@@ -29,36 +32,65 @@ export default function Hero() {
     };
   }, []);
 
+  // Charge le drop + les produits actifs pour la rotation.
   useEffect(() => {
     let alive = true;
-    (async () => {
+    const load = async () => {
       try {
-        const d = (await fetchDrop()) as DbDrop | null;
+        const [drop, products] = await Promise.all([
+          fetchDrop() as Promise<DbDrop | null>,
+          fetchProducts(),
+        ]);
         if (!alive) return;
-        if (d?.image_url) setDropImg({ imageUrl: d.image_url, brand: d.brand, name: d.name });
-      } catch {}
-    })();
-    const sync = () => {
-      (async () => {
-        try {
-          const d = (await fetchDrop()) as DbDrop | null;
-          if (!alive) return;
-          if (d?.image_url) setDropImg({ imageUrl: d.image_url, brand: d.brand, name: d.name });
-        } catch {}
-      })();
+        const list: Slide[] = [];
+        if (drop?.image_url) list.push({ imageUrl: drop.image_url, brand: drop.brand, name: drop.name });
+        const withImage = (products as DbProduct[])
+          .filter((p) => p.status === 'active' && p.image_url)
+          .slice(0, 4);
+        for (const p of withImage) {
+          const first = (p.image_url || '').split('|').map((s) => s.trim()).find(Boolean);
+          if (first && !list.some((s) => s.imageUrl === first)) {
+            list.push({ imageUrl: first, brand: p.brand, name: p.name });
+          }
+        }
+        setSlides(list);
+      } catch {
+        /* garde les slides existants */
+      }
     };
-    window.addEventListener('tof-drop-updated', sync);
+    load();
+    window.addEventListener('tof-drop-updated', load);
     return () => {
       alive = false;
-      window.removeEventListener('tof-drop-updated', sync);
+      window.removeEventListener('tof-drop-updated', load);
     };
   }, []);
 
+  // Rotation douce : uniquement s'il y a plusieurs slides.
+  useEffect(() => {
+    if (slides.length < 2) return;
+    const t = window.setInterval(() => setIndex((i) => (i + 1) % slides.length), ROTATE_MS);
+    return () => window.clearInterval(t);
+  }, [slides.length]);
+
+  const active = useMemo(() => slides[index] || null, [slides, index]);
+
   return (
-    <section className="relative min-h-[90svh] lg:min-h-[calc(100svh-140px)] flex items-center overflow-hidden bg-bg py-10 sm:py-14 lg:py-20">
-      {/* Blobs */}
-      <div className="absolute top-20 right-[-10%] w-[500px] h-[500px] bg-accent/10 anim-blob opacity-60 pointer-events-none" />
-      <div className="absolute bottom-10 left-[-5%] w-[300px] h-[300px] bg-orange-200/30 anim-blob opacity-40 pointer-events-none" style={{ animationDelay: '4s' }} />
+    <section className="relative min-h-[90svh] lg:min-h-[calc(100svh-140px)] flex items-center overflow-hidden py-10 sm:py-14 lg:py-20">
+      {/* Dégradé animé en fond (remplace le fond uni) */}
+      <div
+        className="absolute inset-0 anim-gradient pointer-events-none"
+        style={{
+          background:
+            'linear-gradient(120deg, #f6f5f2 0%, #fbe9e2 30%, #f6f5f2 55%, #fde8dc 80%, #f6f5f2 100%)',
+        }}
+      />
+      {/* Halos qui dérivent */}
+      <div className="absolute top-16 right-[-8%] w-[520px] h-[520px] rounded-full bg-accent/10 blur-3xl anim-drift pointer-events-none" />
+      <div
+        className="absolute bottom-8 left-[-6%] w-[320px] h-[320px] rounded-full bg-orange-200/40 blur-3xl anim-drift pointer-events-none"
+        style={{ animationDelay: '6s' }}
+      />
 
       <div className="relative z-10 mx-auto max-w-6xl px-5 w-full">
         <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center py-10 lg:py-0">
@@ -127,8 +159,8 @@ export default function Hero() {
             </div>
           </div>
 
-          {/* Image placeholder + floating brand pills */}
-          <div className={`relative ${dropImg ? 'lg:block' : 'hidden lg:block'} anim-fade-in opacity-0 delay-300`}>
+          {/* Carrousel animé (effet vidéo : fondu + zoom lent) */}
+          <div className={`relative ${active ? 'lg:block' : 'hidden lg:block'} anim-fade-in opacity-0 delay-300`}>
             <div className="relative flex justify-center">
               {/* Floating brand pills */}
               {floatingBrands.map((b) => (
@@ -148,17 +180,37 @@ export default function Hero() {
 
               <div className="relative">
                 <div className="aspect-[3/4] w-[min(380px,80vw)] rounded-[2rem] bg-gradient-to-br from-subtle to-white overflow-hidden flex items-center justify-center border border-dark/5 shadow-xl shadow-dark/5">
-                  {dropImg ? (
-                    <img
-                      src={dropImg.imageUrl}
-                      alt={`${dropImg.brand} ${dropImg.name}`}
-                      className="h-full w-full object-cover"
-                      loading="eager"
-                      decoding="async"
-                      fetchPriority="high"
-                      width={380}
-                      height={507}
-                    />
+                  {active ? (
+                    <div className="relative h-full w-full">
+                      {slides.map((s, i) => (
+                        <img
+                          key={s.imageUrl}
+                          src={s.imageUrl}
+                          alt={`${s.brand} ${s.name}`}
+                          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-1000 ${
+                            i === index ? 'opacity-100 anim-ken-burns' : 'opacity-0'
+                          }`}
+                          loading={i === 0 ? 'eager' : 'lazy'}
+                          decoding="async"
+                          fetchPriority={i === 0 ? 'high' : 'auto'}
+                          width={380}
+                          height={507}
+                        />
+                      ))}
+                      {/* Indicateur de rotation */}
+                      {slides.length > 1 && (
+                        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+                          {slides.map((_, i) => (
+                            <span
+                              key={i}
+                              className={`h-1.5 rounded-full transition-all duration-300 ${
+                                i === index ? 'w-5 bg-white' : 'w-1.5 bg-white/40'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     <div className="relative w-full h-full flex items-center justify-center">
                       <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-accent-light/5" />

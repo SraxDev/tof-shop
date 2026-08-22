@@ -238,8 +238,40 @@ img.emoji {
   animation: soft-attention 2.4s ease-in-out infinite;
 }
 
+/* ── Bannière animée (hero) ────────────────────────────────────────────────
+   Effet « vidéo » sans vidéo : zoom lent (Ken Burns) + fondu enchaîné entre
+   les produits, halos qui dérivent, dégradé qui se déplace. Zéro poids. */
+
+@keyframes ken-burns {
+  0%   { transform: scale(1) translate(0, 0); }
+  100% { transform: scale(1.12) translate(0, -2%); }
+}
+.anim-ken-burns {
+  animation: ken-burns 7s ease-out forwards;
+}
+
+@keyframes drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%      { transform: translate(30px, -40px) scale(1.15); }
+  66%      { transform: translate(-25px, 25px) scale(0.95); }
+}
+.anim-drift {
+  animation: drift 18s ease-in-out infinite;
+}
+
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+.anim-gradient {
+  background-size: 200% 200%;
+  animation: gradient-shift 14s ease infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .anim-attention { animation: none !important; }
+  .anim-ken-burns { animation: none !important; }
+  .anim-drift, .anim-gradient { animation: none !important; }
 }
 
 /* Navigation au clavier : un anneau net et visible.
