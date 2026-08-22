@@ -78,36 +78,46 @@ export default function Hero() {
   const banner = settings.heroBannerImage?.trim();
   const showBanner = Boolean(banner);
 
-  // ── Mode BANNIÈRE : l'image est l'élément principal, pleine largeur, à son
-  //    vrai ratio (16:9) → la paire est entièrement visible, jamais rognée.
+  // ── Mode BANNIÈRE : l'image est l'élément principal, pleine largeur, ratio
+  //    natif (jamais rognée). L'image a un fond #111 sur ses bords, donc le
+  //    dégradé de fusion est parfaitement invisible. Mobile = texte en dessous,
+  //    desktop = texte superposé en bas à gauche.
   if (showBanner) {
     return (
-      <section className="relative bg-dark text-white overflow-hidden">
-        <div className="relative w-full aspect-[16/9] max-h-[82svh] mx-auto">
+      <section className="relative bg-dark text-white">
+        <div className="relative">
           <img
             src={banner}
             alt=""
-            className="absolute inset-0 w-full h-full object-cover"
+            className="w-full h-auto block"
             fetchPriority="high"
             decoding="async"
           />
-          {/* Fin dégradé en bas uniquement, pour la lisibilité du texte */}
+          {/* Dégradé de fusion bas : fond l'image dans #111, sans couture */}
           <div
-            className="absolute inset-x-0 bottom-0 h-2/5 pointer-events-none"
-            style={{ background: 'linear-gradient(to top, rgba(17,17,17,0.92) 0%, rgba(17,17,17,0.35) 55%, rgba(17,17,17,0) 100%)' }}
+            className="absolute inset-x-0 bottom-0 h-[55%] pointer-events-none"
+            style={{
+              background:
+                'linear-gradient(to bottom, rgba(17,17,17,0) 0%, rgba(17,17,17,0.30) 40%, rgba(17,17,17,0.75) 70%, rgba(17,17,17,0.98) 100%)',
+            }}
+          />
+          {/* Dégradé haut subtil (desktop) pour fondre aussi le haut sous la navbar */}
+          <div
+            className="hidden sm:block absolute inset-x-0 top-0 h-24 pointer-events-none"
+            style={{ background: 'linear-gradient(to bottom, rgba(17,17,17,0.55) 0%, rgba(17,17,17,0) 100%)' }}
           />
         </div>
 
-        {/* Texte par-dessus, en bas à gauche */}
-        <div className="relative z-10 mx-auto max-w-6xl px-5 -mt-40 sm:-mt-48 pb-10 sm:pb-14">
+        {/* Texte : en dessous sur mobile, superposé en bas à gauche sur desktop */}
+        <div className="relative sm:absolute sm:inset-x-0 sm:bottom-0 z-10 mx-auto max-w-6xl px-5 py-10 sm:py-14">
           <div className="max-w-2xl space-y-5">
             <span className="inline-flex items-center gap-2 bg-accent text-white rounded-full px-4 py-2 text-xs font-bold">
               <Sparkles size={13} />
               {settings.heroBadge}
             </span>
-            <h1 className="font-display text-4xl sm:text-6xl lg:text-7xl font-800 leading-[0.95] tracking-tight">
+            <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-800 leading-[1.02] tracking-tight">
               {settings.heroTitleStart}{' '}
-              <span className="relative inline-block text-accent">
+              <span className="text-accent">
                 {settings.heroTitleHighlight}
               </span>
               .
@@ -118,7 +128,7 @@ export default function Hero() {
             <div className="flex flex-wrap gap-3">
               <a
                 href="#shop"
-                className="bg-accent hover:bg-accent-light text-white px-7 h-12 rounded-full text-sm font-bold transition-colors shadow-lg shadow-accent/20 flex items-center justify-center active:scale-[0.98] anim-pulse-ring"
+                className="bg-accent hover:bg-accent-light text-white px-7 h-12 rounded-full text-sm font-bold transition-colors shadow-lg shadow-accent/25 flex items-center justify-center active:scale-[0.98] anim-pulse-ring"
               >
                 Voir le shop →
               </a>
@@ -126,7 +136,7 @@ export default function Hero() {
                 href={settings.whatsappUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="border-2 border-white/25 text-white h-12 px-7 rounded-full text-sm font-bold hover:border-accent hover:text-accent transition-colors flex items-center justify-center active:scale-[0.98]"
+                className="border border-white/20 bg-white/5 backdrop-blur text-white h-12 px-7 rounded-full text-sm font-bold hover:border-accent hover:text-accent transition-colors flex items-center justify-center active:scale-[0.98]"
               >
                 Nous contacter
               </a>
@@ -135,7 +145,7 @@ export default function Hero() {
               {settings.trustBadges.map((badge) => (
                 <div
                   key={badge}
-                  className="flex items-center gap-1.5 rounded-full bg-white/10 backdrop-blur px-3 py-2 text-[11px] font-semibold text-white/80 border border-white/10"
+                  className="flex items-center gap-1.5 rounded-full bg-white/[0.07] backdrop-blur px-3 py-2 text-[11px] font-semibold text-white/75 border border-white/10"
                 >
                   <span className="text-green-400">✓</span> {badge}
                 </div>
@@ -168,7 +178,7 @@ export default function Hero() {
       <div className="relative z-10 mx-auto max-w-6xl px-5 w-full">
         <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center py-10 lg:py-0">
           {/* Text */}
-          <div className="space-y-6 sm:space-y-7">
+          <div className="space-y-6 sm:space-y-7 min-w-0">
             <div className="anim-fade-up opacity-0">
               <span className="inline-flex items-center gap-2 bg-accent/10 text-accent rounded-full px-4 py-2 text-xs font-semibold">
                 <Sparkles size={13} />
@@ -176,7 +186,7 @@ export default function Hero() {
               </span>
             </div>
 
-            <h1 className="anim-fade-up opacity-0 delay-200 font-display text-[2.5rem] sm:text-6xl lg:text-7xl font-800 leading-[0.95] tracking-tight text-dark">
+            <h1 className="anim-fade-up opacity-0 delay-200 font-display text-[2.5rem] sm:text-6xl lg:text-7xl font-800 leading-[0.95] tracking-tight text-dark break-words">
               {settings.heroTitleStart}{' '}
               <span className="relative inline-block">
                 {settings.heroTitleHighlight}
@@ -224,6 +234,16 @@ export default function Hero() {
               ))}
             </div>
 
+            {/* Preuve sociale : chiffres qui donnent envie */}
+            <div className="anim-fade-up opacity-0 delay-750 flex flex-wrap items-center gap-x-6 gap-y-2 pt-3 border-t border-dark/10">
+              {settings.reviewStats.map((s) => (
+                <div key={s.label} className="flex items-baseline gap-1.5">
+                  <span className="font-display font-800 text-xl text-dark">{s.value}</span>
+                  <span className="text-[11px] text-dark/40 font-semibold">{s.label}</span>
+                </div>
+              ))}
+            </div>
+
             {/* Honest opening note */}
             <div className="anim-fade-up opacity-0 delay-800 flex items-center gap-2 pt-1">
               <p className="text-xs text-dark/40 max-w-md">
@@ -233,7 +253,7 @@ export default function Hero() {
           </div>
 
           {/* Carrousel animé */}
-          <div className={`relative ${active ? 'lg:block' : 'hidden lg:block'} anim-fade-in opacity-0 delay-300`}>
+          <div className={`relative min-w-0 ${active ? 'lg:block' : 'hidden lg:block'} anim-fade-in opacity-0 delay-300`}>
             <div className="relative flex justify-center">
               {floatingBrands.map((b) => (
                 <div
@@ -316,6 +336,15 @@ export default function Hero() {
                   {settings.heroTopBadge} <AppleEmoji emoji="🚀" size={14} />
                 </div>
               </div>
+
+              {/* Légende du produit affiché (effet lookbook) */}
+              {active && (
+                <div className="mt-5 flex items-center justify-center gap-2 text-center">
+                  <span className="text-[11px] font-bold uppercase tracking-widest text-accent">{active.brand}</span>
+                  <span className="h-1 w-1 rounded-full bg-dark/20" />
+                  <span className="text-sm font-semibold text-dark/70">{active.name}</span>
+                </div>
+              )}
             </div>
           </div>
         </div>

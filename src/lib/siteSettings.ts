@@ -299,7 +299,8 @@ export const defaultSettings: SiteSettings = {
   seoDescription:
     'Sneakers & streetwear sélectionnés pièce par pièce, vérifiés avant expédition. Paiement CB sécurisé, livraison suivie.',
 
-  heroBannerImage: '/hero-banner.webp',
+  // Vide par défaut : le hero utilise le dégradé animé + carrousel (recommandé).
+  heroBannerImage: '',
 };
 
 // Local cache for instant reads (hydrated from Supabase)
