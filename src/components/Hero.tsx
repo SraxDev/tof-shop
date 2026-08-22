@@ -1,26 +1,9 @@
-import { ArrowDown, Sparkles } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
-import AppleEmoji from './AppleEmoji';
+import { ArrowDown, ArrowRight, Sparkles } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { readSiteSettings } from '../lib/siteSettings';
-import { fetchDrop, fetchProducts, type DbDrop, type DbProduct } from '../lib/db';
-
-const floatingBrands = [
-  { name: 'Nike', top: '8%', left: '-12%', delay: '0s' },
-  { name: 'Stüssy', top: '30%', left: '-16%', delay: '1.5s' },
-  { name: "Arc'teryx", top: '65%', left: '-10%', delay: '3s' },
-  { name: 'Jordan', top: '5%', right: '-14%', delay: '2s' },
-  { name: 'Corteiz', top: '45%', right: '-16%', delay: '0.5s' },
-  { name: 'Represent', top: '78%', right: '-10%', delay: '2.5s' },
-];
-
-type Slide = { imageUrl: string; brand: string; name: string };
-
-const ROTATE_MS = 4500;
 
 export default function Hero() {
   const [settings, setSettings] = useState(readSiteSettings);
-  const [slides, setSlides] = useState<Slide[]>([]);
-  const [index, setIndex] = useState(0);
 
   useEffect(() => {
     const sync = () => setSettings(readSiteSettings());
@@ -32,56 +15,10 @@ export default function Hero() {
     };
   }, []);
 
-  // Charge le drop + les produits actifs pour la rotation.
-  useEffect(() => {
-    let alive = true;
-    const load = async () => {
-      try {
-        const [drop, products] = await Promise.all([
-          fetchDrop() as Promise<DbDrop | null>,
-          fetchProducts(),
-        ]);
-        if (!alive) return;
-        const list: Slide[] = [];
-        if (drop?.image_url) list.push({ imageUrl: drop.image_url, brand: drop.brand, name: drop.name });
-        const withImage = (products as DbProduct[])
-          .filter((p) => p.status === 'active' && p.image_url)
-          .slice(0, 4);
-        for (const p of withImage) {
-          const first = (p.image_url || '').split('|').map((s) => s.trim()).find(Boolean);
-          if (first && !list.some((s) => s.imageUrl === first)) {
-            list.push({ imageUrl: first, brand: p.brand, name: p.name });
-          }
-        }
-        setSlides(list);
-      } catch {
-        /* garde les slides existants */
-      }
-    };
-    load();
-    window.addEventListener('tof-drop-updated', load);
-    return () => {
-      alive = false;
-      window.removeEventListener('tof-drop-updated', load);
-    };
-  }, []);
-
-  // Rotation douce : uniquement s'il y a plusieurs slides.
-  useEffect(() => {
-    if (slides.length < 2) return;
-    const t = window.setInterval(() => setIndex((i) => (i + 1) % slides.length), ROTATE_MS);
-    return () => window.clearInterval(t);
-  }, [slides.length]);
-
-  const active = useMemo(() => slides[index] || null, [slides, index]);
-
   const banner = settings.heroBannerImage?.trim();
   const showBanner = Boolean(banner);
 
-  // ── Mode BANNIÈRE : l'image est l'élément principal, pleine largeur, ratio
-  //    natif (jamais rognée). L'image a un fond #111 sur ses bords, donc le
-  //    dégradé de fusion est parfaitement invisible. Mobile = texte en dessous,
-  //    desktop = texte superposé en bas à gauche.
+  // ── Mode BANNIÈRE (optionnel) : image pleine largeur, texte superposé ──
   if (showBanner) {
     return (
       <section className="relative bg-dark text-white">
@@ -93,7 +30,6 @@ export default function Hero() {
             fetchPriority="high"
             decoding="async"
           />
-          {/* Dégradé de fusion bas : fond l'image dans #111, sans couture */}
           <div
             className="absolute inset-x-0 bottom-0 h-[55%] pointer-events-none"
             style={{
@@ -101,14 +37,11 @@ export default function Hero() {
                 'linear-gradient(to bottom, rgba(17,17,17,0) 0%, rgba(17,17,17,0.30) 40%, rgba(17,17,17,0.75) 70%, rgba(17,17,17,0.98) 100%)',
             }}
           />
-          {/* Dégradé haut subtil (desktop) pour fondre aussi le haut sous la navbar */}
           <div
             className="hidden sm:block absolute inset-x-0 top-0 h-24 pointer-events-none"
             style={{ background: 'linear-gradient(to bottom, rgba(17,17,17,0.55) 0%, rgba(17,17,17,0) 100%)' }}
           />
         </div>
-
-        {/* Texte : en dessous sur mobile, superposé en bas à gauche sur desktop */}
         <div className="relative sm:absolute sm:inset-x-0 sm:bottom-0 z-10 mx-auto max-w-6xl px-5 py-10 sm:py-14">
           <div className="max-w-2xl space-y-5">
             <span className="inline-flex items-center gap-2 bg-accent text-white rounded-full px-4 py-2 text-xs font-bold">
@@ -116,40 +49,18 @@ export default function Hero() {
               {settings.heroBadge}
             </span>
             <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-800 leading-[1.02] tracking-tight">
-              {settings.heroTitleStart}{' '}
-              <span className="text-accent">
-                {settings.heroTitleHighlight}
-              </span>
-              .
+              {settings.heroTitleStart} <span className="text-accent">{settings.heroTitleHighlight}</span>.
             </h1>
             <p className="text-white/70 text-base sm:text-lg max-w-xl leading-relaxed">
               {settings.heroDescription}
             </p>
             <div className="flex flex-wrap gap-3">
-              <a
-                href="#shop"
-                className="bg-accent hover:bg-accent-light text-white px-7 h-12 rounded-full text-sm font-bold transition-colors shadow-lg shadow-accent/25 flex items-center justify-center active:scale-[0.98] anim-pulse-ring"
-              >
+              <a href="#shop" className="bg-accent hover:bg-accent-light text-white px-7 h-12 rounded-full text-sm font-bold transition-colors shadow-lg shadow-accent/25 flex items-center justify-center active:scale-[0.98] anim-pulse-ring">
                 Voir le shop →
               </a>
-              <a
-                href={settings.whatsappUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="border border-white/20 bg-white/5 backdrop-blur text-white h-12 px-7 rounded-full text-sm font-bold hover:border-accent hover:text-accent transition-colors flex items-center justify-center active:scale-[0.98]"
-              >
+              <a href={settings.whatsappUrl} target="_blank" rel="noreferrer" className="border border-white/20 bg-white/5 backdrop-blur text-white h-12 px-7 rounded-full text-sm font-bold hover:border-accent hover:text-accent transition-colors flex items-center justify-center active:scale-[0.98]">
                 Nous contacter
               </a>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 pt-1">
-              {settings.trustBadges.map((badge) => (
-                <div
-                  key={badge}
-                  className="flex items-center gap-1.5 rounded-full bg-white/[0.07] backdrop-blur px-3 py-2 text-[11px] font-semibold text-white/75 border border-white/10"
-                >
-                  <span className="text-green-400">✓</span> {badge}
-                </div>
-              ))}
             </div>
           </div>
         </div>
@@ -157,9 +68,9 @@ export default function Hero() {
     );
   }
 
-  // ── Mode par défaut (sans bannière) : dégradé animé + carrousel ──
+  // ── Hero par défaut : centré, typographique, plein écran ──
   return (
-    <section className="relative min-h-[90svh] lg:min-h-[calc(100svh-140px)] flex items-center overflow-hidden py-10 sm:py-14 lg:py-20">
+    <section className="relative min-h-[88svh] flex items-center overflow-hidden py-16 sm:py-24">
       {/* Dégradé animé en fond */}
       <div
         className="absolute inset-0 anim-gradient pointer-events-none"
@@ -174,184 +85,87 @@ export default function Hero() {
         className="absolute bottom-8 left-[-6%] w-[320px] h-[320px] rounded-full bg-orange-200/40 blur-3xl anim-drift pointer-events-none"
         style={{ animationDelay: '6s' }}
       />
+      {/* Glow central subtil derrière le titre */}
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] rounded-full bg-accent/10 blur-3xl pointer-events-none" />
 
-      <div className="relative z-10 mx-auto max-w-6xl px-5 w-full">
-        <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center py-10 lg:py-0">
-          {/* Text */}
-          <div className="space-y-6 sm:space-y-7 min-w-0">
-            <div className="anim-fade-up opacity-0">
-              <span className="inline-flex items-center gap-2 bg-accent/10 text-accent rounded-full px-4 py-2 text-xs font-semibold">
-                <Sparkles size={13} />
-                {settings.heroBadge}
+      <div className="relative z-10 mx-auto max-w-4xl px-5 w-full text-center">
+        <div className="space-y-7 sm:space-y-8">
+          {/* Badge + kicker */}
+          <div className="anim-fade-up opacity-0 space-y-5">
+            <span className="inline-flex items-center gap-2 bg-accent/10 text-accent rounded-full px-4 py-2 text-xs font-bold">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-accent opacity-75 animate-ping" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-accent" />
               </span>
-            </div>
-
-            <h1 className="anim-fade-up opacity-0 delay-200 font-display text-[2.5rem] sm:text-6xl lg:text-7xl font-800 leading-[0.95] tracking-tight text-dark break-words">
-              {settings.heroTitleStart}{' '}
-              <span className="relative inline-block">
-                {settings.heroTitleHighlight}
-                <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 200 12" fill="none" preserveAspectRatio="none">
-                  <path d="M2 8c40-6 80-6 196-2" stroke="#e84d1a" strokeWidth="4" strokeLinecap="round" />
-                </svg>
-              </span>
-              .
-            </h1>
-
-            <p className="anim-fade-up opacity-0 delay-400 text-dark/60 text-base sm:text-lg max-w-md leading-relaxed">
-              {settings.heroDescription}
-            </p>
-
-            <p className="anim-fade-up opacity-0 delay-500 text-sm font-semibold text-dark/45">
-              {settings.heroSubnote}
-            </p>
-
-            <div className="anim-fade-up opacity-0 delay-600 flex flex-wrap gap-3">
-              <a
-                href="#shop"
-                className="bg-dark text-white px-7 h-12 rounded-full text-sm font-bold hover:bg-accent transition-colors shadow-lg shadow-dark/10 flex items-center justify-center active:scale-[0.98] anim-pulse-ring"
-              >
-                Voir le shop →
-              </a>
-              <a
-                href={settings.whatsappUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="border-2 border-dark/10 text-dark h-12 px-7 rounded-full text-sm font-bold hover:border-accent hover:text-accent transition-colors flex items-center justify-center active:scale-[0.98]"
-              >
-                Nous contacter
-              </a>
-            </div>
-
-            {/* Trust badges */}
-            <div className="anim-fade-up opacity-0 delay-700 flex flex-wrap items-center gap-2 pt-2">
-              {settings.trustBadges.map((badge) => (
-                <div
-                  key={badge}
-                  className="flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-2 text-[11px] font-semibold text-dark/50 border border-dark/5"
-                >
-                  <span className="text-green-500">✓</span> {badge}
-                </div>
-              ))}
-            </div>
-
-            {/* Preuve sociale : chiffres qui donnent envie */}
-            <div className="anim-fade-up opacity-0 delay-750 flex flex-wrap items-center gap-x-6 gap-y-2 pt-3 border-t border-dark/10">
-              {settings.reviewStats.map((s) => (
-                <div key={s.label} className="flex items-baseline gap-1.5">
-                  <span className="font-display font-800 text-xl text-dark">{s.value}</span>
-                  <span className="text-[11px] text-dark/40 font-semibold">{s.label}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* Honest opening note */}
-            <div className="anim-fade-up opacity-0 delay-800 flex items-center gap-2 pt-1">
-              <p className="text-xs text-dark/40 max-w-md">
-                <span className="font-bold text-dark/60">Géré à la main</span> — chaque pièce est vérifiée sur photo QC avant de partir.
-              </p>
-            </div>
+              {settings.heroBadge}
+            </span>
+            <span className="block text-[11px] font-bold uppercase tracking-[0.35em] text-dark/35">
+              Sneakers · Streetwear · Accessoires
+            </span>
           </div>
 
-          {/* Carrousel animé */}
-          <div className={`relative min-w-0 ${active ? 'lg:block' : 'hidden lg:block'} anim-fade-in opacity-0 delay-300`}>
-            <div className="relative flex justify-center">
-              {floatingBrands.map((b) => (
-                <div
-                  key={b.name}
-                  className="absolute bg-white shadow-lg shadow-dark/5 rounded-full px-4 py-2 text-[11px] font-bold text-dark/60 border border-dark/5 anim-float z-20 hidden xl:flex items-center"
-                  style={{
-                    top: b.top,
-                    left: b.left,
-                    right: b.right,
-                    animationDelay: b.delay,
-                  } as React.CSSProperties}
-                >
-                  {b.name}
-                </div>
-              ))}
+          {/* Titre */}
+          <h1 className="anim-fade-up opacity-0 delay-150 font-display text-5xl sm:text-7xl lg:text-8xl font-800 leading-[0.93] tracking-tight text-dark break-words">
+            {settings.heroTitleStart}{' '}
+            <span className="relative inline-block bg-clip-text text-transparent bg-gradient-to-r from-accent to-accent-light">
+              {settings.heroTitleHighlight}
+              <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 200 12" fill="none" preserveAspectRatio="none">
+                <path d="M2 8c40-6 80-6 196-2" stroke="#e84d1a" strokeWidth="4" strokeLinecap="round" />
+              </svg>
+            </span>
+            .
+          </h1>
 
-              <div className="relative">
-                <div className="aspect-[3/4] w-[min(380px,80vw)] rounded-[2rem] bg-gradient-to-br from-subtle to-white overflow-hidden flex items-center justify-center border border-dark/5 shadow-xl shadow-dark/5">
-                  {active ? (
-                    <div className="relative h-full w-full">
-                      {slides.map((s, i) => (
-                        <img
-                          key={s.imageUrl}
-                          src={s.imageUrl}
-                          alt={`${s.brand} ${s.name}`}
-                          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-1000 ${
-                            i === index ? 'opacity-100 anim-ken-burns' : 'opacity-0'
-                          }`}
-                          loading={i === 0 ? 'eager' : 'lazy'}
-                          decoding="async"
-                          fetchPriority={i === 0 ? 'high' : 'auto'}
-                          width={380}
-                          height={507}
-                        />
-                      ))}
-                      {slides.length > 1 && (
-                        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
-                          {slides.map((_, i) => (
-                            <span
-                              key={i}
-                              className={`h-1.5 rounded-full transition-all duration-300 ${
-                                i === index ? 'w-5 bg-white' : 'w-1.5 bg-white/40'
-                              }`}
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="relative w-full h-full flex items-center justify-center">
-                      <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-accent-light/5" />
-                      <div className="relative text-center space-y-4 p-8">
-                        <div className="mx-auto h-20 w-20 rounded-[1.5rem] bg-white shadow-xl shadow-dark/5 flex items-center justify-center">
-                          <AppleEmoji emoji="👟" size={44} className="mx-auto" />
-                        </div>
-                        <div>
-                          <p className="text-dark/30 text-xs font-bold uppercase tracking-widest mb-1">Drop de la semaine</p>
-                          <p className="text-dark/50 text-sm font-semibold">Découvre la sélection</p>
-                        </div>
-                        <a href="#shop" className="inline-flex items-center gap-1.5 bg-dark text-white text-xs font-bold px-5 py-2.5 rounded-full hover:bg-accent transition-colors">
-                          Voir <ArrowDown size={12} />
-                        </a>
-                      </div>
-                    </div>
-                  )}
-                </div>
-                {/* Floating badge */}
-                <div className="absolute -bottom-4 -left-4 bg-white rounded-2xl shadow-xl shadow-dark/5 px-4 sm:px-5 py-3 border border-dark/5 anim-float z-20">
-                  <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-xl bg-accent/10 flex items-center justify-center">
-                      <AppleEmoji emoji="🔥" size={22} />
-                    </div>
-                    <div>
-                      <div className="text-sm font-bold text-dark">{settings.heroStatValue}</div>
-                      <div className="text-[10px] text-dark/40 font-semibold">{settings.heroStatLabel}</div>
-                    </div>
-                  </div>
-                </div>
-                <div className="hidden sm:flex absolute -top-3 -right-3 bg-accent text-white rounded-xl px-4 py-2 text-xs font-bold shadow-lg shadow-accent/20 anim-float items-center gap-1.5 z-20" style={{ animationDelay: '2s' }}>
-                  {settings.heroTopBadge} <AppleEmoji emoji="🚀" size={14} />
-                </div>
+          {/* Description */}
+          <p className="anim-fade-up opacity-0 delay-300 text-dark/60 text-base sm:text-xl max-w-xl mx-auto leading-relaxed">
+            {settings.heroDescription}
+          </p>
+
+          {/* CTA */}
+          <div className="anim-fade-up opacity-0 delay-450 flex flex-wrap justify-center gap-3">
+            <a
+              href="#shop"
+              className="group bg-dark text-white pl-8 pr-6 h-14 rounded-full text-sm font-bold hover:bg-accent transition-colors shadow-lg shadow-dark/15 flex items-center justify-center gap-2 active:scale-[0.98] anim-pulse-ring"
+            >
+              Voir le shop
+              <ArrowRight size={16} strokeWidth={2.5} className="transition-transform group-hover:translate-x-0.5" />
+            </a>
+            <a
+              href={settings.whatsappUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="border-2 border-dark/10 text-dark h-14 px-8 rounded-full text-sm font-bold hover:border-accent hover:text-accent transition-colors flex items-center justify-center active:scale-[0.98]"
+            >
+              Nous contacter
+            </a>
+          </div>
+
+          {/* Trust badges */}
+          <div className="anim-fade-up opacity-0 delay-600 flex flex-wrap justify-center items-center gap-2">
+            {settings.trustBadges.map((badge) => (
+              <div
+                key={badge}
+                className="flex items-center gap-1.5 rounded-full bg-white/80 px-3 py-2 text-[11px] font-semibold text-dark/50 border border-dark/5"
+              >
+                <span className="text-green-500">✓</span> {badge}
               </div>
+            ))}
+          </div>
 
-              {/* Légende du produit affiché (effet lookbook) */}
-              {active && (
-                <div className="mt-5 flex items-center justify-center gap-2 text-center">
-                  <span className="text-[11px] font-bold uppercase tracking-widest text-accent">{active.brand}</span>
-                  <span className="h-1 w-1 rounded-full bg-dark/20" />
-                  <span className="text-sm font-semibold text-dark/70">{active.name}</span>
-                </div>
-              )}
-            </div>
+          {/* Preuve sociale */}
+          <div className="anim-fade-up opacity-0 delay-750 flex flex-wrap justify-center items-center gap-x-8 gap-y-3 pt-6 border-t border-dark/10">
+            {settings.reviewStats.map((s) => (
+              <div key={s.label} className="flex items-baseline gap-1.5">
+                <span className="font-display font-800 text-2xl text-dark">{s.value}</span>
+                <span className="text-xs text-dark/40 font-semibold">{s.label}</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
       {/* Scroll indicator */}
-      <div className="absolute bottom-28 sm:bottom-8 left-1/2 -translate-x-1/2">
+      <div className="absolute bottom-24 sm:bottom-8 left-1/2 -translate-x-1/2">
         <a href="#shop" aria-label="Défiler vers le shop" className="h-10 w-10 rounded-full bg-white/70 backdrop-blur border border-dark/5 flex items-center justify-center text-dark/30 hover:text-accent transition-colors">
           <ArrowDown size={16} strokeWidth={2.5} className="animate-bounce" />
         </a>

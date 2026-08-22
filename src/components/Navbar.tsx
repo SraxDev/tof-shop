@@ -156,6 +156,13 @@ export default function Navbar() {
                 </span>
               )}
             </button>
+            {/* CTA desktop : bouton de conversion directe */}
+            <a
+              href="#shop"
+              className="hidden md:inline-flex items-center h-11 px-5 rounded-full bg-dark text-white text-sm font-bold hover:bg-accent transition-colors"
+            >
+              Voir le shop
+            </a>
             <button
               onClick={() => setOpen(!open)}
               aria-label={open ? 'Fermer le menu' : 'Ouvrir le menu'}
@@ -213,8 +220,15 @@ export default function Navbar() {
             ))}
           </div>
 
-          <div className="p-6 pt-4 border-t border-dark/5 safe-bottom">
-            <p className="text-[11px] font-bold text-dark/30 uppercase tracking-[0.2em] mb-4">Nous contacter</p>
+          <div className="p-6 pt-4 border-t border-dark/5 safe-bottom space-y-4">
+            <a
+              href="#shop"
+              onClick={closeMenu}
+              className="flex items-center justify-center gap-2 bg-dark text-white h-14 rounded-full text-sm font-bold active:scale-[0.98] transition-transform"
+            >
+              <ShoppingBag size={16} strokeWidth={2.5} /> Voir le shop
+            </a>
+            <p className="text-[11px] font-bold text-dark/30 uppercase tracking-[0.2em]">Nous contacter</p>
             <div className="grid grid-cols-2 gap-3">
               <a href="#contact" onClick={closeMenu} className="bg-[#25D366]/10 p-4 rounded-2xl active:scale-95 transition-transform min-h-[88px] flex flex-col justify-between">
                 <p className="text-[11px] font-bold text-[#25D366] uppercase mb-1">WhatsApp</p>
