@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useState } from 'react';
+import { ExternalLink, LogOut } from 'lucide-react';
 import { useTwemoji } from './hooks/useTwemoji';
 import { hydrateSiteSettings } from './lib/siteSettings';
 import { resetSeo } from './lib/seo';
@@ -167,15 +168,25 @@ function AdminAccess() {
     <div className="bg-dark min-h-screen">
       <div className="sticky top-0 z-50 bg-dark/90 backdrop-blur-xl border-b border-white/10 safe-top">
         <div className="mx-auto max-w-6xl px-3 sm:px-5 py-3 sm:py-4 flex items-center justify-between gap-2">
-          <a href="#" className="font-display text-xl sm:text-2xl font-800 tracking-tight text-white">
-            tof<span className="text-accent">.</span> admin
+          <a href="#" className="font-display text-xl sm:text-2xl font-800 tracking-tight text-white shrink-0">
+            tof<span className="text-accent">.</span>{' '}
+            <span className="text-white/40 text-sm sm:text-base font-semibold">admin</span>
           </a>
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <a href="#" className="rounded-full bg-white/5 px-3 sm:px-4 py-2 h-10 flex items-center text-[11px] sm:text-xs font-semibold text-white/55 hover:text-white hover:bg-white/10 transition-colors">
-              Site
+          <div className="flex items-center gap-2">
+            <a
+              href="#"
+              className="inline-flex items-center gap-1.5 rounded-full bg-white/5 px-3 sm:px-4 h-10 text-[11px] sm:text-xs font-semibold text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+            >
+              <ExternalLink size={14} />
+              <span>Voir le site</span>
             </a>
-            <button onClick={logout} className="rounded-full bg-accent px-3 sm:px-4 py-2 h-10 flex items-center text-[11px] sm:text-xs font-semibold text-white hover:bg-accent-light transition-colors">
-              Deco
+            <button
+              onClick={logout}
+              className="inline-flex items-center gap-1.5 rounded-full bg-accent px-3 sm:px-4 h-10 text-[11px] sm:text-xs font-semibold text-white hover:bg-accent-light transition-colors"
+            >
+              <LogOut size={14} />
+              <span className="hidden sm:inline">Déconnexion</span>
+              <span className="sm:hidden">Déco</span>
             </button>
           </div>
         </div>

@@ -3,7 +3,8 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Copy, ExternalLink, Package, Pencil, Plus, RotateCcw, Save, Search, Send,
   Trash2, Truck, X, ArrowUpDown, Flame, ArrowLeft, Calculator, Bell, BellOff, Download,
-  ChevronUp, ChevronDown, Zap,
+  ChevronUp, ChevronDown, Zap, LayoutDashboard, ShoppingCart, Shirt,
+  Tags, Settings, MessageSquare, StickyNote, Layers,
 } from 'lucide-react';
 import { defaultDrop, type FeaturedDropConfig } from './FeaturedDrop';
 import { defaultSettings, readSiteSettings, saveSiteSettings, hydrateSiteSettings, type SiteSettings } from '../lib/siteSettings';
@@ -3223,26 +3224,28 @@ export default function AdminPanel() {
 
         <div className="sticky top-[72px] sm:top-[76px] z-40 -mx-3 sm:-mx-5 px-3 sm:px-5 pt-3 pb-2 bg-dark/90 backdrop-blur-xl flex gap-2 overflow-x-auto -mt-3 mb-4 scrollbar-thin">
           {[
-            { id: 'dashboard', label: 'Dashboard' },
-            { id: 'orders', label: 'Commandes', badge: ordersNeedingAction },
-            { id: 'products', label: 'Produits & liens' },
-            { id: 'outfits', label: 'Outfits' },
-            { id: 'drop', label: 'Drop semaine' },
-            { id: 'promos', label: 'Promos' },
-            { id: 'settings', label: 'Réglages' },
-            { id: 'chat', label: 'Chat' },
-            { id: 'notes', label: 'Notes & idées' },
-            { id: 'estimate', label: 'Estimation livraison' },
+            { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+            { id: 'orders', label: 'Commandes', badge: ordersNeedingAction, icon: ShoppingCart },
+            { id: 'products', label: 'Produits', icon: Shirt },
+            { id: 'outfits', label: 'Outfits', icon: Layers },
+            { id: 'drop', label: 'Drop semaine', icon: Flame },
+            { id: 'promos', label: 'Promos', icon: Tags },
+            { id: 'settings', label: 'Réglages', icon: Settings },
+            { id: 'chat', label: 'Chat', icon: MessageSquare },
+            { id: 'notes', label: 'Notes', icon: StickyNote },
+            { id: 'estimate', label: 'Estimation', icon: Calculator },
           ].map((tab) => {
             const isActive = activeTab === tab.id;
+            const Icon = tab.icon;
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                className={`relative rounded-full px-4 py-2.5 text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap flex-shrink-0 inline-flex items-center gap-2 ${
-                  isActive ? 'bg-accent text-white' : 'bg-white/5 text-white/45 hover:bg-white/10'
+                className={`relative rounded-full px-3.5 py-2.5 text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap flex-shrink-0 inline-flex items-center gap-2 ${
+                  isActive ? 'bg-accent text-white' : 'bg-white/5 text-white/45 hover:bg-white/10 hover:text-white/70'
                 }`}
               >
+                <Icon size={15} strokeWidth={2.2} className={isActive ? '' : 'text-white/40'} />
                 <span>{tab.label}</span>
                 {tab.badge && tab.badge > 0 && (
                   <span className={`h-5 min-w-5 px-1.5 rounded-full text-[10px] font-800 inline-flex items-center justify-center ${

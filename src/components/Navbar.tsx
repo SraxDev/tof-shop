@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Menu, X, ShoppingBag } from 'lucide-react';
+import { Menu, X, ShoppingBag, Store, Flame, PackageSearch, HelpCircle, Info, MessageCircle } from 'lucide-react';
 import { readCart, cartCount } from '../lib/cart';
 import CartDrawer from './CartDrawer';
 
-const NAV_LINKS: Array<{ label: string; href: string }> = [
-  { label: 'Shop', href: '#shop' },
-  { label: 'Drop', href: '#drop' },
-  { label: 'Suivi', href: '#suivi' },
-  { label: 'FAQ', href: '#faq' },
-  { label: 'À propos', href: '#apropos' },
-  { label: 'Contact', href: '#contact' },
+const NAV_LINKS: Array<{ label: string; href: string; icon: typeof Store }> = [
+  { label: 'Shop', href: '#shop', icon: Store },
+  { label: 'Drop', href: '#drop', icon: Flame },
+  { label: 'Suivi', href: '#suivi', icon: PackageSearch },
+  { label: 'FAQ', href: '#faq', icon: HelpCircle },
+  { label: 'À propos', href: '#apropos', icon: Info },
+  { label: 'Contact', href: '#contact', icon: MessageCircle },
 ];
 
 function getSectionIds() {
@@ -114,11 +114,11 @@ export default function Navbar() {
           aria-hidden
         />
         <div className="mx-auto max-w-6xl flex items-center justify-between px-5 py-3.5 sm:py-4">
-          <a href="#" onClick={closeMenu} className="font-display text-3xl font-800 tracking-tight text-dark select-none">
+          <a href="#" onClick={closeMenu} className="font-display text-3xl font-800 tracking-tight text-dark select-none shrink-0">
             tof<span className="text-accent">.</span>
           </a>
 
-          <div className="hidden md:flex items-center gap-1">
+          <div className="hidden md:flex items-center gap-1 absolute left-1/2 -translate-x-1/2">
             {NAV_LINKS.map((l) => {
               const id = l.href.replace('#', '');
               const active = activeAnchor === id;
@@ -127,13 +127,10 @@ export default function Navbar() {
                   key={l.label}
                   href={l.href}
                   className={`relative px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                    active ? 'text-dark' : 'text-dark/55 hover:text-accent'
+                    active ? 'bg-dark/5 text-dark font-semibold' : 'text-dark/55 hover:text-accent hover:bg-dark/5'
                   }`}
                 >
                   {l.label}
-                  {active && (
-                    <span className="absolute left-4 right-4 -bottom-0.5 h-[2px] bg-accent rounded-full" />
-                  )}
                 </a>
               );
             })}
@@ -203,21 +200,27 @@ export default function Navbar() {
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-2">
-            {NAV_LINKS.map((l, i) => (
-              <a
-                key={l.label}
-                href={l.href}
-                onClick={closeMenu}
-                className="flex items-center justify-between text-4xl font-display font-800 text-dark hover:text-accent transition-colors py-2"
-                style={{
-                  animation: open ? `slide-up 0.4s cubic-bezier(0.22,1,0.36,1) ${i * 0.05 + 0.08}s both` : 'none',
-                }}
-              >
-                <span>{l.label}</span>
-                <span className="text-accent text-2xl">→</span>
-              </a>
-            ))}
+          <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-1">
+            {NAV_LINKS.map((l, i) => {
+              const Icon = l.icon;
+              return (
+                <a
+                  key={l.label}
+                  href={l.href}
+                  onClick={closeMenu}
+                  className="group flex items-center gap-4 py-2.5 text-3xl font-display font-800 text-dark hover:text-accent transition-colors"
+                  style={{
+                    animation: open ? `slide-up 0.4s cubic-bezier(0.22,1,0.36,1) ${i * 0.05 + 0.08}s both` : 'none',
+                  }}
+                >
+                  <span className="h-11 w-11 rounded-2xl bg-dark/5 group-hover:bg-accent/10 flex items-center justify-center text-dark/50 group-hover:text-accent transition-colors shrink-0">
+                    <Icon size={20} strokeWidth={2} />
+                  </span>
+                  <span>{l.label}</span>
+                  <span className="ml-auto text-accent text-xl opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all">→</span>
+                </a>
+              );
+            })}
           </div>
 
           <div className="p-6 pt-4 border-t border-dark/5 safe-bottom space-y-4">
